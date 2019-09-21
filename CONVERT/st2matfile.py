@@ -1,6 +1,6 @@
 def st2matfile(st):
     for i, tr in enumerate(st):
-        mdict = {k: str(v) for k, v in tr.stats.iteritems()}
+        mdict = {k: str(v) for k, v in tr.stats.items()}
         mdict['data'] = tr.data
         mdict['sampling_rate'] = tr.stats.sampling_rate
         mdict['network'] = tr.stats.network

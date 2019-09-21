@@ -8,19 +8,19 @@ from os import walk
 #sys.path.insert(0, '/home/t/thompsong/Desktop')
 
 def main():
-	# read in the wav file name from the command line
-	fileroot = sys.argv[1]
-	files = []
-	for (dirpath, dirnames, filenames) in walk(fileroot):
-    		files.extend(filenames)
-    		break
+    # read in the wav file name from the command line
+    fileroot = sys.argv[1]
+    files = []
+    for (dirpath, dirnames, filenames) in walk(fileroot):
+            files.extend(filenames)
+            break
 
-	i = 1
-	for f in sorted(files):
-		if sys.argv[2] in f:
-			fullpath = fileroot + "/" + f
-			print "#%06d\t%s" % (i, fullpath)
-			i += 1
-	
+    i = 1
+    for f in sorted(files):
+        if sys.argv[2] in f:
+            fullpath = fileroot + "/" + f
+            print("#%06d\t%s" % (i, fullpath))
+            i += 1
+    
 if __name__ == "__main__":
     main()

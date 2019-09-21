@@ -26,30 +26,30 @@ class CSS_Event(object):
 
     def __init__(self, evid=1, evname=None, prefor=None, auth=None, commid=None, lddate=None):
         """ initialise an empty Event object """
-	print "Creating CSS Event object"
+    print "Creating CSS Event object"
         self.evid = evid
-	self.evname = evname
+    self.evname = evname
         self.prefor = prefor 
-	self.auth = auth
+    self.auth = auth
         self.commid = commid
-	self.lddate = lddate
-	self.origins = list()
+    self.lddate = lddate
+    self.origins = list()
 
     def __str__(self):
         """ print out the attributes of an event object """
-	str = "CSS Event object with attributes:\n"
-	str += "\tevid: %d\n" % self.evid
-	if self.evname:
-		str += "\tevname: %s\n" % self.evname
-	if self.prefor:
-		str += "\tprefor: %d\n" % self.prefor
-	if self.auth:
-		str += "\tauth: %s\n" % self.auth
-	if self.commid:
-		str += "\tcommid: %d\n" % self.commid
-	if self.lddate:
-		str += "\tlddate: %f\n" % self.lddate
-	return str
+    str = "CSS Event object with attributes:\n"
+    str += "\tevid: %d\n" % self.evid
+    if self.evname:
+        str += "\tevname: %s\n" % self.evname
+    if self.prefor:
+        str += "\tprefor: %d\n" % self.prefor
+    if self.auth:
+        str += "\tauth: %s\n" % self.auth
+    if self.commid:
+        str += "\tcommid: %d\n" % self.commid
+    if self.lddate:
+        str += "\tlddate: %f\n" % self.lddate
+    return str
 
     def add_origin(self, originobject):
         self.origins.append(originobject)
@@ -57,45 +57,45 @@ class CSS_Event(object):
 #    def read_event(dbname, evid):
 
      def parse(self, line):
-    	"""
-	Parse a line of a CSS Event table and return a CSS_Event object
+        """
+    Parse a line of a CSS Event table and return a CSS_Event object
 
-	The format of an Antelope/CSS3.0 schema event table is taken from $ANTELOPE/data/schemas/css3.0
-	(part of the commercial Antelope system)
+    The format of an Antelope/CSS3.0 schema event table is taken from $ANTELOPE/data/schemas/css3.0
+    (part of the commercial Antelope system)
 
         Fields ( evid evname prefor auth commid lddate )
-		evid [0-7] - integer(%8ld), null -1, evid>0
-		evname [8-22] - string(%-15s), null -
-		prefor [23-30]  - integer(%8ld), null -1, prefor>0
-		auth [31-45] - string(%-15s), null -
-		commid [46-53] - integer(%8ld), null -1, commid>0
-		lddate [54-70] - time(%17.5f), null -9999999999.99900, epoch seconds
-    	"""
+        evid [0-7] - integer(%8ld), null -1, evid>0
+        evname [8-22] - string(%-15s), null -
+        prefor [23-30]  - integer(%8ld), null -1, prefor>0
+        auth [31-45] - string(%-15s), null -
+        commid [46-53] - integer(%8ld), null -1, commid>0
+        lddate [54-70] - time(%17.5f), null -9999999999.99900, epoch seconds
+        """
 
-	try:
-		self.evid = int(line[0:8])
-		self.evname = line[8:23].strip().decode()
-		self.prefor = int(line[23:31])
-		self.auth = line[31:46].strip().decode()
-		self.commid = int(line[46:54])
-		self.lddate = float(line[54:])
+    try:
+        self.evid = int(line[0:8])
+        self.evname = line[8:23].strip().decode()
+        self.prefor = int(line[23:31])
+        self.auth = line[31:46].strip().decode()
+        self.commid = int(line[46:54])
+        self.lddate = float(line[54:])
 
-		# check for nulls
-		if self.evid == NULLID:
-			self.evid = None
-		if self.evname == NULLSTRING:
-			self.evname = None
-		if self.prefor == NULLID
-			self.prefor = None
-		if self.auth == NULLSTRING:
-			self.auth = None
-		if self.commid == NULLID
-			self.commid = None
-		if self.lddate == NULLTIME
-			self.lddate = None
+        # check for nulls
+        if self.evid == NULLID:
+            self.evid = None
+        if self.evname == NULLSTRING:
+            self.evname = None
+        if self.prefor == NULLID
+            self.prefor = None
+        if self.auth == NULLSTRING:
+            self.auth = None
+        if self.commid == NULLID
+            self.commid = None
+        if self.lddate == NULLTIME
+            self.lddate = None
 
-	except:
-		print "Error reading event from line: %s" % line
+    except:
+        print "Error reading event from line: %s" % line
 
 
 

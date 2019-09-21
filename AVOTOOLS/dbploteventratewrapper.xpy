@@ -3,7 +3,7 @@ AVOSEIS=os.getenv("AVOSEIS");
 sys.path.append(AVOSEIS + "/bin")
 import antelope.datascope as datascope
 import matplotlib as mpl
-if 'DISPLAY' in os.environ.keys():
+if 'DISPLAY' in list(os.environ.keys()):
         mpl.use("Agg")
 #import numpy as np
 import matplotlib.pyplot as plt
@@ -15,16 +15,16 @@ import dbploteventrate
 ######################################################
 
 def usage():
-        print 'Usage: '+sys.argv[0]+' <catalogpath> <dbplacespath> <outputdir>'
-        print """
+        print('Usage: '+sys.argv[0]+' <catalogpath> <dbplacespath> <outputdir>')
+        print("""
         <catalogpath> must have an origin and event table present
         <dbplacespath> is a list of volcanoes and their lat, lon, elev and radii in places_avo_1.3 schema format
         <outputdir> is the directory to save png files to 
-        """
-        print """\nExample:
+        """)
+        print("""\nExample:
         produce month, year and all dbploteventrate plots from the AVO Catalog for each volcano in the volcanoes_avo database \n
         %s /Seis/Kiska4/picks/Total/Total volcanoes_avo /usr/local/mosaic/AVO/avoseis/counts
-        """ % (sys.argv[0])
+        """ % (sys.argv[0]))
 
 def main(argv=None):
         try:
@@ -35,8 +35,8 @@ def main(argv=None):
                 catalogpath = args[0]
                 dbplacespath = args[1]
                 outdir = args[2]
-        except getopt.GetoptError,e:
-                print e
+        except getopt.GetoptError as e:
+                print(e)
                 usage()
                 sys.exit(2)
 
@@ -53,9 +53,9 @@ def main(argv=None):
                         assert False, "unhandled option"
 
         if verbose:
-                print "catalogpath = " + catalogpath
-                print "dbplacespath = " + dbplacespath
-                print "outdir = " + outdir
+                print("catalogpath = " + catalogpath)
+                print("dbplacespath = " + dbplacespath)
+                print("outdir = " + outdir)
 
         # time now
         datetimenow = datetime.datetime.now() # datetime
@@ -63,58 +63,58 @@ def main(argv=None):
         epochnow = datascope.stock.now()
         #datenumnow = mpl.dates.epoch2num(epochnow) # datenumber
         secsperday = 60 * 60 * 24
-	daysperyear = 365
-	dayspermonth = 30
+    daysperyear = 365
+    dayspermonth = 30
         epoch1989 = 599616000
 
-	# epoch at start and end today
-	epochtodaystart = (epochnow // secsperday) * secsperday
-	epochtodayend = epochtodaystart + secsperday
-	
-	# datenum start and end time
-	enum = mpl.dates.epoch2num(epochtodayend)
-	epoch1yearago = epochtodaystart - (secsperday * daysperyear)
-	epoch1monthago = epochtodaystart - (secsperday * dayspermonth)
-	snum1yearago = mpl.dates.epoch2num(epoch1yearago)
-	snum1monthago = mpl.dates.epoch2num(epoch1monthago)
-	
+    # epoch at start and end today
+    epochtodaystart = (epochnow // secsperday) * secsperday
+    epochtodayend = epochtodaystart + secsperday
+    
+    # datenum start and end time
+    enum = mpl.dates.epoch2num(epochtodayend)
+    epoch1yearago = epochtodaystart - (secsperday * daysperyear)
+    epoch1monthago = epochtodaystart - (secsperday * dayspermonth)
+    snum1yearago = mpl.dates.epoch2num(epoch1yearago)
+    snum1monthago = mpl.dates.epoch2num(epoch1monthago)
+    
         dictplaces = modgiseis.readplacesdb(dbplacespath)
         place = dictplaces['place']
         lat = dictplaces['lat']
         lon = dictplaces['lon']
         radius = dictplaces['radius']
-	n = place.__len__()
-	if n > 0:
-		print "- number of places = {}".format(n)
-	
-		for c in range(n):
-	
-			# LAST MONTH
-			monthfile = outdir + "/" + place[c] + "_month.png"
-			if os.path.exists(monthfile):
-				os.remove(monthfile)
-			subset_expr = "time > %f && deg2km(distance(lat, lon, %s, %s))<%s" % (epoch1monthago, lat[c], lon[c], radius[c])
-			dbploteventrate.main([catalogpath, monthfile, subset_expr, snum1monthago, enum])
-	
-	
-			# LAST YEAR
-			yearfile = outdir + "/" + place[c] + "_year.png"
-			if os.path.exists(yearfile):
-				os.remove(yearfile)
-			subset_expr = "time > %f && deg2km(distance(lat, lon, %s, %s))<%s" % (epoch1yearago, lat[c], lon[c], radius[c])
-			dbploteventrate.main([catalogpath, yearfile, subset_expr, snum1yearago, enum])
-	
-			# TOTAL
-			totalfile = outdir + "/" + place[c] + "_total.png"
-			if os.path.exists(totalfile):
-				os.remove(totalfile)
-			subset_expr = "time > %f && deg2km(distance(lat, lon, %s, %s))<%s" % (epoch1989, lat[c], lon[c], radius[c])
-			dbploteventrate.main([catalogpath, totalfile, subset_expr])
+    n = place.__len__()
+    if n > 0:
+        print("- number of places = {}".format(n))
+    
+        for c in range(n):
+    
+            # LAST MONTH
+            monthfile = outdir + "/" + place[c] + "_month.png"
+            if os.path.exists(monthfile):
+                os.remove(monthfile)
+            subset_expr = "time > %f && deg2km(distance(lat, lon, %s, %s))<%s" % (epoch1monthago, lat[c], lon[c], radius[c])
+            dbploteventrate.main([catalogpath, monthfile, subset_expr, snum1monthago, enum])
+    
+    
+            # LAST YEAR
+            yearfile = outdir + "/" + place[c] + "_year.png"
+            if os.path.exists(yearfile):
+                os.remove(yearfile)
+            subset_expr = "time > %f && deg2km(distance(lat, lon, %s, %s))<%s" % (epoch1yearago, lat[c], lon[c], radius[c])
+            dbploteventrate.main([catalogpath, yearfile, subset_expr, snum1yearago, enum])
+    
+            # TOTAL
+            totalfile = outdir + "/" + place[c] + "_total.png"
+            if os.path.exists(totalfile):
+                os.remove(totalfile)
+            subset_expr = "time > %f && deg2km(distance(lat, lon, %s, %s))<%s" % (epoch1989, lat[c], lon[c], radius[c])
+            dbploteventrate.main([catalogpath, totalfile, subset_expr])
 
 
         ############
 
-        print "Done.\n"
+        print("Done.\n")
 
 
 if __name__ == "__main__":

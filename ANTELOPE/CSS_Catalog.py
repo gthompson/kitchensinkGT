@@ -42,9 +42,74 @@ import os
 from obspy import UTCDateTime
 import datetime
 from obspy.core.event import Catalog, Event, Origin, Magnitude, ResourceIdentifier, CreationInfo
-from obspy.core.util.geodetics import FlinnEngdahl
+from obspy.geodetics import FlinnEngdahl
 VERBOSE = False
+ANTELOPE_INSTALLED = False
+try:
+    from antelope.datascope import *
+    ANTELOPE_INSTALLED = True
+except:
+    # module doesn't exist, deal with it.
+    print("antelope.datascope not installed")
 
+class CSS_Catalog(object):
+    """
+    CSS_Catalog class
+    Blueprint for CSS3.0 catalog objects
+    """
+
+    def __init__(self):
+        """ initialise an empty Event object """
+        if VERBOSE:
+            print("Creating CSS Catalog object")
+        self.events = list()
+        self.source = None
+
+    def __str__(self):
+        """ print out the attributes of a catalog object """
+        str = "CSS Catalog object:\n"
+        str += "\tnumber of events: %d\n" % len(self.events)
+        if self.source:
+            str += "\tsource: %s\n" % self.source
+        return str
+
+    def import_antelope(self, table, expr=""):
+        """ load a catalog using Antelope/Datascope tools """
+        """ if an event table is given, it will be joined to origin on prefor """
+        """ if an origin table is given, it is assumed there is no event table """
+        print("IMPORT ANTELOPE")
+        parts = table.split('.')
+        dbname = parts[0]
+        self.source = dbname
+        db = dbopen(dbname, 'r')
+        dbo = dbopen_table(db, 'origin')
+        if parts[1]=='event':
+            dbe = dbopen_table(db, 'event')
+            dbj = dbjoin(dbe, dbo)
+            dbs = dbsubset(dbj, 'orid == prefor')
+        elif parts[1]=='origin':
+            dbs = dbo
+        nrecs = dbquery(dbs, 'dbRECORD_COUNT')
+        for i in range(nrecs):
+            dbs[3] = i-1
+            e = CSS_Event()
+            if parts[1]=='event':
+                [e.evid, e.evname, e.prefor, e.auth, e.commid, e.lddate] = \
+                 dbgetv(dbs, 'evid', 'evname', 'prefor', 'event.auth', 'event.commid', 
+                  'event.lddate')
+            elif parts[1]=='origin':
+                e.evid = o.evid
+                e.prefor = o.orid
+            o = CSS_Origin()
+            [o.lat, o.lon, o.depth, o.time, o.orid, o.evid, o.jdate, o.nass,
+             o.ndef, o.ndp, o.grn, o.srn, o.etype, o.review, o.depdp, 
+             o.mb, o.mbid, o.ms, o.msid, o.ml, o.mlid, o.algorithm, 
+             o.auth, o.commid, o.lddate] = \
+             dbgetv(dbs, 'lat', 'lon', 'depth', 'time', 'orid', 'origin.evid', 'jdate',
+              'nass', 'ndef', 'ndp', 'grn', 'srn', 'etype', 'review', 'depdp',
+              'mb', 'mbid', 'ms', 'msid', 'ml', 'mlid', 'algorithm',
+              'origin.auth', 'origin.commid', 'origin.lddate')
+            e.origins.append(o)
 def parse_attribute(line, length, ptr, attribute_type):
     """
     function [pend, var] = parse_attribute(line, length, ptr, attribute_type)
@@ -117,23 +182,11 @@ def read_table(table):
     """
     lines = list()
     with open(table, "r") as fh:
-        print "Opening %s" % table
+        print("Opening %s" % table)
         lines = fh.readlines()
-        print "- got %d lines" % len(lines)
+        print("- got %d lines" % len(lines))
     return lines
 
-def is_antelope_installed():
-    """
-    check if antelope/datascope libraries available
-    """
-    return False
-    try:
-        from antelope.datascope import *
-        return True
-    #except ImportError, e:
-    except:
-        # module doesn't exist, deal with it.
-        return False
 
 class CSS_Catalog(object):
     """
@@ -144,7 +197,7 @@ class CSS_Catalog(object):
     def __init__(self):
         """ initialise an empty Event object """
         if VERBOSE:
-            print "Creating CSS Catalog object"
+            print("Creating CSS Catalog object")
         self.events = list()
         self.source = None
 
@@ -160,7 +213,7 @@ class CSS_Catalog(object):
         """ load a catalog using Antelope/Datascope tools """
         """ if an event table is given, it will be joined to origin on prefor """
         """ if an origin table is given, it is assumed there is no event table """
-        print "IMPORT ANTELOPE"
+        print("IMPORT ANTELOPE")
         parts = table.split('.')
         dbname = parts[0]
         self.source = dbname
@@ -201,7 +254,7 @@ class CSS_Catalog(object):
         read a CSS3.0 event table into a catalog object
         """
         # if Antelope is installed, we can use the easier Datascope methods
-        #if is_antelope_installed():
+        #if ANTELOPE_INSTALLED:
         #    import_antelope(table)
         #    return
         lines = read_table(table)
@@ -209,7 +262,7 @@ class CSS_Catalog(object):
         for line in lines:
             line_num += 1
             if VERBOSE:
-                print "Processing line %d" % line_num
+                print("Processing line %d" % line_num)
             e = CSS_Event()        # instantiate blank event object
             e.parse(line)          # parse line for this event
             self.events.append(e)  # append event to catalog
@@ -222,7 +275,7 @@ class CSS_Catalog(object):
         since origin objects cannot connect directly to catalog objects
         """
         # if Antelope is installed, we can use the easier Datascope methods
-        #if is_antelope_installed():
+        #if ANTELOPE_INSTALLED:
         #    import_antelope(table)
         #    return
         lines = read_table(table)
@@ -230,7 +283,7 @@ class CSS_Catalog(object):
         for line in lines:
             line_num += 1
             if VERBOSE:
-                print "processing line %d" % line_num
+                print("processing line %d" % line_num)
             o = CSS_Origin()
             o.parse(line)
             if o.evid is None:
@@ -250,7 +303,7 @@ class CSS_Catalog(object):
         if(os.path.exists(event_table)):
             self.read_event_table(event_table)
         else:
-            print "Event table %s does not exist" % event_table  
+            print("Event table %s does not exist" % event_table)  
             origin_table = os.path.join(dbname + '.origin')
             if(os.path.exists(origin_table)):
                 self.read_origin_table(origin_table)
@@ -343,7 +396,7 @@ class CSS_Catalog(object):
 
     def to_antelope(self, dbname):
         """ export CSS_Catalog as an Antelope origin table """
-        if not is_antelope_installed():
+        if not ANTELOPE_INSTALLED:
             return
         db = dbopen(dbname, 'a+')
         dbo = dbopen_table(db + '.origin', 'a+')
@@ -382,7 +435,7 @@ class CSS_Event(object):
     def __init__(self, evid=1, evname=None, prefor=None, auth=None, commid=None, lddate=None):
         """ initialise an empty Event object """
         if VERBOSE:
-            print "Creating CSS Event object"
+            print("Creating CSS Event object")
         self.evid = evid
         self.evname = evname
         self.prefor = prefor 
@@ -441,7 +494,7 @@ class CSS_Event(object):
             if self.lddate == NULLTIME:
                 self.lddate = None
         except:
-            print "Error reading event from line: %s" % line
+            print("Error reading event from line: %s" % line)
 
 class CSS_Origin(object):
     """
@@ -487,7 +540,7 @@ class CSS_Origin(object):
         depdp=None, dtype=None, algorithm=None, auth=None, commid=None, lddate=None):
         """ initialise an empty Origin object """
         if VERBOSE:
-            print "Creating CSS Origin object"
+            print("Creating CSS Origin object")
         self.lat = lat
         self.lon = lon
         self.depth = depth
@@ -616,7 +669,7 @@ class CSS_Origin(object):
             ptr, self.commid = parse_attribute(line, 8, ptr+1, 'i')
             ptr, self.lddate = parse_attribute(line, 17, ptr+1, 't')
         except:
-            print "Error parsing origin from line\n: %s" % line
+            print("Error parsing origin from line\n: %s" % line)
         return
 
 if __name__ == "__main__":
@@ -626,14 +679,14 @@ if __name__ == "__main__":
     c.read('/opt/antelope/data/db/demo/demo')
 
     # Inspect it
-    print c.events[0]
-    print c.events[0].origins[0]
+    print(c.events[0])
+    print(c.events[0].origins[0])
 
     # export the CSS_Catalog object to an ObsPy Catalog object
     c2 = c.to_obspy()
-    print c2
-    print c2.events[0]
-    print c2.events[0].origins[0]
+    print(c2)
+    print(c2.events[0])
+    print(c2.events[0].origins[0])
 
     # write the ObsPy Catalog object to QuakeML
     c2.write("/tmp/my_custom_events.xml", format="QUAKEML")

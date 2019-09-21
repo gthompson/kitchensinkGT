@@ -244,14 +244,14 @@ def compute_bins(dictorigin, snum=None, enum=None, binsize=None):
     else: # the usual case
         # roundoff the start and end times based on the binsize
         if snum==None and enum==None:
-            print "snum and enum undefined - calculating"
+            print("snum and enum undefined - calculating")
             snum = floor(snum, binsize) # start time
             enum = ceil(enum, binsize) # end time
         #bins = np.arange(snum, enum+binsize, binsize)
         bins = np.arange(enum, snum-binsize, -binsize)
         bins = bins[::-1]
 
-    print 'snum: %s' % datenum2datestr(snum)
-    print 'enum: %s' % datenum2datestr(enum)
+    print('snum: %s' % datenum2datestr(snum))
+    print('enum: %s' % datenum2datestr(enum))
     return bins, snum, enum
 

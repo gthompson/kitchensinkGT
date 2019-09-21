@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import obspy.core
 from scipy import stats
 from obspy.core.stream import Stream
-from __future__ import print_function
-from __future__ import unicode_literals
+
+
 from future import standard_library  # NOQA
 from future.builtins import zip
 from future.builtins import range
@@ -133,7 +133,7 @@ class StreamGT(Stream):
              ymax = np.max(np.abs(y))
              yrms = nanrms(y)
              ystd = stats.nanstd(y)
-             print "%s.%s | %8.1e %8.1e %8.1e %8.1e" % (st[i].stats.station, st[i].stats.channel, ymax, yrms, ystd, offset)
+             print("%s.%s | %8.1e %8.1e %8.1e %8.1e" % (st[i].stats.station, st[i].stats.channel, ymax, yrms, ystd, offset))
 
     def nanrms(x, axis=None):
         return np.sqrt(stats.nanmean(x**2, axis=axis))

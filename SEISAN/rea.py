@@ -138,7 +138,7 @@ class REA:
       rea_fh.close()
       return lines
     except IOError:
-      print("Error: The specified file does not exist - %s" % (self.file))
+      print(("Error: The specified file does not exist - %s" % (self.file)))
       raise e
 
   def write_sfile(self,lines):
@@ -148,7 +148,7 @@ class REA:
         rea_fh.write("%s\n" % (line))
       rea_fh.close()
     except IOError:
-      print("Error: The specified file does not exist - %s" % (self.file))
+      print(("Error: The specified file does not exist - %s" % (self.file)))
       raise e
   
   def print_sfile(self,lines):

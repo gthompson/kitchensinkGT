@@ -19,13 +19,13 @@ class origin(object):
     def __str__(self):
         """ print out the attributes of an origin object """
         #print 'orid = %d' % self.orid, ', time = %s' % self.datetime, ', %s' % self.location, ', ml = %4.1f' % self.ml
-        print 'orid = %d' % self.orid, ', time = %s' % self.datetime, ', ml = %4.1f' % self.ml           
+        print('orid = %d' % self.orid, ', time = %s' % self.datetime, ', ml = %4.1f' % self.ml)           
 
 if __name__ == "__main__":
     import random
     l = [origin(), origin(2, 1200000000, random.random() * 360 - 180, random.random() * 180 - 90, random.random() * 30, 2.5)]
     for i in range(len(l)):
-        print l[i].__str__()
-    print l[1]
+        print(l[i].__str__())
+    print(l[1])
     
 

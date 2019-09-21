@@ -1,11 +1,11 @@
 #!/raid/apps/OBSPY/bin/python
 from obspy.core import read
 st = read('http://examples.obspy.org/RJOB_061005_072159.ehz.new')
-print st
+print(st)
 len(st)
 tr = st[0]  
-print tr
-print tr.stats
+print(tr)
+print(tr.stats)
 tr.stats.station
 tr.data
 len(tr)

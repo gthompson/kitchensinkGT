@@ -19,7 +19,7 @@ def main():
     linenum = 0 
     while True:
         thisfile = line[6:].strip()
-        choice = raw_input(line + "? ")
+        choice = input(line + "? ")
         if choice == 'n':
             continue
     
@@ -30,16 +30,16 @@ def main():
             mulplt(thisfile)
 
         elif choice == 'h':
-            print "Menu:"
-            print "\tf = first event"
-            print "\tn = next event"
-            print "\tp = previous event"
-            print "\tl = last event"
-            print "\tw = plot waveform file(s)"
-            print "\ts = show Sfile"
-            print "\ta = show AEFfile"
-            print "\tq = quit"
-	    print " "
+            print("Menu:")
+            print("\tf = first event")
+            print("\tn = next event")
+            print("\tp = previous event")
+            print("\tl = last event")
+            print("\tw = plot waveform file(s)")
+            print("\ts = show Sfile")
+            print("\ta = show AEFfile")
+            print("\tq = quit")
+        print(" ")
 
         elif choice == 'q':
             break

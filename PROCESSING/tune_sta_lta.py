@@ -56,7 +56,7 @@ tsl.tune_sta_lta(tr, algorithm, tsignalstart, tsignalend, ntrys)
     # LTA window cannot be longer than 30% of the overall time window
     MAX_SECONDS = int(0.3 * tr.stats.npts / df)
 
-    print '\nAlgorithm: %s' % algorithm
+    print('\nAlgorithm: %s' % algorithm)
     m = 1.0
     sta_best = 0
     lta_best = 0
@@ -67,7 +67,7 @@ tsl.tune_sta_lta(tr, algorithm, tsignalstart, tsignalend, ntrys)
         # draw LTA window length uniform distribution of 2 to 10 times the STA window length
         lta_seconds = sta_seconds * round(2+random.random()*8,0)
         if lta_seconds > MAX_SECONDS:
-	     lta_seconds = MAX_SECONDS
+         lta_seconds = MAX_SECONDS
 
         staltaratio = float("-inf")
         if algorithm == 'classic_sta_lta':
@@ -88,7 +88,7 @@ tsl.tune_sta_lta(tr, algorithm, tsignalstart, tsignalend, ntrys)
             sta_best = sta_seconds
             lta_best = lta_seconds
             staltaratio_best = staltaratio
-            print ("sta_seconds=%.1f lta_seconds=%.1f max(staltaratio)=%.1f") % (sta_best, lta_best, m)
+            print(("sta_seconds=%.1f lta_seconds=%.1f max(staltaratio)=%.1f") % (sta_best, lta_best, m))
         
        
    # now we have captured the best STA/LTA settings

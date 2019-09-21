@@ -7,6 +7,6 @@ st.plot()
 # getting catalog data
 c = CSS_Catalog.CSS_Catalog()
 c.read('/opt/antelope/data/db/demo/demo')
-print c.events
-print c.events[0].origins[0]
+print(c.events)
+print(c.events[0].origins[0])
 

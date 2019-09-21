@@ -13,14 +13,14 @@ class location(object):
 
     def __str__(self):
         """ print out the attributes of a Location object """
-        print 'longitude = %.4f' % self.lon,', latitude = %.4f' % self.lat,', z = %.1f' % self.z, ', z-direction is %s' % self.zdir
+        print('longitude = %.4f' % self.lon,', latitude = %.4f' % self.lat,', z = %.1f' % self.z, ', z-direction is %s' % self.zdir)
             
 
 if __name__ == "__main__":
     import random
     l = [location(), location(random.random() * 360 - 180, random.random() * 180 - 90, random.random() * 30, 'down')]
     for i in range(len(l)):
-        print l[i].__str__()
+        print(l[i].__str__())
     
 
 

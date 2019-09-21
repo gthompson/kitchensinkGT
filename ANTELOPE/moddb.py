@@ -12,11 +12,11 @@ def remove_database(dbpath, ask=True):
             os.remove(dbpath)
             for dbfile in glob.glob("%s.*" % dbpath):
                 os.remove(dbfile)
-            print "database %s removed" % dbpath
+            print("database %s removed" % dbpath)
         else:
-            print "You have chosen not to remove %s" % dbpath
+            print("You have chosen not to remove %s" % dbpath)
     else:
-        print "database %s not found" % dbpath
+        print("database %s not found" % dbpath)
 
 def dbsubset2db(dbpath, subset_expr, subsetdbpath):
     # open the origin table, join to event table, subset for preferred origins
@@ -25,17 +25,17 @@ def dbsubset2db(dbpath, subset_expr, subsetdbpath):
     dborigin = dborigin.join('event')
     dbnetmag = db.lookup( table = 'netmag' )
     dborigin = dborigin.subset("orid == prefor")
-    print "subset %s with %s" % (dbpath, subset_expr)
+    print("subset %s with %s" % (dbpath, subset_expr))
     dborigin = dborigin.subset(subset_expr)
     dborigin = dborigin.sort('time')
     n = dborigin.nrecs()
     if n>0:    
         # ask to remove database if it already exists
         remove_database(subsetdbpath, False)
-        print "unjoin to %s" % subsetdbpath
+        print("unjoin to %s" % subsetdbpath)
         dborigin.unjoin(subsetdbpath)
     else:
-        print "no records to save to new database\n"
+        print("no records to save to new database\n")
     db.free()
 
 def dbgetorigins(dbpath, subset_expr):
@@ -119,7 +119,7 @@ def readplacesdb(dbplacespath):
             placeelev.append(elements[2])
             placeradius.append(elements[3])
     else:
-        print dbtablepath + " does not exist"        
+        print(dbtablepath + " does not exist")        
     return {'place':placename, 'placetype':placetype, 'lat':placelat, 'lon':placelon, 'elev':placeelev, 'radius':placeradius}
 
 def read_volcanoes(): # THIS IS A PREVIOUS VERSION I WROTE FOR GETTING VOLCANOES FROM PLACESDB THAT SEEMS TO WORK

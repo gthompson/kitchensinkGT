@@ -13,7 +13,7 @@ def trim(im):
 
 def yn_choice(message, default='y'):
     choices = 'Y/n' if default.lower() in ('y', 'yes') else 'y/N'
-    choice = raw_input("%s (%s) " % (message, choices))
+    choice = input("%s (%s) " % (message, choices))
     values = ('y', 'yes', '') if default == 'y' else ('y', 'yes')
     return True if choice.strip().lower() in values else False
 

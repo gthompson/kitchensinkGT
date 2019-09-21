@@ -6,17 +6,17 @@ DB = "MVOE_"
 def event_list(startdate,enddate):
     event_list=[]
     reapath = os.path.join(SEISAN_DATA_ROOT, 'REA', DB)
-    years=range(startdate.year,enddate.year+1)
+    years=list(range(startdate.year,enddate.year+1))
     for year in years:
         #print year
         if year==enddate.year and year==startdate.year:
-            months=range(startdate.month,enddate.month+1)
+            months=list(range(startdate.month,enddate.month+1))
         elif year==startdate.year:
-            months=range(startdate.month,13)
+            months=list(range(startdate.month,13))
         elif year==enddate.year:
-            months=range(1,enddate.month+1)
+            months=list(range(1,enddate.month+1))
         else:
-            months=range(1,13)
+            months=list(range(1,13))
         for month in months:
             #print month
             dir=os.path.join(reapath, "%04d" % year, "%02d" % month)
@@ -68,7 +68,7 @@ class Sfile:
         self.aeffiles = list()
         self.aefrows = list()
         self.maximum_intensity = None
-	self.arrivals = list()
+    self.arrivals = list()
         
         # Initialize temporary variables
         _aeffiles = list() # a list of files containing amplitude-energy-frequency rows
@@ -84,20 +84,20 @@ class Sfile:
         ss=int(basename[8:10])
         self.filetime = datetime.datetime(yyyy,mm,dd,hh,mi,ss)
         if not os.path.exists(path):
-            print "%s does not exist" % path
+            print("%s does not exist" % path)
             return
         try:
             fptr = open(path,'r') 
             row = fptr.readlines()
         except IOError:
-            print "Error: The specified file does not exist - %s" % (self.path)
+            print("Error: The specified file does not exist - %s" % (self.path))
             raise e
 
         # File opened ok, parse each line in a way that depends on the 80th character (line[79])
         for line in row:
 
             if len(line) < 80:
-		print line + " - IGNORED"
+        print(line + " - IGNORED")
                 continue
 
             if line[79] == '1':
@@ -206,7 +206,7 @@ class Sfile:
 
             # Process Type F line, Fault plane solution
             # Format has changed need to fix AAH - 2011-06-23
-            if line[79] == 'F' and not self.focmec.has_key('dip'):
+            if line[79] == 'F' and 'dip' not in self.focmec:
                 self.focmec['strike']=float(line[0:10])
                 self.focmec['dip']=float(line[10:20])
                 self.focmec['rake']=float(line[20:30])
@@ -239,30 +239,30 @@ class Sfile:
                 self.id = int(line[60:74])
 
             if line[79] == ' ':
-		if line.strip() == '':
-			continue
-		asta = line[1:5].strip()
-		achan = line[5:8].strip()
-		aphase = line[8:16].strip()
-		ahour = line[18:20].strip()
-		aminute = line[20:22].strip()
-		asecond = line[22:28].strip()
-		tmplist = asecond.split('.')
-		asecond = tmplist[0]
-		amillisecond = tmplist[1]
-		atime = datetime.datetime(self.year, self.month, day, int(ahour), int(aminute), int(asecond), 1000 * int( amillisecond) )
-		if aphase == 'AMPL':
-			aamp = line[33:40].strip()
-			aper = line[40:45].strip()
-		thisarrival = dict()
-		thisarrival['sta'] = asta
-		thisarrival['chan'] = achan
-		thisarrival['phase'] = aphase
-		thisarrival['time'] = atime
-		if aphase == 'AMPL':
-			thisarrival['amp'] = aamp
-			thisarrival['per'] = aper
-		self.arrivals.append(thisarrival)
+        if line.strip() == '':
+            continue
+        asta = line[1:5].strip()
+        achan = line[5:8].strip()
+        aphase = line[8:16].strip()
+        ahour = line[18:20].strip()
+        aminute = line[20:22].strip()
+        asecond = line[22:28].strip()
+        tmplist = asecond.split('.')
+        asecond = tmplist[0]
+        amillisecond = tmplist[1]
+        atime = datetime.datetime(self.year, self.month, day, int(ahour), int(aminute), int(asecond), 1000 * int( amillisecond) )
+        if aphase == 'AMPL':
+            aamp = line[33:40].strip()
+            aper = line[40:45].strip()
+        thisarrival = dict()
+        thisarrival['sta'] = asta
+        thisarrival['chan'] = achan
+        thisarrival['phase'] = aphase
+        thisarrival['time'] = atime
+        if aphase == 'AMPL':
+            thisarrival['amp'] = aamp
+            thisarrival['per'] = aper
+        self.arrivals.append(thisarrival)
 
         for _aeffile in _aeffiles:
             self.aeffiles.append(AEFfile(_aeffile))
@@ -307,20 +307,20 @@ class Sfile:
             str += "\n\tError: " + pprint.pformat(self.error)
         if self.focmec:
             str += "\n\tFocmec: " + pprint.pformat(self.focmec)
-	str += "\n\tNumber of arrivals: %d" % len(self.arrivals)
-	if len(self.arrivals)>0:
-	    str += "\n\tArrivals:" 
+    str += "\n\tNumber of arrivals: %d" % len(self.arrivals)
+    if len(self.arrivals)>0:
+        str += "\n\tArrivals:" 
         for arrival in self.arrivals:
             str += "\n\t\t" + "%s.%s %s " % (arrival['sta'], arrival['chan'], arrival['phase']) + arrival['time'].strftime("%Y-%m-%d %H:%M:%S.%f")
         for wavfile in self.wavfiles:
             str += "\n" + wavfile.__str__()
-	for aeffile in self.aeffiles:
+    for aeffile in self.aeffiles:
             str += "\n" + aeffile.__str__()
 
         return str
 
     def to_css(self):
-	pass
+    pass
 
     def maximum_magnitude(self):
         mag = 0.0
@@ -334,7 +334,7 @@ class Sfile:
         return mag,mtype,agency 
 
     def cat(self):
-        print cat(self.path)
+        print(cat(self.path))
         return None
 
 class Wavfile:
@@ -397,12 +397,12 @@ class SSAM:
 class AEFrow:
     def __init__(self, station, channel, amplitude, energy, ssam, maxf):
         self.station = station
-	self.channel = channel
-	self.amplitude = amplitude
-	self.energy = energy
-	self.ssam = ssam
+    self.channel = channel
+    self.amplitude = amplitude
+    self.energy = energy
+    self.ssam = ssam
         self.maxf = maxf
-	return None
+    return None
     def __str__(self):
         str = "\n\tstation = %s, channel = %s, amplitude = %e, energy = %e, maxf = %4.2f" \
             % (self.station, self.channel, self.amplitude, self.energy, self.maxf)
@@ -431,13 +431,13 @@ class AEFfile:
         self.average_window = None
         self.path = path.strip()
         if not os.path.exists(path):
-            print "%s does not exist" % path
+            print("%s does not exist" % path)
             return
         try:
             file = open(path,'r') 
             lines = file.readlines()
         except IOError:
-            print "Error: The specified file does not exist - %s" % (path)
+            print("Error: The specified file does not exist - %s" % (path))
             raise e
 
         for line in lines:
@@ -451,9 +451,9 @@ class AEFfile:
                     if line[1:10]=="VOLC MAIN":
                         pass
                     else:
-		        aefrow = parse_aefline(line)
-		        if aefrow:
-	                    self.aefrows.append(aefrow)
+                aefrow = parse_aefline(line)
+                if aefrow:
+                        self.aefrows.append(aefrow)
                 _i = line.find("trigger window")
                 if _i > -1:
                     _str1 = line[_i:_i+20]
@@ -481,7 +481,7 @@ class AEFfile:
         return str
             
     def cat(self):
-        print cat(self.path)
+        print(cat(self.path))
         return None
 
 if __name__ == "__main__":
@@ -492,8 +492,8 @@ if __name__ == "__main__":
                     '/raid/data/seisan/REA/MVOE_/1996/11/30-1254-26L.S199611', 
                     '/raid/data/seisan/REA/MVOE_/2000/05/16-2339-12L.S200005', 
                     '/raid/data/seisan/REA/MVOE_/1997/10/11-2228-03L.S199710',
-		    '/raid/data/seisan/REA/MVOE_/1996/12/24-2103-55R.S199612',
-		    '/raid/data/seisan/REA/MVOE_/1996/12/01-0138-00R.S199612' 
+            '/raid/data/seisan/REA/MVOE_/1996/12/24-2103-55R.S199612',
+            '/raid/data/seisan/REA/MVOE_/1996/12/01-0138-00R.S199612' 
                 ]
 
     for path in sfilelist:
@@ -506,10 +506,10 @@ if __name__ == "__main__":
         s1.cat() # cat(s1.path) would also work
 
         # print the object
-        print s1
+        print(s1)
     
     
         # export to ObsPy event object
-    	e = s1.to_css('obspy')
-    	#print e
+        e = s1.to_css('obspy')
+        #print e
 

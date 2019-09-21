@@ -24,8 +24,8 @@ def nanrms(x, axis=None):
 def patch(self):
 
     def summary(st):
-        print "STAT.CHA |  max      rms      std      offset "
-        print "---------|------------------------------------"
+        print("STAT.CHA |  max      rms      std      offset ")
+        print("---------|------------------------------------")
         for i in range(len(st)):
              # We could detrend, but in case of spikes, subtracting the median may be better
              #st[i].detrend()
@@ -34,7 +34,7 @@ def patch(self):
              ymax = np.max(np.abs(y))
              yrms = nanrms(y)
              ystd = stats.nanstd(y)
-             print "%s.%s | %8.1e %8.1e %8.1e %8.1e" % (st[i].stats.station, st[i].stats.channel, ymax, yrms, ystd, offset)
+             print("%s.%s | %8.1e %8.1e %8.1e %8.1e" % (st[i].stats.station, st[i].stats.channel, ymax, yrms, ystd, offset))
     st.summary = types.MethodType(summary, st)
 
     def mulplt(st, bottomlabel='', ylabels=[]):
@@ -156,18 +156,23 @@ def patch(self):
         return wdata
 
 if __name__ == "__main__":
-    # Test with 'python StreamGT.py' to retrieve and plot 3 seismograms and then convert to 1-minute RSAM data
-    from obspy.fdsn import Client
+
+    from obspy.clients.fdsn import Client
     client = Client()
     t = obspy.core.UTCDateTime("2010-02-27T06:45:00.000")
-    st = client.get_waveforms("IU", "ANMO", "00", "BH?", t, t + 60 * 15)
-    print st[0]
-    print st[0].stats
+    st = client.get_waveforms("IU", "ANMO", "00", "BHZ", t, t + 60 * 5)
+    print(st[0])
+    print(st[0].stats)
     patch(st)
-    st.mulplt()
+    #st.mulplt()
+    st.summary()
     st.detrend()
     st.summary()
+    st.plot()
     s = st.to_sam()
     for i in s:
-        print i
+        print(i)
+        i.plot()
+    for i in s:
+        print(i)
         i.plot()

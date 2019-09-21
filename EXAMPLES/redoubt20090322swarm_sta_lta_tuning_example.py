@@ -48,9 +48,9 @@ for tr in st:
 import scipy.stats.mstats as mstats
 sta_gmean=mstats.gmean(sta_best)
 lta_gmean=mstats.gmean(lta_best)    
-print sta_best
-print lta_best
-print "Best STA window = %.1f seconds, Best LTA window = %.1f seconds" % (sta_gmean, lta_gmean)
+print(sta_best)
+print(lta_best)
+print("Best STA window = %.1f seconds, Best LTA window = %.1f seconds" % (sta_gmean, lta_gmean))
 
 # Plot the STA/LTA ratio
 thresh_on = 5
@@ -67,7 +67,7 @@ algorithm_without_underlines = re.sub('_', '', algorithm)
 trig = trigger.coincidence_trigger(algorithm_without_underlines, thresh_on, thresh_off, st, triggers_per_event, sta=sta_gmean, lta=lta_gmean) 
 from pprint import pprint
 pprint(trig)
-print "Number of events detected = %d" % len(trig)    
+print("Number of events detected = %d" % len(trig))    
 
 # Plot each trigger
 pretrig = 5;
@@ -75,7 +75,7 @@ posttrig = 5;
 count = 0
 for thistrig in trig:
     count += 1
-    print "Event %d at %s" % (count,thistrig['time'].isoformat())
+    print("Event %d at %s" % (count,thistrig['time'].isoformat()))
     st2 = st.copy()
     st2.trim(starttime = thistrig['time'] - pretrig, endtime = thistrig['time'] + thistrig['duration'] + posttrig) 
     st2.plot(type='relative', equal_scale=False)

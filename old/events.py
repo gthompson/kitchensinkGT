@@ -155,20 +155,20 @@ class Catalog(object):
         FontSize = 12
         pylab.close('all')
         pylab.figure(1)
-        print 'Plotting lat vs.lon'
+        print('Plotting lat vs.lon')
         pylab.axes([0.1, 0.45, 0.5, 0.5])
         self.plotlonlat(FontSize)
-        print 'Plotting lon vs. depth'
+        print('Plotting lon vs. depth')
         pylab.axes([0.1, 0.25, 0.5, 0.15])
         self.plotdepthlon(FontSize)
-        print 'Plotting depth vs. time'
+        print('Plotting depth vs. time')
         pylab.axes([0.1, 0.05, 0.8, 0.15])    
         self.plotdepthtime(FontSize)
-        print 'Plotting lat vs. depth'
+        print('Plotting lat vs. depth')
         pylab.axes([0.7, 0.45, 0.2, 0.5])    
         self.plotlatdepth(FontSize)
         #pylab.show()
-        print 'Saving figure'
+        print('Saving figure')
         pylab.savefig(pngfile)
 
     def plotcounts(self, binsize, pngfile):
@@ -249,9 +249,9 @@ class Catalog(object):
 
 if __name__ == "__main__":
     c = Catalog()
-    n = input('Number of events ? ')
+    n = eval(input('Number of events ? '))
     c.import_random(n)
-    print c
+    print(c)
     
     #c.plotcounts(1.0/24, 'hist.png')
     c.volplot('volplot.png')

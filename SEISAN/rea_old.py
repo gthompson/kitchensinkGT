@@ -147,17 +147,17 @@ def event_list(startdate,enddate):
   event_list=[]
   #reapath="/home/analyst/REA/OGS__/"
   reapath="/raid/data/seisan/REA/MVOE_/"
-  years=range(startdate.year,enddate.year+1)
+  years=list(range(startdate.year,enddate.year+1))
   for year in years:
     #print year
     if year==enddate.year and year==startdate.year:
-      months=range(startdate.month,enddate.month+1)
+      months=list(range(startdate.month,enddate.month+1))
     elif year==startdate.year:
-      months=range(startdate.month,13)
+      months=list(range(startdate.month,13))
     elif year==enddate.year:
-      months=range(1,enddate.month+1)
+      months=list(range(1,enddate.month+1))
     else:
-      months=range(1,13)
+      months=list(range(1,13))
     for month in months:
       #print month
       dir="%s%d/%02d/" % (reapath,year,month)
@@ -199,12 +199,12 @@ class REA:
       rea_fh.close()
       return lines
     except IOError:
-      print "Error: The specified file does not exist - %s" % (self.file)
+      print("Error: The specified file does not exist - %s" % (self.file))
       raise e
 
   def print_file(self,lines):
     for line in lines:
-      print line
+      print(line)
     return True
 
   def write_file(self,lines):
@@ -214,7 +214,7 @@ class REA:
         rea_fh.write("%s\n" % (line))
       rea_fh.close()
     except IOError:
-      print "Error: The specified file does not exist - %s" % (self.file)
+      print("Error: The specified file does not exist - %s" % (self.file))
       raise e
   
   def parse_reaheader(self):
@@ -323,7 +323,7 @@ class REA:
 
         # Process Type F line, Fault plane solution
         # Format has changed need to fix AAH - 2011-06-23
-        if lntype(line) == 'F' and not self.focmec.has_key('dip'):
+        if lntype(line) == 'F' and 'dip' not in self.focmec:
           self.focmec['strike']=float(line[0:10])
           self.focmec['dip']=float(line[10:20])
           self.focmec['rake']=float(line[20:30])
@@ -508,8 +508,8 @@ class REA:
             tmp['azimuth']=int(line[76:79])
             amps.append(tmp)
           except:
-            print "ERROR READING LINE"
-            print line
+            print("ERROR READING LINE")
+            print(line)
             tmp={}
     return amps
 
@@ -563,7 +563,7 @@ class REA:
         sta=line[1:6].strip()
         
         if line[10] == 'P':
-          if not sta in tmp.keys() and len(sta)>2:
+          if not sta in list(tmp.keys()) and len(sta)>2:
                 tmp[sta]={}
           try:
             tmp[sta]['dist']=float(line[71:75].strip())
@@ -581,7 +581,7 @@ class REA:
           except:
             pass
         if line[10] == 'S':
-          if not sta in tmp.keys() and len(sta)>2:
+          if not sta in list(tmp.keys()) and len(sta)>2:
                 tmp[sta]={}
           try:
             tmp[sta]['dist']=float(line[71:75].strip())
@@ -607,8 +607,8 @@ class REA:
     amps=self.parse_Amb()
     mags=[]
     if not quiet:
-      print "mbLg Magnitude Calculation summary"
-      print "\t Sta \t Dist\t Vel \tAmp(um)\t Per\t mbLg\tComments"
+      print("mbLg Magnitude Calculation summary")
+      print("\t Sta \t Dist\t Vel \tAmp(um)\t Per\t mbLg\tComments")
     for amp in amps:
       comment=""
       lgtt=self.phase_traveltime(amp['hour'],amp['min'],amp['sec'])
@@ -627,9 +627,9 @@ class REA:
       else:
         comment+="Bad Distance, "
       if not quiet:
-        print "\t%s\t%5.1f\t%5.2f\t%7.5f\t%4.2f\t%5.2f\t%s" %(amp['sta'],amp['distance'],lgvel,amplitude,amp['period'],mblg,comment)
+        print("\t%s\t%5.1f\t%5.2f\t%7.5f\t%4.2f\t%5.2f\t%s" %(amp['sta'],amp['distance'],lgvel,amplitude,amp['period'],mblg,comment))
     if not quiet:
-      print "\nmbLg= %4.1f" % (mean(mags))
+      print("\nmbLg= %4.1f" % (mean(mags)))
     return mags
 
   def mblg_recalc(self):
@@ -670,7 +670,7 @@ class REA:
     agency="NA"
     for j,magid in enumerate(pref_order):
       for i,magnitude in enumerate(self.magnitude):
-        for key in agency_equiv.keys():
+        for key in list(agency_equiv.keys()):
           if self.magnitude_agency[i]==key:
             self.magnitude_agency[i]=agency_equiv[key]
         if magid['agency']==self.magnitude_agency[i] and magid['type']==self.magnitude_type[i]:
@@ -820,13 +820,13 @@ class REA:
       cat['magnitude']="%.1f" % (mag)
       cat['magnitudetype']=type
       # GTHO 20140318: add checks for existence of self.error keys as getting error here
-      if self.error.has_key('latitude'):
+      if 'latitude' in self.error:
         cat['laterror']="%.2f" % (self.error['latitude'])
-      if self.error.has_key('longitude'):
+      if 'longitude' in self.error:
         cat['lonerror']="%.2f" % (self.error['longitude'])
-      if self.error.has_key('depth'):
+      if 'depth' in self.error:
         cat['deptherror']="%.2f" % (self.error['depth'])
-      if self.error.has_key('origintime'):
+      if 'origintime' in self.error:
         cat['oterror']="%.2f" % (self.error['origintime'])
       cat['origintime']="%s" % (self.origin_time.isoformat(" "))
       if eqcatalog.isdst(self.origin_time):
@@ -869,7 +869,7 @@ class REA:
       magstr+="%.1f %s %s<br />" % (self.magnitude[i],self.magnitude_type[i],self.magnitude_agency[i])
     fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Magnitude</td><td>%s</td>\n" % (magstr))
     fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Maximum Modified Mercalli Intensity</td><td>%s</td>\n" % (eqcatalog.roman_intensity(self.maximum_intensity)))
-    if self.focmec.has_key('strike'):
+    if 'strike' in self.focmec:
       mechstr="Strike: %.1f&deg;<br />Dip: %.1f&deg;<br />Rake: %.1f&deg;<br />Agency: %s<br />Method: %s,<br />" % (self.focmec['strike'],self.focmec['dip'],self.focmec['rake'],self.focmec['agency'],self.focmec['source'])
       fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Focal Mechanism</td><td>%s</td>\n" % (mechstr))
     fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Number of Stations</td><td>%d</td>\n" % (self.no_sta))
@@ -909,11 +909,11 @@ class REA:
           fullwave = os.path.join(fullmonth, wave)
           if os.path.exists(fullwave):
             st += obspy.read(fullwave)
-            print "local pathname stored"
+            print("local pathname stored")
             continue
           elif os.path.exists(wave):
             st += obspy.read(wave)
-            print "full pathname stored"
+            print("full pathname stored")
             continue
     return st
 

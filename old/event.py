@@ -12,7 +12,7 @@ class event(object):
 
     def __str__(self):
         """ print out the attributes of an event object """
-        print '%5d' % self.evid,', %s' % self.etype, ', %s' % self.origin, ', %s' % self.arrival
+        print('%5d' % self.evid,', %s' % self.etype, ', %s' % self.origin, ', %s' % self.arrival)
 
     def add_origin(self, originobject):
         self.origin = originobject
@@ -31,5 +31,5 @@ if __name__ == "__main__":
     #a = arrival.arrival()
     #e.add_origin(o)
     #e.add_arrival(a)
-    print e
+    print(e)
 

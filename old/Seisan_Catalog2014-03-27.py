@@ -79,7 +79,7 @@ class Sfile:
 class Wavfile(self):
     def __init__(self, path=None):
         self.path = path.strip()
-	self.st = None
+    self.st = None
 
     def plot(self):
        #if os.path.exists(self.path):

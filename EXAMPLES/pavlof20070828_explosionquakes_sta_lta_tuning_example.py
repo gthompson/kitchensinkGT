@@ -46,7 +46,7 @@ tr_seismic = st[1]
 result = tsl.tune_sta_lta(tr_infrasound, algorithm, t_signal_start, t_signal_end, numtries )
 sta_best = result[0]
 lta_best = result[1]
-print "Best STA window = %.1f seconds, Best LTA window = %.1f seconds" % (sta_best, lta_best)
+print("Best STA window = %.1f seconds, Best LTA window = %.1f seconds" % (sta_best, lta_best))
 
 # Show the STA/LTA ratio
 staltaratio_best = result[2]
@@ -61,7 +61,7 @@ algorithm_without_underlines = re.sub('_', '', algorithm)
 trig = trigger.coincidence_trigger(algorithm_without_underlines, thresh_on, thresh_off, st, triggers_per_event, sta=sta_best, lta=lta_best) 
 from pprint import pprint
 pprint(trig)
-print "Number of events detected = %d" % len(trig)
+print("Number of events detected = %d" % len(trig))
 
 # Plot each trigger
 pretrig = 5;
@@ -69,7 +69,7 @@ posttrig = 5;
 count = 0
 for thistrig in trig:
     count += 1
-    print "Event %d at %s" % (count,thistrig['time'].isoformat())
+    print("Event %d at %s" % (count,thistrig['time'].isoformat()))
     st2 = st.copy()
     st2.trim(starttime = thistrig['time'] - pretrig, endtime = thistrig['time'] + thistrig['duration'] + posttrig) 
     st2.plot(type='relative', equal_scale=False)

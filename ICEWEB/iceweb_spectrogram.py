@@ -19,10 +19,13 @@ def main():
     # read the wav file as a stream object
     st = read(wavfile)
     print(st)
+    st.spectrogram()
+    return
 
-    #fh = plt.figure()
+    fh = plt.figure()
 
     # Only do this if want to use a common x-axis
+    n = np.min([6, len(st)])
     #ax = plt.subplot(n, 1, 1)
 
     # start time of the record section
@@ -32,14 +35,14 @@ def main():
     axh = []
 
     # loop over all stream objects
-    n = len(st)
+
     for i in range(n):
         # add new axes handle for new subplot
         #axh.append(plt.subplot(n, 1, i+1, sharex=ax))
-        axh.append(plt.subplot(n, 1, i+1))
+        axh.append(plt.subplot(2*n, 1, i*2+1))
 
         # time vector, t, in seconds since start of record section
-            t = np.linspace(st[i].stats.starttime.timestamp - startepoch,
+        t = np.linspace(st[i].stats.starttime.timestamp - startepoch,
                         st[i].stats.endtime.timestamp - startepoch,
                         st[i].stats.npts)
 
@@ -49,13 +52,13 @@ def main():
         y = st[i].data - offset
 
         # PLOT THE DATA
-        axh[i].plot(t, y)
+        axh[i*2+1].plot(t, y)
 
         # remove yticks because we will add text showing max and offset values
-        axh[i].yaxis.set_ticks([])
+        axh[i*2+1].yaxis.set_ticks([])
 
         # remove xticklabels for all but the bottom subplot
-        if i < n-1:
+        if i < n*2-1:
             axh[i].xaxis.set_ticklabels([])
         else:
             # for the bottom subplot, also add an xlabel with wavfilename and start time
@@ -68,8 +71,11 @@ def main():
         plt.text(0, 1, "max=%.1e offset=%.1e" % (np.max(np.abs(y)), offset),
                 horizontalalignment='left',
                 verticalalignment='top',transform=axh[i].transAxes)
-
-        #st[i].plot(fig=fh, color='black', tick_format='%I:%M:%S.%s', starttime=st[i].stats.starttime, endtime=st[i].stats.starttime+20)
+        
+        # PLOT SPECTROGRAM
+        axh.append(plt.subplot(n*2, 1, i*2+2))
+        #st[i].plot(color='black') # problem here with attaching to subplot
+        st[i].spectrogram(axes=axh[i*2+2], log=True, title=st[i].stats.station + " " + str(st[i].stats.starttime))
 
     # change all font sizes
     plt.rcParams.update({'font.size': 8})
@@ -77,7 +83,7 @@ def main():
     # show the figure
     plt.show()
 
-    #st[0].spectrogram(log=True, title=st[0].stats.station + " " + str(st[0].stats.starttime))
+
 
 
 if __name__ == "__main__":

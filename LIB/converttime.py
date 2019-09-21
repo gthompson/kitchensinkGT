@@ -4,12 +4,12 @@
 import datetime
 
 def epoch2datetime(et):
-        epoch0 = datetime.datetime(1970,1,1,0,0,0)
+    epoch0 = datetime.datetime(1970,1,1,0,0,0)
     dt = epoch0 + datetime.timedelta(0, et, 0)
-        return dt
+    return dt
         
 def datetime2epoch(dt):
-        epoch0 = datetime.datetime(1970,1,1,0,0,0)
+    epoch0 = datetime.datetime(1970,1,1,0,0,0)
     td = dt - epoch0
     et = td.days * 86400.0 + td.seconds + float(td.microseconds)/1000000
     return et
