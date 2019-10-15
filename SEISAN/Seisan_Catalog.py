@@ -1,7 +1,9 @@
-import os, datetime, pprint
+#!/Users/thompsong/miniconda3/bin/python
+import os
+import datetime
+import pprint
 import numpy as np
-SEISAN_DATA_ROOT = os.path.join("/raid", "data", "seisan")
-DB = "MVOE_"
+#SEISAN_DATA_ROOT = ""
 
 def event_list(startdate,enddate):
     event_list=[]
@@ -41,7 +43,18 @@ class Sfile:
     'Base class for Sfile parameters'
 
     def __init__(self, path):
-
+        mytup = path.split("REA/")
+        if len(mytup)>1:
+           SEISAN_DATA_ROOT = mytup[0]
+           mytup2=mytup[1].split('/')
+           DB=mytup2[0]
+        else:
+           SEISAN_DATA_ROOT = "."
+        if SEISAN_DATA_ROOT[0]!='/' and SEISAN_DATA_ROOT[0]!='.':
+            SEISAN_DATA_ROOT = './' + SEISAN_DATA_ROOT
+        if SEISAN_DATA_ROOT[-1]=="/":
+            SEISAN_DATA_ROOT = SEISAN_DATA_ROOT[0:-1]
+        #print(SEISAN_DATA_ROOT)
         # Initialize optional variable to NULLs
         self.otime = None # origin time, a datetime
         self.mainclass = None
@@ -68,7 +81,7 @@ class Sfile:
         self.aeffiles = list()
         self.aefrows = list()
         self.maximum_intensity = None
-    self.arrivals = list()
+        self.arrivals = list()
         
         # Initialize temporary variables
         _aeffiles = list() # a list of files containing amplitude-energy-frequency rows
@@ -97,7 +110,7 @@ class Sfile:
         for line in row:
 
             if len(line) < 80:
-        print(line + " - IGNORED")
+                #print(line + " - IGNORED")
                 continue
 
             if line[79] == '1':
@@ -107,7 +120,10 @@ class Sfile:
                     day = int(line[8:10])
                     hour = int(line[11:13])
                     minute = int(line[13:15])
-                    second = float(line[15:20])
+                    try:
+                        second = float(line[15:20])
+                    except:
+                        second = 0.0
                     if int(second) == 60:
                         minute += 1
                         second -= 60.0
@@ -180,6 +196,7 @@ class Sfile:
                             _aeffiles.append(path)
         
             if line[79] == '6':
+                #print("got a WAV file")
                 wavfiles = line[1:79].split()
                 #wavfile = line[1:36]
                 for wavfile in wavfiles:
@@ -239,30 +256,31 @@ class Sfile:
                 self.id = int(line[60:74])
 
             if line[79] == ' ':
-        if line.strip() == '':
-            continue
-        asta = line[1:5].strip()
-        achan = line[5:8].strip()
-        aphase = line[8:16].strip()
-        ahour = line[18:20].strip()
-        aminute = line[20:22].strip()
-        asecond = line[22:28].strip()
-        tmplist = asecond.split('.')
-        asecond = tmplist[0]
-        amillisecond = tmplist[1]
-        atime = datetime.datetime(self.year, self.month, day, int(ahour), int(aminute), int(asecond), 1000 * int( amillisecond) )
-        if aphase == 'AMPL':
-            aamp = line[33:40].strip()
-            aper = line[40:45].strip()
-        thisarrival = dict()
-        thisarrival['sta'] = asta
-        thisarrival['chan'] = achan
-        thisarrival['phase'] = aphase
-        thisarrival['time'] = atime
-        if aphase == 'AMPL':
-            thisarrival['amp'] = aamp
-            thisarrival['per'] = aper
-        self.arrivals.append(thisarrival)
+                if line.strip() == '':
+                    continue
+                asta = line[1:5].strip()
+                achan = line[5:8].strip()
+                aphase = line[8:16].strip()
+                ahour = line[18:20].strip()
+                aminute = line[20:22].strip()
+                asecond = line[22:28].strip()
+                #print(asecond)
+                tmplist = asecond.split('.')
+                asecond = tmplist[0]
+                amillisecond = tmplist[1]
+                atime = datetime.datetime(self.year, self.month, day, int(ahour), int(aminute), int(asecond), 1000 * int( amillisecond) )
+                if aphase == 'AMPL':
+                    aamp = line[33:40].strip()
+                    aper = line[40:45].strip()
+                thisarrival = dict()
+                thisarrival['sta'] = asta
+                thisarrival['chan'] = achan
+                thisarrival['phase'] = aphase
+                thisarrival['time'] = atime
+                if aphase == 'AMPL':
+                    thisarrival['amp'] = aamp
+                    thisarrival['per'] = aper
+                self.arrivals.append(thisarrival)
 
         for _aeffile in _aeffiles:
             self.aeffiles.append(AEFfile(_aeffile))
@@ -307,20 +325,20 @@ class Sfile:
             str += "\n\tError: " + pprint.pformat(self.error)
         if self.focmec:
             str += "\n\tFocmec: " + pprint.pformat(self.focmec)
-    str += "\n\tNumber of arrivals: %d" % len(self.arrivals)
-    if len(self.arrivals)>0:
-        str += "\n\tArrivals:" 
-        for arrival in self.arrivals:
-            str += "\n\t\t" + "%s.%s %s " % (arrival['sta'], arrival['chan'], arrival['phase']) + arrival['time'].strftime("%Y-%m-%d %H:%M:%S.%f")
-        for wavfile in self.wavfiles:
-            str += "\n" + wavfile.__str__()
-    for aeffile in self.aeffiles:
-            str += "\n" + aeffile.__str__()
+        str += "\n\tNumber of arrivals: %d" % len(self.arrivals)
+        if len(self.arrivals)>0:
+            str += "\n\tArrivals:" 
+            for arrival in self.arrivals:
+                str += "\n\t\t" + "%s.%s %s " % (arrival['sta'], arrival['chan'], arrival['phase']) + arrival['time'].strftime("%Y-%m-%d %H:%M:%S.%f")
+            for wavfile in self.wavfiles:
+                str += "\n" + wavfile.__str__()
+            for aeffile in self.aeffiles:
+                str += "\n" + aeffile.__str__()
 
         return str
 
     def to_css(self):
-    pass
+        pass
 
     def maximum_magnitude(self):
         mag = 0.0
@@ -397,12 +415,13 @@ class SSAM:
 class AEFrow:
     def __init__(self, station, channel, amplitude, energy, ssam, maxf):
         self.station = station
-    self.channel = channel
-    self.amplitude = amplitude
-    self.energy = energy
-    self.ssam = ssam
+        self.channel = channel
+        self.amplitude = amplitude
+        self.energy = energy
+        self.ssam = ssam
         self.maxf = maxf
-    return None
+        return None
+
     def __str__(self):
         str = "\n\tstation = %s, channel = %s, amplitude = %e, energy = %e, maxf = %4.2f" \
             % (self.station, self.channel, self.amplitude, self.energy, self.maxf)
@@ -451,9 +470,9 @@ class AEFfile:
                     if line[1:10]=="VOLC MAIN":
                         pass
                     else:
-                aefrow = parse_aefline(line)
-                if aefrow:
-                        self.aefrows.append(aefrow)
+                        aefrow = parse_aefline(line)
+                        if aefrow:
+                            self.aefrows.append(aefrow)
                 _i = line.find("trigger window")
                 if _i > -1:
                     _str1 = line[_i:_i+20]
@@ -486,14 +505,16 @@ class AEFfile:
 
 if __name__ == "__main__":
 
+    SEISAN_DATA_ROOT = os.path.join("/raid", "data", "seisan")
+    DB = "MVOE_"
     sfilelist = [ 
                     '/raid/data/seisan/REA/MVOE_/2002/01/09-1204-48L.S200201', 
                     '/raid/data/seisan/REA/MVOE_/1996/11/30-1254-26L.S199611', 
                     '/raid/data/seisan/REA/MVOE_/1996/11/30-1254-26L.S199611', 
                     '/raid/data/seisan/REA/MVOE_/2000/05/16-2339-12L.S200005', 
                     '/raid/data/seisan/REA/MVOE_/1997/10/11-2228-03L.S199710',
-            '/raid/data/seisan/REA/MVOE_/1996/12/24-2103-55R.S199612',
-            '/raid/data/seisan/REA/MVOE_/1996/12/01-0138-00R.S199612' 
+                    '/raid/data/seisan/REA/MVOE_/1996/12/24-2103-55R.S199612',
+                    '/raid/data/seisan/REA/MVOE_/1996/12/01-0138-00R.S199612' 
                 ]
 
     for path in sfilelist:
@@ -501,15 +522,13 @@ if __name__ == "__main__":
         # load an Sfile into a Sfile object
         s1 = Sfile(path)
 
-
         # show the file
         s1.cat() # cat(s1.path) would also work
 
         # print the object
         print(s1)
     
-    
         # export to ObsPy event object
-        e = s1.to_css('obspy')
+        #e = s1.to_css()
         #print e
 

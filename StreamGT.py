@@ -150,6 +150,7 @@ def patch(self):
         win = hanningcosine(wdata3)
         wdata3 = wdata3 * win
         # create bandpass filter lowcut to highcut
+        wdata3.filter('bandpass', freq=[lowcut,highcut], corners=poles, zerophase=True)
         # apply both ways on wdata3
         # extract middle 3rd
         wdata = wdata3[numsamples + 1: numsamples * 2]
