@@ -22,6 +22,7 @@ def generate_monthly_csv(mm):
     fptr = open(outfile,'w+')
     fptr.write('datetime, mainclass, subclass, duration, wavfilepath, sampling_rate, npts, traceNum, traceID, sfilepath\n') 
     for thissfile in sfileslist:
+        print(thissfile)
         s = SC.Sfile(thissfile)
         #print(s)
         numwavfiles = len(s.wavfiles)

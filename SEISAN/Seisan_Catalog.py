@@ -108,6 +108,23 @@ class Sfile:
 
         # File opened ok, parse each line in a way that depends on the 80th character (line[79])
         for line in row:
+            result = line.find("VOLC")
+            if line[-1] == '3' or result:
+                if line[1:7]== 'ExtMag':
+                    self.magnitude.append(float(line[8:12]))
+                    #self.magnitude_type.append(magtype_map[line[12]])
+                    self.magnitude_type.append(line[12])
+                    self.magnitude_agency.append(line[13:16])
+                elif line[1:4]=='URL':
+                    self.url=line[5:78].rstrip()
+                elif result:
+                    if line[result:result+9]=="VOLC MAIN":
+                        self.subclass = line[result+10:result+20].strip()
+                    else:
+                        # We think this Sfile contains AEF information, so store it in list of aeffiles
+                        if not path in _aeffiles:
+                            _aeffiles.append(path)
+                continue 
 
             if len(line) < 80:
                 #print(line + " - IGNORED")
@@ -174,27 +191,12 @@ class Sfile:
 #                        #self.magnitude_type.append(magtype_map[line[75]])
 #                        self.magnitude_type.append(line[75])
 #                        self.magnitude_agency.append(line[76:79].strip())
-
+                continue
             # Process Type 2 line, Macroseismic Intensity Information
             if line[79] == '2':
                self.maximum_intensity=int(line[27:29]) 
+               continue
 
-            if line[79] == '3':
-                if line[1:7]== 'ExtMag':
-                    self.magnitude.append(float(line[8:12]))
-                    #self.magnitude_type.append(magtype_map[line[12]])
-                    self.magnitude_type.append(line[12])
-                    self.magnitude_agency.append(line[13:16])
-                elif line[1:4]=='URL':
-                    self.url=line[5:78].rstrip()
-                elif line[1:7]=="VOLC M":
-                    if line[1:10]=="VOLC MAIN":
-                        self.subclass = line[11]
-                    else:
-                        # We think this Sfile contains AEF information, so store it in list of aeffiles
-                        if not path in _aeffiles:
-                            _aeffiles.append(path)
-        
             if line[79] == '6':
                 #print("got a WAV file")
                 wavfiles = line[1:79].split()
@@ -209,7 +211,7 @@ class Sfile:
                         if not aeffullpath in _aeffiles:
                             _aeffiles.append(aeffullpath)
 
-
+                continue
             # Process Type E line, Hyp error estimates
             if line[79] == 'E':
                 self.gap=int(line[5:8])
@@ -220,7 +222,7 @@ class Sfile:
                 self.error['covxy']=float(line[43:55].strip())
                 self.error['covxz']=float(line[55:67].strip())
                 self.error['covyz']=float(line[67:79].strip())
-
+                continue
             # Process Type F line, Fault plane solution
             # Format has changed need to fix AAH - 2011-06-23
             if line[79] == 'F' and 'dip' not in self.focmec:
@@ -231,7 +233,7 @@ class Sfile:
                 self.focmec['agency']=line[66:69]
                 self.focmec['source']=line[70:77]
                 self.focmec['quality']=line[77]
-
+                continue
             # Process Type H line, High accuracy line
             # This replaces some origin parameters with more accurate ones
             if line[79] == 'H':
@@ -248,26 +250,31 @@ class Sfile:
                 self.longitude=float(line[33:43].strip())
                 self.depth=float(line[44:52].strip())
                 self.rms=float(line[53:59].strip())
-
+                continue
             if line[79] == 'I':
                 self.last_action=line[8:11]
                 self.action_time=line[12:26]
                 self.analyst = line[30:33]
                 self.id = int(line[60:74])
-
-            if line[79] == ' ':
+                continue
+            if line[79] == ' ' and line[1:5]!="VOLC":
                 if line.strip() == '':
                     continue
+                print(line[1:5])
+                print(line)
                 asta = line[1:5].strip()
                 achan = line[5:8].strip()
                 aphase = line[8:16].strip()
                 ahour = line[18:20].strip()
                 aminute = line[20:22].strip()
                 asecond = line[22:28].strip()
-                #print(asecond)
-                tmplist = asecond.split('.')
-                asecond = tmplist[0]
-                amillisecond = tmplist[1]
+                if len(asecond)>0:
+                    tmplist = asecond.split('.')
+                    asecond = tmplist[0]
+                    amillisecond = tmplist[1]
+                else:
+                    asecond=0
+                    amillisecond=0
                 atime = datetime.datetime(self.year, self.month, day, int(ahour), int(aminute), int(asecond), 1000 * int( amillisecond) )
                 if aphase == 'AMPL':
                     aamp = line[33:40].strip()
@@ -281,7 +288,7 @@ class Sfile:
                     thisarrival['amp'] = aamp
                     thisarrival['per'] = aper
                 self.arrivals.append(thisarrival)
-
+                continue
         for _aeffile in _aeffiles:
             self.aeffiles.append(AEFfile(_aeffile))
         return None
@@ -464,7 +471,7 @@ class AEFfile:
             if len(line) < 80:
                 continue
 
-            if line[79] == '3':
+            if line[79] == '3' or  (line[79] == ' ' and line[1:5]=="VOLC"):
                 #print line[1:10]
                 if line[1:5]=="VOLC":
                     if line[1:10]=="VOLC MAIN":
