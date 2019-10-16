@@ -3,6 +3,7 @@ import os
 import datetime
 import pprint
 import numpy as np
+import sys, glob, obspy.core
 #SEISAN_DATA_ROOT = ""
 
 def event_list(startdate,enddate):
@@ -38,6 +39,36 @@ def cat(path):
     except IOError:
         pass
     return str
+
+def generate_monthly_csv(mm):
+    sfileslist = sorted(glob.glob(os.path.join(mm, "*")))
+    outfile = mm[-13:-8] + 'catalog' + mm[-7:-3] + mm[-2:] + '.csv'
+    print("...Creating %s" % outfile)
+    fptr = open(outfile,'w+')
+    fptr.write('datetime, mainclass, subclass, duration, wavfilepath, sampling_rate, npts, traceNum, traceID, sfilepath\n') 
+    for thissfile in sfileslist:
+        print(thissfile)
+        s = Sfile(thissfile)
+        #print(s)
+        numwavfiles = len(s.wavfiles)
+        if not s.subclass:
+            s.subclass = "_"
+        if numwavfiles > 0:
+            for thiswavfile in s.wavfiles:
+                if not os.path.exists(thiswavfile.path):
+                    continue
+                st = obspy.read(thiswavfile.path)
+                tracenum = 0
+                for tr in st:
+                     duration = tr.stats.npts / tr.stats.sampling_rate
+                     fptr.write("%s,%s,%s,%8.3f,%s,%3d,%6d,%02d,%s,%s\n" % (s.filetime, s.mainclass, \
+                         s.subclass, duration, \
+                         thiswavfile.path, \
+                         tr.stats.sampling_rate, tr.stats.npts, \
+                         tracenum, tr.id, thissfile ))
+                     tracenum += 1
+    fptr.close()
+
 
 class Sfile:
     'Base class for Sfile parameters'
@@ -124,10 +155,9 @@ class Sfile:
                         # We think this Sfile contains AEF information, so store it in list of aeffiles
                         if not path in _aeffiles:
                             _aeffiles.append(path)
-                continue 
 
             if len(line) < 80:
-                #print(line + " - IGNORED")
+                print(line + " - IGNORED")
                 continue
 
             if line[79] == '1':
@@ -137,13 +167,17 @@ class Sfile:
                     day = int(line[8:10])
                     hour = int(line[11:13])
                     minute = int(line[13:15])
-                    try:
-                        second = float(line[15:20])
-                    except:
-                        second = 0.0
+                    second = 0.0 # sometimes second is not defined at all, so set to 0.0 and then override with value if it exists
+                    dummy = line[15:20].strip()
+                    if dummy:
+                        second = float(line[15:20].strip())
                     if int(second) == 60:
                         minute += 1
                         second -= 60.0
+                    #print("second = %f" % second)
+                    if second>60: # sometimes second is like 211 which means 2.11 and not 211 seconds. usually it has a decimal point though, e.g. 1.1
+                        second=second/100   
+                    
                     self.otime = datetime.datetime(self.year, self.month, day, hour, minute, int(second), 1000 * int(  (second - int(second)) * 1000) )
                 self.mainclass = line[21:23].strip()
                 if line[23:30]!="       ":
@@ -191,11 +225,10 @@ class Sfile:
 #                        #self.magnitude_type.append(magtype_map[line[75]])
 #                        self.magnitude_type.append(line[75])
 #                        self.magnitude_agency.append(line[76:79].strip())
-                continue
+
             # Process Type 2 line, Macroseismic Intensity Information
             if line[79] == '2':
                self.maximum_intensity=int(line[27:29]) 
-               continue
 
             if line[79] == '6':
                 #print("got a WAV file")
@@ -211,7 +244,6 @@ class Sfile:
                         if not aeffullpath in _aeffiles:
                             _aeffiles.append(aeffullpath)
 
-                continue
             # Process Type E line, Hyp error estimates
             if line[79] == 'E':
                 self.gap=int(line[5:8])
@@ -222,7 +254,7 @@ class Sfile:
                 self.error['covxy']=float(line[43:55].strip())
                 self.error['covxz']=float(line[55:67].strip())
                 self.error['covyz']=float(line[67:79].strip())
-                continue
+
             # Process Type F line, Fault plane solution
             # Format has changed need to fix AAH - 2011-06-23
             if line[79] == 'F' and 'dip' not in self.focmec:
@@ -233,7 +265,7 @@ class Sfile:
                 self.focmec['agency']=line[66:69]
                 self.focmec['source']=line[70:77]
                 self.focmec['quality']=line[77]
-                continue
+
             # Process Type H line, High accuracy line
             # This replaces some origin parameters with more accurate ones
             if line[79] == 'H':
@@ -250,14 +282,14 @@ class Sfile:
                 self.longitude=float(line[33:43].strip())
                 self.depth=float(line[44:52].strip())
                 self.rms=float(line[53:59].strip())
-                continue
+
             if line[79] == 'I':
                 self.last_action=line[8:11]
                 self.action_time=line[12:26]
                 self.analyst = line[30:33]
                 self.id = int(line[60:74])
-                continue
-            if line[79] == ' ' and line[1:5]!="VOLC":
+
+            if line[79] == ' ' and not result:
                 if line.strip() == '':
                     continue
                 print(line[1:5])
@@ -288,7 +320,7 @@ class Sfile:
                     thisarrival['amp'] = aamp
                     thisarrival['per'] = aper
                 self.arrivals.append(thisarrival)
-                continue
+
         for _aeffile in _aeffiles:
             self.aeffiles.append(AEFfile(_aeffile))
         return None
