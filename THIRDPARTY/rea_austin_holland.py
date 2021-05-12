@@ -6,6 +6,86 @@
  University of Oklahoma
  2010
 """
+
+"""
+Modifications by GLenn THompson 2014
+1. There were a mixture of tabs and spaces which meant my version of Python couldn't load the module.
+Stripped out the tabs and replaced with spaces, then realigned code throughout whole file to prevent
+identation errors.
+2. 
+
+Methods used are:
+from rea import REA
+r = REA('/raid/data/seisan/REA/MVOE_/2002/01/31-2356-00L.S200201') # create the object
+r.read_file() # print lines from the file to screen
+vars(r) # print attributes
+print(r) # fails because there needs to be an origin. Default behaviour needed.
+r.parse_reaheader() # populates attributes
+r.to_obspy()
+r.plot()
+Got error:
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/raid/apps/antelope/python2.7.2/lib/python2.7/site-packages/obspy-0.8.4_705_gd3b2fe_dirty-py2.7.egg/obspy/core/stream.py", line 1083, in plot
+    waveform = WaveformPlotting(stream=self, *args, **kwargs)
+  File "/opt/antelope/python2.7.2/lib/python2.7/site-packages/obspy.imaging-0.7.0-py2.7.egg/obspy/imaging/waveform.py", line 59, in __init__
+    raise IndexError(msg)
+IndexError: Empty stream object
+>>> print st
+0 Trace(s) in Stream:
+
+r.to_obspy() obviously is not working!
+
+Here is a full list of REA class methods:
+  __init__(self,reafile): # constructor
+  read_file(self):
+  print_file(self,lines):
+  write_file(self,lines):
+  parse_reaheader(self): # populate attributes from reafile
+  fix_depth(self,depth):
+  free_depth(self):
+  fix_origintime(self,ot):
+  fix_location(self,lat,lon,depth):
+  set_velmod(self,model):
+  external_mag(self,mag,type,agency,info):
+  add_comment(self,comment):
+  gen_ln1(self,ot,model,distance,latitude,longitude,depth,nsta,rms,mag,fixed=True):
+  add_waveform(self,filename):
+  phase_traveltime(self,h,m,s):
+  parse_Amb(self):
+  parse_AML(self):
+  parse_pmotions(self):
+  parse_phasetimes(self):
+  calculate_mblg(self,quiet=False):
+  mblg_recalc(self):
+  preferred_magnitude(self,agency=None,code=None,force_mblg_recalc=False):
+  maximum_magnitude(self,force_mblg_recalc=False):
+  __str__(self):
+  catalog_report(self):
+  to_simpleList(self):
+  to_GEORSS(self):
+  to_EQXML(self,action=None):
+  to_CSVsimple(self):
+  to_XMLCatalog(self):
+  to_HTML(self,filename=None):
+  to_obspy(self): # read WAV file into ObsPy stream
+  parse_traveltimes(self,phase):
+  to_SimpleEQ(self):
+
+And functions:
+  lntype(line):
+  mag_commentln(mag,type,agency,info):
+  sec2isecmsec(seconds):
+  velocity(dist,time):
+  mean(array):
+  seidb_traverse(readir,dbname,type):
+  event_list(startdate,enddate): # return a Python list of all events in REA tree
+  eqxml_isoformat(dt):
+  eqxml_magkey(type):
+  get_eqxmlID():
+
+
+"""
 # Import PYTHON modules we need
 import os
 import sys
@@ -16,141 +96,144 @@ import math
 import re
 #from eqdb.py import *
 
+
 #Useful global variables
 magtype_map={"L":"ML","b":"mb","B":"mB","s":"Ms","S":"MS","W":"MW","G":"mbLg","C":"Md"}
 
 def lntype(line):
-    if len(line) == 80:
-        type=line[79]
-    else:
-        type=''
-    return type
+  if len(line) == 80:
+    type=line[79]
+  else:
+    type=''
+  return type
 
 def mag_commentln(mag,type,agency,info):
-    str=" ExtMag %4.1f%1s%3s%63s3" % (mag,type,agency,info)
-    return str
+  str=" ExtMag %4.1f%1s%3s%63s3" % (mag,type,agency,info)
+  return str
 
 def sec2isecmsec(seconds):
-    isec=int(seconds)
-    msec=int((seconds-isec)*1e6)
-    return isec,msec
+  isec=int(seconds)
+  msec=int((seconds-isec)*1e6)
+  return isec,msec
 
 def velocity(dist,time):
-    return dist/time       
+  return dist/time       
 
 def mean(array):
-    n=len(array)
-    if n > 0:
-        return (math.fsum(array)/n)
-    else:
-        return 0.0
+  n=len(array)
+  if n > 0:
+    return (math.fsum(array)/n)
+  else:
+    return 0.0
 
 def seidb_traverse(readir,dbname,type):
-    """full_filenames=seidb_traverse(readir,dbname,type)
-    This will return a list of fully qualified path and filenames for the SEISAN database
-    identified by the dbname and type is the SEISAN location code L,R, or D."""
-    _sdir=""
-    _sstr="%s.S" % (type)
-    flist=[]
-    if readir[-1]=='/':
-      _sdir=readir+dbname
-    else:
-      _sdir=readir+'/'+dbname
-    for root, dirs, files in os.walk(_sdir):
-        for filename in files:
-            if re.search(_sstr,filename):
-                flist.append(root+'/'+filename)
-    return flist
+  """full_filenames=seidb_traverse(readir,dbname,type)
+  This will return a list of fully qualified path and filenames for the SEISAN database
+  identified by the dbname and type is the SEISAN location code L,R, or D."""
+  _sdir=""
+  _sstr="%s.S" % (type)
+  flist=[]
+  if readir[-1]=='/':
+    _sdir=readir+dbname
+  else:
+    _sdir=readir+'/'+dbname
+  for root, dirs, files in os.walk(_sdir):
+    for filename in files:
+      if re.search(_sstr,filename):
+        flist.append(root+'/'+filename)
+  return flist
 
 def event_list(startdate,enddate):
-    event_list=[]
-    reapath="/home/analyst/REA/OGS__/"
-    years=range(startdate.year,enddate.year+1)
-    for year in years:
-        #print year
-        if year==enddate.year and year==startdate.year:
-            months=range(startdate.month,enddate.month+1)
-        elif year==startdate.year:
-            months=range(startdate.month,13)
-        elif year==enddate.year:
-            months=range(1,enddate.month+1)
-        else:
-            months=range(1,13)
-        for month in months:
-            #print month
-            dir="%s%d/%02d/" % (reapath,year,month)
-            #print dir
-            flist=glob(dir+"*L.S*")
-            event_list.extend(flist)
-    return event_list  
+  event_list=[]
+  #reapath="/home/analyst/REA/OGS__/"
+  reapath="/raid/data/seisan/REA/MVOE_/"
+  years=list(range(startdate.year,enddate.year+1))
+  for year in years:
+    #print year
+    if year==enddate.year and year==startdate.year:
+      months=list(range(startdate.month,enddate.month+1))
+    elif year==startdate.year:
+      months=list(range(startdate.month,13))
+    elif year==enddate.year:
+      months=list(range(1,enddate.month+1))
+    else:
+      months=list(range(1,13))
+    for month in months:
+      #print month
+      dir="%s%d/%02d/" % (reapath,year,month)
+      #print dir
+      flist=glob(dir+"*L.S*")
+      event_list.extend(flist)
+  return event_list  
 
 class REA:
 
-    def __init__(self,reafile):
-        if os.path.exists(reafile):
-            self.file=reafile
-            self.file_mtime=os.path.getmtime(reafile) 
-            self.wave_files=[]
-            self.error_msg=""
-            self.evtype={}
-            self.magnitude=[]
-            self.magnitude_type=[]
-            self.magnitude_agency=[]
-            self.line1_proc=False
-            self.error={}
-            self.url=''
-            self.ha={}
-            self.focmec={}
-            self.maximum_intensity=0
-            self.debug_msg="Initialized instance of REA Class"
-            self.error_msg=''
-        else:
-            self.error_msg="REA file does not exist"
+  def __init__(self,reafile):
+    if os.path.exists(reafile):
+      self.file=reafile
+      self.file_mtime=os.path.getmtime(reafile) 
+      self.wave_files=[]
+      self.error_msg=""
+      self.evtype={}
+      self.magnitude=[]
+      self.magnitude_type=[]
+      self.magnitude_agency=[]
+      self.line1_proc=False
+      self.error={}
+      self.url=''
+      self.ha={}
+      self.focmec={}
+      self.maximum_intensity=0
+      self.debug_msg="Initialized instance of REA Class"
+      self.error_msg=''
+      self.origin_time = None
+    else:
+      self.error_msg="REA file does not exist"
   
 
-    def read_file(self):
-        try:
-            rea_fh=open(self.file,"r")
-            raw=rea_fh.read()
-            lines=raw.split('\n')
-            rea_fh.close()
-            return lines
-        except IOError:
-            print "Error: The specified file does not exist - %s" % (self.file)
-            raise e
+  def read_file(self):
+    try:
+      rea_fh=open(self.file,"r")
+      raw=rea_fh.read()
+      lines=raw.split('\n')
+      rea_fh.close()
+      return lines
+    except IOError:
+      print("Error: The specified file does not exist - %s" % (self.file))
+      raise e
 
-    def print_file(self,lines):
-        for line in lines:
-            print line
-        return True
+  def print_file(self,lines):
+    for line in lines:
+      print(line)
+    return True
 
-    def write_file(self,lines):
-        try:
-            rea_fh=open(self.file,'w')
-            for line in lines:
-                rea_fh.write("%s\n" % (line))
-            rea_fh.close()
-        except IOError:
-            print "Error: The specified file does not exist - %s" % (self.file)
-            raise e
+  def write_file(self,lines):
+    try:
+      rea_fh=open(self.file,'w')
+      for line in lines:
+        rea_fh.write("%s\n" % (line))
+      rea_fh.close()
+    except IOError:
+      print("Error: The specified file does not exist - %s" % (self.file))
+      raise e
   
-    def parse_reaheader(self):
-        lines=self.read_file()
-        for line in lines:
-            if lntype(line) != '':
-            # Process Type 1 line
-                if lntype(line) == '1':
-                    if not self.line1_proc:
-                        self.line1_proc=True
-                        year=int(line[1:5])
-                        month=int(line[6:8])
-                        day=int(line[8:10])
-                        hour=int(line[11:13])
-                        min=int(line[13:15])
-                        isec=int(line[16:18])
-                        if isec == 60: # 
-                             min+=1
-                       isec=isec-60
+  def parse_reaheader(self):
+    lines=self.read_file()
+    for line in lines:
+      if lntype(line) != '':
+        # Process Type 1 line
+        if lntype(line) == '1':
+          if not self.line1_proc:
+            self.line1_proc=True
+            year=int(line[1:5])
+            month=int(line[6:8])
+            day=int(line[8:10])
+            hour=int(line[11:13])
+            min=int(line[13:15])
+            isec=int(line[16:18])
+            if isec == 60: # 
+               min+=1
+               isec=isec-60
             self.origin_time=datetime(year,month,day,hour,min,isec)
             self.evtype['dist']=line[21]
             self.velmod=line[20]
@@ -209,8 +292,7 @@ class REA:
             self.magnitude_type.append(magtype_map[line[12]])
             self.magnitude_agency.append(line[13:16])
           if line[1:4]=='URL':
-        self.url=line[5:78].rstrip()
-
+            self.url=line[5:78].rstrip()
 
         # Process Type E line, Hyp error estimates
         if lntype(line) == 'E':
@@ -240,8 +322,8 @@ class REA:
           self.rms=self.ha['rms']
 
         # Process Type F line, Fault plane solution
-    # Format has changed need to fix AAH - 2011-06-23
-        if lntype(line) == 'F' and not self.focmec.has_key('dip'):
+        # Format has changed need to fix AAH - 2011-06-23
+        if lntype(line) == 'F' and 'dip' not in self.focmec:
           self.focmec['strike']=float(line[0:10])
           self.focmec['dip']=float(line[10:20])
           self.focmec['rake']=float(line[20:30])
@@ -249,13 +331,13 @@ class REA:
           self.focmec['agency']=line[66:69]
           self.focmec['source']=line[70:77]
           self.focmec['quality']=line[77]
-    
-    # Process Type 6 lines, Waveform file lists
-    # Build an array of waveform files
-    if lntype(line) == '6':
-      lvals=line[1:79].split()
-      for val in lvals:
-        self.wave_files.append(val)
+  
+        # Process Type 6 lines, Waveform file lists
+        # Build an array of waveform files
+        if lntype(line) == '6':
+          lvals=line[1:79].split()
+          for val in lvals:
+            self.wave_files.append(val)
 
         # Process Type 2 line, Macroseismic Intensity Information
         if lntype(line) == '2':
@@ -284,13 +366,13 @@ class REA:
     if self.z_indicator=='F':
       lines=self.read_file()
       if lntype(lines[0]) == '1':
-         dstr="%5.1f " % (self.depth)
-         prefix=lines[0][0:38]
-         sufix=lines[0][44:len(lines[0])]
-         lines[0]="%s%s%s" % (prefix,dstr,sufix)
-         self.write_file(lines)
-         self.debug_msg="Modified Type 1 Line: \n%s" % lines[0]
-         return True
+        dstr="%5.1f " % (self.depth)
+        prefix=lines[0][0:38]
+        sufix=lines[0][44:len(lines[0])]
+        lines[0]="%s%s%s" % (prefix,dstr,sufix)
+        self.write_file(lines)
+        self.debug_msg="Modified Type 1 Line: \n%s" % lines[0]
+        return True
       else:
         self.error_msg="Something funny happened and line one is not the first line"
         return False   
@@ -298,7 +380,7 @@ class REA:
       return False   
 
   def fix_origintime(self,ot):
-      #ot must be a datetime object
+    #ot must be a datetime object
     lines=self.read_file()
     if lntype(lines[0]) == '1':
       dstr=" %4d %2d%2dF%2d%2d%5.1f" % (ot.year,ot.month,ot.day,ot.hour,ot.minute,ot.second+ot.microsecond*1e-6)
@@ -347,7 +429,7 @@ class REA:
       return False
 
   def external_mag(self,mag,type,agency,info):
-# Support for using comment lines to contain external magnitudes
+  # Support for using comment lines to contain external magnitudes
     lines=self.read_file()
     ln3=mag_commentln(mag,type,agency,info)
     for index, line in enumerate(lines):
@@ -357,8 +439,8 @@ class REA:
     self.write_file(lines)
 
   def add_comment(self,comment):
-# Support for adding a comment to an sfile
-# comment must be 78 characters or less
+  # Support for adding a comment to an sfile
+  # comment must be 78 characters or less
     lines=self.read_file()
     ln3=' '+comment+' '*(78-len(comment))+'3'    
     for index, line in enumerate(lines):
@@ -419,15 +501,15 @@ class REA:
           tmp['min']=int(line[20:22])
           tmp['sec']=float(line[22:28])
 #          print line[33:40]
-      try:
+          try:
             tmp['amplitude']=float(line[33:40])
             tmp['period']=float(line[41:45])
             tmp['distance']=float(line[70:75])
             tmp['azimuth']=int(line[76:79])
             amps.append(tmp)
-      except:
-            print "ERROR READING LINE"
-        print line
+          except:
+            print("ERROR READING LINE")
+            print(line)
             tmp={}
     return amps
 
@@ -437,21 +519,21 @@ class REA:
     for line in lines:
       if lntype(line) == ' ' or lntype(line) == '4':
         if line[10:14] == 'IAML':
-         if line[33:40]!='       ':
-          tmp={}
-          #print line[1:6]
-          tmp['sta']=line[1:6]
-          tmp['inst']=line[6]
-          tmp['comp']=line[7]
-          tmp['hour']=int(line[18:20])
-          tmp['min']=int(line[20:22])
-          tmp['sec']=float(line[22:28])
-#          print line[33:40]
-          tmp['amplitude']=float(line[33:40])
-          tmp['period']=float(line[41:45])
-          tmp['distance']=float(line[70:75])
-          tmp['azimuth']=int(line[76:79])
-          amps.append(tmp)
+          if line[33:40]!='       ':
+            tmp={}
+            #print line[1:6]
+            tmp['sta']=line[1:6]
+            tmp['inst']=line[6]
+            tmp['comp']=line[7]
+            tmp['hour']=int(line[18:20])
+            tmp['min']=int(line[20:22])
+            tmp['sec']=float(line[22:28])
+#           print line[33:40]
+            tmp['amplitude']=float(line[33:40])
+            tmp['period']=float(line[41:45])
+            tmp['distance']=float(line[70:75])
+            tmp['azimuth']=int(line[76:79])
+            amps.append(tmp)
     return amps
 
 
@@ -461,15 +543,15 @@ class REA:
     for line in lines:
       if lntype(line) == ' ' or lntype(line) == '4':
         if line[10] == 'P':
-         if line[16]!=' ':
-          tmp={}
-          #print line[1:6]
-          tmp['sta']=line[1:6]
-          tmp['qual']=line[9]
-          tmp['mot']=line[16]
-          tmp['azm']=float(line[76:79])
-          tmp['ain']=float(line[56:60])
-          mot.append(tmp)
+          if line[16]!=' ':
+            tmp={}
+            #print line[1:6]
+            tmp['sta']=line[1:6]
+            tmp['qual']=line[9]
+            tmp['mot']=line[16]
+            tmp['azm']=float(line[76:79])
+            tmp['ain']=float(line[56:60])
+            mot.append(tmp)
     return mot
 
   def parse_phasetimes(self):
@@ -481,7 +563,7 @@ class REA:
         sta=line[1:6].strip()
         
         if line[10] == 'P':
-          if not sta in tmp.keys() and len(sta)>2:
+          if not sta in list(tmp.keys()) and len(sta)>2:
                 tmp[sta]={}
           try:
             tmp[sta]['dist']=float(line[71:75].strip())
@@ -499,7 +581,7 @@ class REA:
           except:
             pass
         if line[10] == 'S':
-          if not sta in tmp.keys() and len(sta)>2:
+          if not sta in list(tmp.keys()) and len(sta)>2:
                 tmp[sta]={}
           try:
             tmp[sta]['dist']=float(line[71:75].strip())
@@ -525,8 +607,8 @@ class REA:
     amps=self.parse_Amb()
     mags=[]
     if not quiet:
-      print "mbLg Magnitude Calculation summary"
-      print "\t Sta \t Dist\t Vel \tAmp(um)\t Per\t mbLg\tComments"
+      print("mbLg Magnitude Calculation summary")
+      print("\t Sta \t Dist\t Vel \tAmp(um)\t Per\t mbLg\tComments")
     for amp in amps:
       comment=""
       lgtt=self.phase_traveltime(amp['hour'],amp['min'],amp['sec'])
@@ -545,28 +627,28 @@ class REA:
       else:
         comment+="Bad Distance, "
       if not quiet:
-    print "\t%s\t%5.1f\t%5.2f\t%7.5f\t%4.2f\t%5.2f\t%s" %(amp['sta'],amp['distance'],lgvel,amplitude,amp['period'],mblg,comment)
+        print("\t%s\t%5.1f\t%5.2f\t%7.5f\t%4.2f\t%5.2f\t%s" %(amp['sta'],amp['distance'],lgvel,amplitude,amp['period'],mblg,comment))
     if not quiet:
-      print "\nmbLg= %4.1f" % (mean(mags))
+      print("\nmbLg= %4.1f" % (mean(mags)))
     return mags
 
   def mblg_recalc(self):
   #This function was added to make sure that the mbLg reported is determined from the most
   #current data and not what is necessarily stored in the SEISAN
-      mblg_index=-1
-      mags=[]
-      for i,magnitude in enumerate(self.magnitude):
-    if self.magnitude_type[i]=="mbLg" and self.magnitude_agency[i]=="OGS":
-      mblg_index=i
-      if mblg_index>=0:
-    mags=self.calculate_mblg(quiet=True)
-    self.magnitude[mblg_index]=mean(mags)
-      else:
-    if len(mags)>0:
-      self.magnitude.append(mean(mags))
-      self.magnitude_type.append("mbLg")
-      self.magnitude_agency("OGS")
-      return True
+    mblg_index=-1
+    mags=[]
+    for i,magnitude in enumerate(self.magnitude):
+      if self.magnitude_type[i]=="mbLg" and self.magnitude_agency[i]=="OGS":
+        mblg_index=i
+    if mblg_index>=0:
+      mags=self.calculate_mblg(quiet=True)
+      self.magnitude[mblg_index]=mean(mags)
+    else:
+      if len(mags)>0:
+        self.magnitude.append(mean(mags))
+        self.magnitude_type.append("mbLg")
+        self.magnitude_agency("OGS")
+    return True
 
   def preferred_magnitude(self,agency=None,code=None,force_mblg_recalc=False):
     # code is the magnitude type
@@ -576,47 +658,47 @@ class REA:
       self.mblg_recalc()
     agency_equiv={' GS':' US'}
     pref_order=[
-    {'agency':' US','type':'MW'},
-    {'agency':' US','type':'MS'},
-    {'agency':'OGS','type':'ML'},
-    {'agency':' US','type':'mbLg'},
-    {'agency':'OGS','type':'mbLg'},
-    {'agency':'OGS','type':'Md'},
-    {'agency':' US','type':'Md'}]
+        {'agency':' US','type':'MW'},
+        {'agency':' US','type':'MS'},
+        {'agency':'OGS','type':'ML'},
+        {'agency':' US','type':'mbLg'},
+        {'agency':'OGS','type':'mbLg'},
+        {'agency':'OGS','type':'Md'},
+        {'agency':' US','type':'Md'}]
     mag=0.0
     mtype="NA"
     agency="NA"
     for j,magid in enumerate(pref_order):
       for i,magnitude in enumerate(self.magnitude):
-    for key in agency_equiv.keys():
-      if self.magnitude_agency[i]==key:
-        self.magnitude_agency[i]=agency_equiv[key]
-    if magid['agency']==self.magnitude_agency[i] and magid['type']==self.magnitude_type[i]:
-      if select_agency:
-        if (agency=="NA") and (self.magnitude_agency[i]==select_agency):
-          #Only update values if we haven't yet so the order of presedence is preserved
-          if code:
-        if code==self.magnitude_type[i]:
-          mag=magnitude
-          mtype=self.magnitude_type[i]
-          agency=self.magnitude_agency[i]
-          else:
-        mag=magnitude
-        mtype=self.magnitude_type[i]
-        agency=self.magnitude_agency[i]
+        for key in list(agency_equiv.keys()):
+          if self.magnitude_agency[i]==key:
+            self.magnitude_agency[i]=agency_equiv[key]
+        if magid['agency']==self.magnitude_agency[i] and magid['type']==self.magnitude_type[i]:
+          if select_agency:
+            if (agency=="NA") and (self.magnitude_agency[i]==select_agency):
+              #Only update values if we haven't yet so the order of presedence is preserved
+              if code:
+                if code==self.magnitude_type[i]:
+                  mag=magnitude
+                  mtype=self.magnitude_type[i]
+                  agency=self.magnitude_agency[i]
+              else:
+                mag=magnitude
+                mtype=self.magnitude_type[i]
+                agency=self.magnitude_agency[i]
 
-      else:
-        if agency=="NA":
-          #Only update values if we haven't yet so the order of presedence is preserved
-          if code:
-        if code==self.magnitude_type[i]:
-          mag=magnitude
-          mtype=self.magnitude_type[i]
-          agency=self.magnitude_agency[i]
           else:
-        mag=magnitude
-        mtype=self.magnitude_type[i]
-        agency=self.magnitude_agency[i]
+            if agency=="NA":
+              #Only update values if we haven't yet so the order of presedence is preserved
+              if code:
+                if code==self.magnitude_type[i]:
+                  mag=magnitude
+                  mtype=self.magnitude_type[i]
+                  agency=self.magnitude_agency[i]
+                else:
+                  mag=magnitude
+                  mtype=self.magnitude_type[i]
+                  agency=self.magnitude_agency[i]
     return mag,mtype,agency
 
 
@@ -636,58 +718,11 @@ class REA:
       
 
   def __str__(self):
-    return "%s (UTC) - Magnitude %.1f" % (self.origin_time.ctime(),self.preferred_magnitude()[0])
-    
-
-  def catalog_report(self):
-    """This function determines whether or not the rea file meets the OGS reporting
-requirements:
-    More than 3 stations
-        Local earthquake that has not been identified as an explosion or possible explosion
-
-The function returns true if it meets our reporting requirements and false if not
-"""
-    flag=False
-    if (self.evtype['dist'] == 'L' and self.evtype['qual'] == ' '):
-      if (self.no_sta > 3) and self.error.has_key('latitude'):
-        flag=True
-    return flag
-
-  def to_simpleList(self):
-      if eqcatalog.isdst(self.origin_time):
-        ltime= self.origin_time - timedelta(hours=5.0)
-        tstr="%s CDT" % (ltime.isoformat(" "))
-      else:
-        ltime= self.origin_time - timedelta(hours=6.0)
-        tstr="%s CDT" % (ltime.isoformat(" "))
-      mstr="%.1f %s %s" % (self.maximum_magnitude())
-      #print self.ha['latitude']
-      #print self.error['latitude']
-      return [tstr,self.ha['latitude'],self.error['latitude'],self.ha['longitude'],
-        self.error['longitude'],self.ha['depth'],self.error['depth'],mstr]
-
-  def to_GEORSS(self):
-# This function generates georss records from rea objects.
-#The tcompare value is a datetime value.  For records to be reported they need to have origin times after this value
-    if self.catalog_report():
-      mag,type,agency=self.maximum_magnitude()
-      cat=dict(entry='entry',id=self.id)
-      cat['pubdate']=datetime.utcfromtimestamp(self.file_mtime).isoformat("T")
-      cat['title']="M %.1f, %s UTC" % (mag, self.origin_time.isoformat(" "))
-      ttime=time.localtime(time.mktime(self.origin_time.timetuple()))
-      if eqcatalog.isdst(self.origin_time):
-        ltime= self.origin_time - timedelta(hours=5.0)
-        cat['summary']="Origin Time %s UTC (%s CDT), Magnitude %.1f %s" % (self.origin_time.isoformat(" "),ltime.isoformat(" "),mag,type)
-      else:
-        ltime= self.origin_time - timedelta(hours=6.0)
-        cat['summary']="Origin Time %s UTC (%s CST), Magnitude %.1f %s" % (self.origin_time.isoformat(" "),ltime.isoformat(" "),mag,type)
-
-        
-      cat['georss:point']="%f %f" % (self.ha['latitude'],self.ha['longitude'])
-        
-      return eqcatalog.dict2xml(cat,4)
+    # GTHO 20140319 Added test here to see if origin_time defined
+    if self.origin_time:
+      return "%s (UTC) - Magnitude %.1f" % (self.origin_time.ctime(),self.preferred_magnitude()[0])
     else:
-      return ''
+      return "No origin time"
 
   def to_EQXML(self,action=None):
     self.parse_reaheader()
@@ -784,10 +819,15 @@ The function returns true if it meets our reporting requirements and false if no
       cat['depth']="%.2f" % (self.ha['depth'])
       cat['magnitude']="%.1f" % (mag)
       cat['magnitudetype']=type
-      cat['laterror']="%.2f" % (self.error['latitude'])
-      cat['lonerror']="%.2f" % (self.error['longitude'])
-      cat['deptherror']="%.2f" % (self.error['depth'])
-      cat['oterror']="%.2f" % (self.error['origintime'])
+      # GTHO 20140318: add checks for existence of self.error keys as getting error here
+      if 'latitude' in self.error:
+        cat['laterror']="%.2f" % (self.error['latitude'])
+      if 'longitude' in self.error:
+        cat['lonerror']="%.2f" % (self.error['longitude'])
+      if 'depth' in self.error:
+        cat['deptherror']="%.2f" % (self.error['depth'])
+      if 'origintime' in self.error:
+        cat['oterror']="%.2f" % (self.error['origintime'])
       cat['origintime']="%s" % (self.origin_time.isoformat(" "))
       if eqcatalog.isdst(self.origin_time):
         ltime= self.origin_time - timedelta(hours=5.0)
@@ -829,9 +869,9 @@ The function returns true if it meets our reporting requirements and false if no
       magstr+="%.1f %s %s<br />" % (self.magnitude[i],self.magnitude_type[i],self.magnitude_agency[i])
     fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Magnitude</td><td>%s</td>\n" % (magstr))
     fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Maximum Modified Mercalli Intensity</td><td>%s</td>\n" % (eqcatalog.roman_intensity(self.maximum_intensity)))
-    if self.focmec.has_key('strike'):
-        mechstr="Strike: %.1f&deg;<br />Dip: %.1f&deg;<br />Rake: %.1f&deg;<br />Agency: %s<br />Method: %s,<br />" % (self.focmec['strike'],self.focmec['dip'],self.focmec['rake'],self.focmec['agency'],self.focmec['source'])
-        fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Focal Mechanism</td><td>%s</td>\n" % (mechstr))
+    if 'strike' in self.focmec:
+      mechstr="Strike: %.1f&deg;<br />Dip: %.1f&deg;<br />Rake: %.1f&deg;<br />Agency: %s<br />Method: %s,<br />" % (self.focmec['strike'],self.focmec['dip'],self.focmec['rake'],self.focmec['agency'],self.focmec['source'])
+      fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Focal Mechanism</td><td>%s</td>\n" % (mechstr))
     fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Number of Stations</td><td>%d</td>\n" % (self.no_sta))
     fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Location RMS</td><td>%.2f</td>\n" % (self.rms))
     fh.write("<tr><td style=\"font-weight:bold;vertical-align:top;\">Last Updated</td><td>%s UTC</td>\n" % (datetime.utcfromtimestamp(self.file_mtime).isoformat(" ")))
@@ -844,43 +884,45 @@ The function returns true if it meets our reporting requirements and false if no
       fh.close()
     return True
 
-
-
-
   def to_obspy(self):
     """
     returns an obspy  stream object
     """
     import obspy.core
     
-    dir_top = '/home/analyst/WAV/'
-    dirs = os.walk(dir_top).next()[1]
-    dirs.append('')
+    #dir_top = '/home/analyst/WAV/'
+    dir_top = '/raid/data/seisan/WAV/MVOE_/'
+    years = os.walk(dir_top).next()[1]
+    years.append('')
     st = obspy.core.Stream()
     for wave in self.wave_files:
-      for dir in dirs:
-        #print dir_top+dir+wave
-        if os.path.exists(dir_top+dir+wave):
-          wave_file=dir_top+dir+wave
-          st += obspy.read(wave_file)
-          #print "local pathname stored"
-          continue
-        elif os.path.exists(wave):
-          wave_file=wave
-          st += obspy.read(wave_file)
-          #print "full pathname stored"
-          continue
+      for year in years:
+        fullyear = os.path.join(dir_top, year)
+        #print fullyear
+        months = os.walk(fullyear).next()[1]
+        months.append('')
+        for month in months:
+          if len(month)>2:
+            continue
+          fullmonth = os.path.join(fullyear, month)
+          #print fullmonth
+          fullwave = os.path.join(fullmonth, wave)
+          if os.path.exists(fullwave):
+            st += obspy.read(fullwave)
+            print("local pathname stored")
+            continue
+          elif os.path.exists(wave):
+            st += obspy.read(wave)
+            print("full pathname stored")
+            continue
     return st
-
-
-
 
   def parse_traveltimes(self,phase):
     """
     Creates a dictionary of traveltimes
     of the format:
-   {'receiver A name': travel time in seconds,
-    'receiver B name': travel time in seconds}
+       {'receiver A name': travel time in seconds,
+        'receiver B name': travel time in seconds}
 
     takes argument of self and phase (p,P,s,S)
     """
@@ -906,7 +948,7 @@ The function returns true if it meets our reporting requirements and false if no
     return tts
 
 """
-    def to_SimpleEQ(self):
+  def to_SimpleEQ(self):
     ret = SimpleEQ()
     ret.id=self.id
     ret.rea_file=self.file
@@ -927,12 +969,6 @@ The function returns true if it meets our reporting requirements and false if no
     ret.county="NA"
 
     return ret"""
-
-
-
-    
-    
-
 
 # End of REA Class and define more local methods 
 def eqxml_isoformat(dt):
@@ -958,3 +994,16 @@ def get_eqxmlID():
   f.write("%i\n" % (id))
   f.close()
   return id
+  
+
+
+if __name__ == "__main__":
+    r = REA('/raid/data/Montserrat/MASTERING/seisan/REA/MVOE_/2002/01/31-2356-00L.S200201') # create the object
+    r.read_file() # print lines from the file to screen
+    print((vars(r))) # print attributes
+    print(r) # fails because there needs to be an origin. Default behaviour needed.
+    r.parse_reaheader() # populates attributes
+    #r.plot()
+    st = r.to_obspy() # not working!
+    print(st)
+    #st.plot()

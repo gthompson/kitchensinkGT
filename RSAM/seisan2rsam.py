@@ -1,11 +1,11 @@
 import os, datetime, pprint
 import numpy as np
-SEISAN_DATA_ROOT = os.path.join("/raid", "data", "seisan")
+SEISAN_DATA = os.environ['SEISAN_DATA']
 DB = "DSNC_"
 
 def main(startdate, enddate):
     event_list=[]
-    reapath = os.path.join(SEISAN_DATA_ROOT, 'REA', DB)
+    reapath = os.path.join(SEISAN_DATA, 'REA', DB)
     years=range(startdate.year,enddate.year+1)
     for year in years:
         #print year
@@ -23,20 +23,20 @@ def main(startdate, enddate):
             #print dir
             flist=glob(os.path.join(dir,"%04d*" % year))
             for file in flist:
-                % load file
+                # load file
                 st = read(file)
-                % for each channel
+                # for each channel
                 for tr in st:
 
-                    % detrend data
+                    # detrend data
                     tr.detrend('linear')
-                    % compute abs
+                    # compute abs
                     a = abs(tr.data)
                     m = list()
-                    % for each minute
+                    # for each minute
                     for i=0:60:length(a)
-                        % compute mean
-                        % append to array for channel
+                        # compute mean
+                        # append to array for channel
                         m.append( mean(a[i:i+59]) )
 
-                    % save to channel file
+                    # save to channel file

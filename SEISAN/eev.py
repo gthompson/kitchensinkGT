@@ -1,4 +1,4 @@
-#!/raid/apps/OBSPY/bin/python
+#!/usr/bin/env python
 # Make a list of Sfiles or wavfiles
 # Glenn Thompson 2013/01/06
 # Usage: eev filenr.lis
@@ -9,31 +9,38 @@ import Seisan_Catalog, StreamGT
 from os import walk
 
 def main():
-    # read in the wav file name from the command line
     filenrlis = sys.argv[1]
-    files = []
-    file=open(filenrlis,'r') 
+    file = open(filenrlis,'r') 
         
     lines = file.readlines()
+    nlines = len(lines)
 
     linenum = 0 
     while True:
-        thisfile = line[6:].strip()
+        thisfile = lines[linenum][6:].strip()
         choice = input(line + "? ")
+
         if choice == 'n':
-            continue
+            linenum += 1
+            if linenum>=nlines:
+                linenum=nlines-1
     
+        elif choice == 'b':
+            linenum -= 1
+            if linenum<0:
+                linenum=0
+
         elif choice == 's':
-            show_sfile(thisfile)
+            Seisan_Catalog.show_sfile(thisfile)
 
         elif choice == 'p':
-            mulplt(thisfile)
+            StreamGT.mulplt(thisfile)
 
         elif choice == 'h':
             print("Menu:")
             print("\tf = first event")
             print("\tn = next event")
-            print("\tp = previous event")
+            print("\tb = previous event")
             print("\tl = last event")
             print("\tw = plot waveform file(s)")
             print("\ts = show Sfile")
