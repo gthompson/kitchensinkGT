@@ -1,0 +1,13 @@
+# Three instruments installed Miami lakes on July 3rd
+# Another in Miramar on July 7.
+# Another at Steve's house on July 4th.
+# Quarry is "White Rock Quarry"
+$net = "AM";
+@stations = qw(R976A REFFB RCC6E R4FF5 R6324 RA71B);
+
+# Other station metadata
+@owners = qw(Irene Oscar Miguel Nancy Steve Unknown);
+@lat = (0, 25.9447, 25.9445, 0, 27.8301, 0);
+@lon = (0, 80.3310, 80.3311, 0, 82.6121, 0);
+
+# See DROPBOX/PROFESSIONAL/RESEARCH/PROJECTS/Project Documents/MiamiLakes for the old Perl script
