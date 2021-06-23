@@ -53,7 +53,7 @@ for index, row in df.iterrows():
     inv = get_FDSN_inventory(fdsnClient, row['time'], stationXMLfile, NETWORK, LATITUDE, LONGITUDE, searchRadiusDeg, PRE_TRIGGER_SECS, POST_TRIGGER_SECS )
             
     #inv.plot(projection='local', resolution='l')
-eventTime = list()
+    eventTime = list()
 
     # for sta in inv[0].stations:
     #     print(sta)

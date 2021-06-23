@@ -5,6 +5,7 @@ import os
 import shutil
 import glob
 import pandas as pd
+import obspy
 from obspy.core import Stream, read 
 import numpy as np
 from obspy.core.utcdatetime import UTCDateTime
@@ -14,12 +15,14 @@ import matplotlib.pyplot as plt
 import datetime
 #from sys import exit
 from obspy.signal.trigger import classic_sta_lta, z_detect, plot_trigger, trigger_onset
+from obspy.geodetics.base import gps2dist_azimuth, kilometers2degrees
+from obspy.taup import TauPyModel
 
 # Glenn Thompson, Feb 2021
 
 
 #######################################################################
-##                                                    Stream tools                                                              ##
+##                Stream tools                                       ##
 #######################################################################
 
 def Stream_min_starttime(all_traces):
@@ -45,82 +48,24 @@ def Stream_min_starttime(all_traces):
     return min_stime, max_stime, min_etime, max_etime
 
 
-
-def Stream_to_24H(all_traces):
+def removeInstrumentResponse(st, preFilter = (1, 1.5, 30.0, 45.0), outputType = "VEL", inventory = ""):  
     """
-    Take a Stream object, merge all traces with common ids and pad out to 24-hour-long traces
-
-    Created for ROCKETSEIS data conversion and modified for CALIPSO data archive from Alan Linde. 
+    Remove instrument response - assumes inventories have been added to Stream object
+    Written for Miami Lakes
     """
-
-    all_traces.merge(fill_value=0)
-    min_stime, max_stime, min_etime, max_etime = Stream_min_starttime(all_traces)
-    
-    desired_stime = UTCDateTime(min_stime.year, min_stime.month, min_stime.day, 0, 0, 0.0)
-    desired_etime = desired_stime + 86400
-    
-    days = Stream()
-    while True:
-        
-        this_st = all_traces.copy()
-        this_st.trim(starttime=desired_stime, endtime=desired_etime, pad=True, fill_value=0)
-        for this_tr in this_st:
-            days.append(this_tr)
-        desired_stime += 86400
-        desired_etime += 86400
-        if desired_etime > max_etime + 86400:
-            break
-    return days
-
-
-
-def Trace_merge_with_BUDfile(this_tr, budfile):
-    """
-    Clever way to merge overlapping traces into a BUD file. Uses all non-zero data values from both.
-
-    Created for CALIPSO data archive from Alan Linde, when needed to upgrade Stream_to_BUD.
-    """
-
-    other_st = read(budfile)
-    error_flag = False
-    
-    if len(other_st)>1:
-        print('More than 1 trace in %s. Cannot merge.' % budfile)
-        error_flag = True
-        
-    other_tr = other_st[0]
-    if not (this_tr.id == other_tr.id):
-        print('Different trace IDs. Cannot merge.')
-        error_flag = True
-        
-    if not (this_tr.stats.sampling_rate == other_tr.stats.sampling_rate):
-        print('Different sampling rates. Cannot merge.')
-        error_flag = True
-        
-    if (abs(this_tr.stats.starttime - other_tr.stats.starttime) > this_tr.stats.delta/4):
-        print('Different start times. Cannot merge.')  
-        error_flag = True
-
-    if (abs(this_tr.stats.endtime - other_tr.stats.endtime) > this_tr.stats.delta/4):
-        print('Different end times. Cannot merge.')  
-        error_flag = True
-        
-    if error_flag: # traces incompatible, so return the trace with the most non-zero values
-        this_good = np.count_nonzero(this_tr.data)
-        #print(this_tr.stats)
-        other_good = np.count_nonzero(other_tr.data)
-        #print(other_tr.stats)
-        if other_good > this_good:
-            return other_tr
-        else:
-            return this_tr
-    
-    else: # things are good
-        indices = np.where(other_tr.data == 0)
-        other_tr.data[indices] = this_tr.data[indices]
-        return other_tr
-    
-
+    try:
+        st.remove_response(output=outputType, pre_filt=preFilter)
+    except:
+        for tr in st:
+            try:
+                if inventory:
+                    tr.remove_response(output=outputType, pre_filt=preFilter, inventory=inventory)
+                else:
+                    tr.remove_response(output=outputType, pre_filt=preFilter)
+            except:
+                print("- Not able to correct data for %s " %  tr.id)
+                st.remove(tr)
+    return
 
 
 def eventStatistics(st):
@@ -204,8 +149,8 @@ def detectEvent(st, pretrig=30, posttrig=30):
     stime = st[0].stats.starttime + onset_seconds
     etime = st[0].stats.starttime + offset_seconds
     st.trim(starttime = stime, endtime = etime)
+    return
     
-
 
 
 def mulplt(st, bottomlabel='', ylabels=[]):
@@ -237,45 +182,33 @@ def mulplt(st, bottomlabel='', ylabels=[]):
         y = st[i].data - offset
         
         # PLOT THE DATA
-        axh[i].plot(t, y)def inventory2traceid(inv, chancode=''):
-    trace_ids = list()
+        axh[i].plot(t, y)
 
-    for networkObject in inv:
-        if chancode:
-            networkObject = networkObject.select(channel=chancode)
-        stationObjects = networkObject.stations
 
-        for stationObject in stationObjects:
-            channelObjects = stationObject.channels
-            for channelObject in channelObjects:
-                this_trace_id = networkObject.code + '.' + stationObject.code + '.' + channelObject.code
-                trace_ids.append(this_trace_id)
-
-    return trace_ids
         
-        # remove yticks because we will add text showing max and offset values
-        axh[i].yaxis.set_ticks([])
+    # remove yticks because we will add text showing max and offset values
+    axh[i].yaxis.set_ticks([])
         
-        # remove xticklabels for all but the bottom subplot
-        if i < n-1:
-            axh[i].xaxis.set_ticklabels([])
+    # remove xticklabels for all but the bottom subplot
+    if i < n-1:
+        axh[i].xaxis.set_ticklabels([])
+    else:
+        # for the bottom subplot, also add an xlabel with start time
+        if bottomlabel=='':
+            plt.xlabel("Starting at %s" % (st[0].stats.starttime) )
         else:
-            # for the bottom subplot, also add an xlabel with start time
-            if bottomlabel=='':
-                plt.xlabel("Starting at %s" % (st[0].stats.starttime) )
-            else:
-                plt.xlabel(bottomlabel)
-                
-        # default ylabel is station.channel
-        if ylabels==[]:
-            plt.ylabel(st[i].stats.station + "." + st[i].stats.channel, rotation=0)
-        else:
-            plt.ylabel(ylabels[i])
+            plt.xlabel(bottomlabel)
+               
+    # default ylabel is station.channel
+    if ylabels==[]:
+        plt.ylabel(st[i].stats.station + "." + st[i].stats.channel, rotation=0)
+    else:
+        plt.ylabel(ylabels[i])
             
-        # explicitly give the maximum amplitude and offset(median)
-        plt.text(0, 1, "max=%.1e offset=%.1e" % (np.max(np.abs(y)), offset),
-            horizontalalignment='left',
-            verticalalignment='top',transform=axh[i].transAxes)
+    # explicitly give the maximum amplitude and offset(median)
+    plt.text(0, 1, "max=%.1e offset=%.1e" % (np.max(np.abs(y)), offset),
+        horizontalalignment='left',
+        verticalalignment='top',transform=axh[i].transAxes)
             
     # change all font sizes
     plt.rcParams.update({'font.size': 8})
@@ -283,6 +216,8 @@ def mulplt(st, bottomlabel='', ylabels=[]):
     # show the figure
     plt.show()
     #st.mulplt = types.MethodType(mulplt,st)    
+    
+    return fh, axh
     
     
 def iceweb_spectrogram(st):
@@ -349,8 +284,25 @@ def iceweb_spectrogram(st):
     plt.show()
 
     
-#######################################################################
-##                                                    WFDISC tools                                                             ##
+
+def max_3c(st):
+    """ max of a 3-component seismogram """
+    N = len(st)/3
+    m = []
+
+    if N.is_integer():
+        st.detrend()
+        for c in range(int(N)):
+            y1 = st[c*3+0].data
+            y2 = st[c*3+1].data
+            y3 = st[c*3+2].data
+            y = np.sqrt(np.square(y1) + np.square(y2) + np.square(y3))
+            m.append(max(y))
+    return m    
+    
+    
+#######################################################################    
+########################         WFDISC tools                        ##
 #######################################################################
 
 
@@ -511,7 +463,7 @@ def process_wfdirs(wfdirs, filematch, put_away=False):
 
 
 #######################################################################
-##                                                    BUD tools                                                                   ##
+##                BUD tools                                          ##
 #######################################################################
 
 
@@ -566,22 +518,8 @@ def Stream_to_BUD(TOPDIR, all_traces):
         mseedDayFile = os.path.join(stationDaysDir, mseedDayBasename)
         #print(mseedDayFile)
         if os.path.exists(mseedDayFile):
-            this_tr = Trace_merge_with_BUDfile(this_tr, mseedDayFile)def inventory2traceid(inv, chancode=''):
-    trace_ids = list()
+            this_tr = Trace_merge_with_BUDfile(this_tr, mseedDayFile)
 
-    for networkObject in inv:
-        if chancode:
-            networkObject = networkObject.select(channel=chancode)
-        stationObjects = networkObject.stations
-
-        for stationObject in stationObjects:
-            channelObjects = stationObject.channels
-            for channelObject in channelObjects:
-                this_trace_id = networkObject.code + '.' + stationObject.code + '.' + channelObject.code
-                trace_ids.append(this_trace_id)
-
-    return trace_ids
-        print('Writing ',this_tr,' to ',mseedDayFile)
         this_tr.write(mseedDayFile, format='MSEED') 
 
 
@@ -637,44 +575,96 @@ def Stream_to_dayplot(TOPDIR, all_traces):
     JJJ = stime.yearday
     pngfile = os.path.join(daysDir, '%s.%s.%s.png' % (NETWORK, YYYYJJJ[0:4], YYYYJJJ[4:])  )   
     all_traces.plot(equal_scale=False, outfile=pngfile);
+    return
 
 
-
-def removeInstrumentResponse(st, preFilter = (1, 1.5, 30.0, 45.0), outputType = "VEL"):  
+def Stream_to_24H(all_traces):
     """
-    Remove instrument response - assumes inventories have been added to Stream object
-    Written for Miami Lakes
+    Take a Stream object, merge all traces with common ids and pad out to 24-hour-long traces
+
+    Created for ROCKETSEIS data conversion and modified for CALIPSO data archive from Alan Linde. 
     """
-    if os.path.exists(correctedfile):
-        # Load corrected data from file
-        st = obspy.core.read(correctedfile)
-    else:
-        try:
-            st.remove_response(output=outputType, pre_filt=preFilter)
-        except:
-            goodst = obspy.Stream()
-            for tr in st:
-                try:
-                    tr.remove_response(output=outputType, pre_filt=preFilter)
-                except:
-                    print("- Not able to correct data for %s "  tr.id)
-                else:
-                    goodst = goodst + tr
-            st = goodst
-    return st
+
+    all_traces.merge(fill_value=0)
+    min_stime, max_stime, min_etime, max_etime = Stream_min_starttime(all_traces)
+    
+    desired_stime = UTCDateTime(min_stime.year, min_stime.month, min_stime.day, 0, 0, 0.0)
+    desired_etime = desired_stime + 86400
+    
+    days = Stream()
+    while True:
+        
+        this_st = all_traces.copy()
+        this_st.trim(starttime=desired_stime, endtime=desired_etime, pad=True, fill_value=0)
+        for this_tr in this_st:
+            days.append(this_tr)
+        desired_stime += 86400
+        desired_etime += 86400
+        if desired_etime > max_etime + 86400:
+            break
+    return days
+
+
+
+def Trace_merge_with_BUDfile(this_tr, budfile):
+    """
+    Clever way to merge overlapping traces into a BUD file. Uses all non-zero data values from both.
+
+    Created for CALIPSO data archive from Alan Linde, when needed to upgrade Stream_to_BUD.
+    """
+
+    other_st = read(budfile)
+    error_flag = False
+    
+    if len(other_st)>1:
+        print('More than 1 trace in %s. Cannot merge.' % budfile)
+        error_flag = True
+        
+    other_tr = other_st[0]
+    if not (this_tr.id == other_tr.id):
+        print('Different trace IDs. Cannot merge.')
+        error_flag = True
+        
+    if not (this_tr.stats.sampling_rate == other_tr.stats.sampling_rate):
+        print('Different sampling rates. Cannot merge.')
+        error_flag = True
+        
+    if (abs(this_tr.stats.starttime - other_tr.stats.starttime) > this_tr.stats.delta/4):
+        print('Different start times. Cannot merge.')  
+        error_flag = True
+
+    if (abs(this_tr.stats.endtime - other_tr.stats.endtime) > this_tr.stats.delta/4):
+        print('Different end times. Cannot merge.')  
+        error_flag = True
+        
+    if error_flag: # traces incompatible, so return the trace with the most non-zero values
+        this_good = np.count_nonzero(this_tr.data)
+        #print(this_tr.stats)
+        other_good = np.count_nonzero(other_tr.data)
+        #print(other_tr.stats)
+        if other_good > this_good:
+            return other_tr
+        else:
+            return this_tr
+    
+    else: # things are good
+        indices = np.where(other_tr.data == 0)
+        other_tr.data[indices] = this_tr.data[indices]
+        return other_tr
+
 
 
 
 ######################################################################
-##                                                  FDSN tools                                                                 ##
+##                          FDSN tools                              ##
 ######################################################################
 
-def get_FDSN_inventory(fdsnClient, eventTime, stationXMLfile, network, latitude, longitude,searchRadiusDeg, pretrigSecs, posttrigSecs ):
+def get_FDSN_inventory(fdsnClient, eventTime, stationXmlFile, network, latitude, longitude,searchRadiusDeg, pretrigSecs, posttrigSecs ):
     """ 
     Load inventory of stations/channels available around this event time. It will attempt to load from file, then from the client
     Written for Miami Lakes project
     """
-
+    
     if os.path.exists(stationXmlFile):
         # load inv from file
         inv = obspy.core.inventory.read_inventory(stationXmlFile)
@@ -691,7 +681,7 @@ def get_FDSN_inventory(fdsnClient, eventTime, stationXMLfile, network, latitude,
                 maxradius = searchRadiusDeg,
                 starttime = startt,
                 endtime = endt,
-                level = 'channel'
+                level = 'response'
             )
             
         except Exception as e: 
@@ -748,12 +738,12 @@ def get_FDSN_Stream(fdsnClient, trace_ids, outfile, startt, endt ):
             st.merge(fill_value=0)
     
             # Save raw waveform data to miniseed
-            st.writeoutfile, format="MSEED")
+            st.write(outfile, format="MSEED")
             
             return st
 
 ######################################################################
-##                                            Inventory tools                                                                 ##
+##                  Inventory tools                                 ##
 ######################################################################
 
 def inventory2traceid(inv, chancode=''):
@@ -773,7 +763,60 @@ def inventory2traceid(inv, chancode=''):
     return trace_ids
 
 
+def attach_station_coordinates_from_inventory(inventory, st):
+    """ attach_station_coordinates_from_inventory """
+    for tr in st:
+        for netw in inventory.networks:
+            for sta in netw.stations:
+                if tr.stats.station == sta.code and netw.code == tr.stats.network:
+                    for cha in sta.channels:
+                        if tr.stats.location == cha.location_code:
+                            tr.stats.latitude = cha.latitude
+                            tr.stats.longitude = cha.longitude
+    return
 
+
+######################################################################
+##                  Modeling  tools                                 ##
+######################################################################
+
+
+def predict_arrival_times(station, quake):
+    """ calculate predicted travel times based on IASP91 model  - see https://docs.obspy.org/packages/obspy.taup.html
+        Input: station and quake both are dicts with lat and lon keys
+        Output: a phases dict is added to station, with phase name keys and predicted arrival times """
+    model = TauPyModel(model="iasp91")
+    
+    [dist_in_m, az1, az2] = gps2dist_azimuth(quake['lat'], quake['lon'], station['lat'], station['lon'])
+    station['distance'] = kilometers2degrees(dist_in_m/1000)
+    arrivals = model.get_travel_times(source_depth_in_km=quake['depth'],distance_in_degree=station['distance'])
+    # https://docs.obspy.org/packages/autogen/obspy.taup.helper_classes.Arrival.html#obspy.taup.helper_classes.Arrival
+    
+    phases = dict()
+    for a in arrivals:
+        phasetime = quake['otime'] + a.time
+        phases[a.name] = phasetime.strftime('%H:%M:%S')
+        if a.name == 'S':
+            Rtime = quake['otime'] + a.time/ ((0.8453)**0.5)
+            phases['Rayleigh'] = Rtime.strftime('%H:%M:%S')
+    station['phases'] = phases
+    
+    return station
+
+def syngine2stream(station, lat, lon, GCMTeventID, mseedfile):
+    """ Generate synthetics for a GCMT event, save into an mseedfile, return as Stream object """
+    if os.path.exists(mseedfile):
+        synth_disp = read(mseedfile)
+    else:
+        synth_disp = read("http://service.iris.edu/irisws/syngine/1/query?"
+                  "format=miniseed&units=displacement&dt=0.02&"
+                  "receiverlatitude=%f&receiverlongitude=%f&"
+                  "eventid=GCMT:%s" % (lat, lon, GCMTeventID))
+        for c in range(len(synth_disp)):
+            synth_disp[c].stats.latitude = lat
+            synth_disp[c].stats.longitude = lon
+        synth_disp.write(mseedfile)
+    return synth_disp
 
 
 
