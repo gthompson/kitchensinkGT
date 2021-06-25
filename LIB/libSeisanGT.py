@@ -549,6 +549,20 @@ class Wavfile:
         self.st = None
         return None
 
+    def get_path_to_sfile(wavfile):
+        spath = os.path.dirname(wavfile)
+        spath = spath.replace('WAV','REA',1)
+        wavbase = os.path.basename(wavfile)
+        yyyy = wavbase[0:4]
+        mm = wavbase[5:7]
+        dd = wavbase[8:10]
+        HH = wavbase[11:13]
+        MI = wavbase[13:15]
+        SS = wavbase[16:18]
+        sbase = dd + "-" + HH + MI + "-" + SS + "L.S" + yyyy + mm
+        sfile = os.path.join(spath, sbase)
+        return sfile
+    
     def plot(self):
     # function Wavfile.plot()
         if self.st:
