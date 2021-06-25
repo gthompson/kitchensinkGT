@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 #import obspy.core
 
+import libMVO
+
 """
 ## Step 1: setup a .bashrc_montserrat file in your ~ (HOME) directory
 ### Example of file contents:
@@ -39,47 +41,6 @@ Glenn Thompson 2019/10/16, at IPGP
 
 """
 
-def check0andMinus1(liste):
-    liste=list(liste)
-    listStr=''.join(str(i) for i in liste)
-    if  "000000000000" in listStr or "-1-1-1-1-1-1-1-1" in listStr :
-        return False
-    else:
-        return True
-
-def fix_trace_ids(tr): # add stuff here to correct sampling rate too
-    # fix the network, channel and location
-    network = 'MV'
-    tr.stats['network']=network
-    sta = tr.stats['station'].strip()
-    chan = tr.stats['channel'].strip()
-    if chan=='PRS' or chan=='APS':
-        chan='BDF'
-    else:
-        if chan[0]=='A':
-            if tr.stats['location'] == 'J':
-                bandcode = 'S'
-            #else:
-                #bandcode = 'B'
-        else:
-            if chan[1]=='B':
-                bandcode = 'B'
-            else:
-                bandcode = chan[0]
-            instrumentcode = 'H'
-            if len(chan)==2:
-                orientationcode = tr.stats['location']
-            else:
-                orientationcode = chan[2]
-            chan = bandcode + instrumentcode + orientationcode
-
-    if chan[0]=='A':
-        print(tr.stats)
-        print(chan)
-        sys.exit('bugger!')
-    tr.stats['channel'] = chan
-    tr.stats['location']='--'
-    return tr
 
 if __name__ == '__main__':
     import os, sys, glob
