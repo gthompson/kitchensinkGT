@@ -1,8 +1,10 @@
 #!/usr/bin/env python
-#import sys
-#sys.path.append('/Users/thompsong/src/kitchensinkGT/LIB')
-import libseisGT
+import sys
 import numpy as np
+sys.path.append('/Users/thompsong/src/kitchensinkGT/LIB')
+from libseisGT import get_seed_band_code
+#import metrics
+
 
 def change_last_sample(tr):
 # function tr = change_last_sample(tr)
@@ -20,6 +22,7 @@ def swap32(i):
     return struct.unpack("<i", struct.pack(">i", i))[0]
 
 def fix_trace_id(st, shortperiod=False):
+    # convenience method to wrap correct_nslc
     for tr in st:
         nslc = correct_nslc(tr.id, tr.stats.sampling_rate, shortperiod=shortperiod)
         tr.id = nslc
@@ -42,7 +45,7 @@ def correct_nslc(traceID, Fs, shortperiod=False):
         loc = ''
                 
     # channel code is bandcode + instrumentcode + orientationcode
-    bandcode = libseisGT.get_seed_band_code(Fs, shortperiod=shortperiod)
+    bandcode = get_seed_band_code(Fs, shortperiod=shortperiod)
     #print(bandcode)
     
     instrumentcode = 'H' # seismic velocity sensor is default

@@ -1,10 +1,182 @@
 #!/usr/bin/env python
 #import sys
 #sys.path.append('/Users/thompsong/src/kitchensinkGT/LIB')
-import libseisGT
+import os
 import numpy as np
+from scipy.stats import describe
+from obspy.signal.quality_control import MSEEDMetadata 
+#import libseisGT
+from libseisGT import add_to_trace_history, clean_trace
 
-def check0andMinus1(liste):
+"""
+Functions for computing data quality metrics and statistical metrics (such as amplitude, energy and frequency) 
+on Stream/Trace objects.
+
+In terms of order of application:
+
+1. Read the raw data.
+2. Fix Trace IDs.
+3. Compute QC metrics (and potentially remove bad Traces).
+4. Correct the data (and save corrected data as MSEED/StationXML).
+5. Compute statistical metrics.
+
+"""
+
+
+def process_trace(tr, inv=None):
+# function tr, quality_factor, snr = compute_metrics(tr)
+# This function wraps all others
+    # Here we compute simple metrics on each trace (and used to write them to NET.STA.CHAN files). 
+    # These metrics are:
+    #     1. duration of signal
+    #     2. signal amplitude
+    #     3. noise amplitude
+    #     4. signal-to-noise ratio
+    
+    if not 'history' in tr.stats:
+        tr.stats['history'] = list()     
+        
+    """ RAW DATA QC METRICS """
+    qcTrace(tr)
+         
+    tr.stats["quality_factor"] = trace_quality_factor(tr) #0 = blank trace, 1 = has some 0s and -1s, 3 = all looks good
+
+    if tr.stats.quality_factor == 0:
+        return
+
+    """ CLEAN (DETREND, BANDPASS, CORRECT) TRACE """
+    clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 40.0], corners=2, zerophase=True, inv=inv)
+
+    """ CLEAN DATA WAVEFORM METRICS """ 
+    # estimate signal-to-noise ratio (after detrending)
+    #tr.stats["snr"] = (-1, -1, -1)
+    tr.stats["snr"] = signaltonoise(tr)
+    add_to_trace_history(tr, 'Signal to noise measured.')
+    if tr.stats["snr"][0] > 1:
+        tr.stats["quality_factor"] += 1 # good traces should now be a 4, some with 2 will be okay too
+    
+    tr.stats["duration"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending
+
+    # SciPy stats
+    tr.stats["scipy"] = describe(tr.data, nan_policy = 'omit') # only do this after removing trend/high pass filtering
+    add_to_trace_history(tr, 'scipy.stats metrics added as tr.stats.scipy.')
+    
+    
+def qcTrace(tr):
+    """ qcTrace(tr) DATA QUALITY CHECKS """
+    
+    """ Useful MSEED metrics
+    {'start_gap': None, 'end_gap': None, 'num_gaps': 0, 
+     'sum_gaps': 0, 'max_gap': None, 'num_overlaps': 0, 
+     'sum_overlaps': 0, 'max_overlap': None, 'quality': 'D', 
+     'sample_min': -22404, 'sample_max': 9261, 
+     'sample_mean': -3854.7406382978725, 'sample_median': -3836.0, 
+     'sample_lower_quartile': -4526.0, 'sample_upper_quartile': -3105.0, 
+     'sample_rms': 4426.1431329789848, 
+     'sample_stdev': 2175.2511682727431, 
+     'percent_availability': 100.0}           
+    """
+    tr.write('temp.mseed')
+    mseedqc = MSEEDMetadata(['temp.mseed']) 
+    tr.stats['metrics'] = mseedqc.meta
+    os.remove('temp.mseed')
+    add_to_trace_history(tr, 'MSEED metrics computed (similar to ISPAQ/MUSTANG).')
+
+def _detectClipping(tr, countThresh = 10):
+    upper_clipped = False
+    lower_clipped = False
+    y = tr.data
+    mu = np.nanmax(y)
+    md = np.nanmin(y)
+    countu = (tr.data == mu).sum()
+    countd = (tr.data == md).sum()
+    if countu >= countThresh:
+        add_to_trace_history(tr, 'Trace %s appears to be clipped at upper limit %e (count=%d)' % (tr.id, mu, countu) )    
+        upper_clipped = True
+    if countd >= countThresh:
+        add_to_trace_history(tr, 'Trace %s appears to be clipped at lower limit %e (count=%d)' % (tr.id, mu, countu) )       
+        lower_clipped = True
+    return upper_clipped, lower_clipped
+    
+def trace_quality_factor(tr):
+    # trace_quality_factor(tr)
+    # a good trace has quality factor 3, one with 0s and -1s has 1, bad trace has 0
+    quality_factor = 1
+    
+    # ignore traces with few samples
+    if tr.stats.npts < 100:
+        add_to_trace_history(tr, 'Not enough samples')
+        return 0
+    
+    # ignore traces with weirdly low sampling rates
+    if tr.stats.sampling_rate < 19.0:
+        add_to_trace_history(tr, 'Sampling rate too low')
+        return 0
+
+    # ignore blank trace
+    anyData = np.count_nonzero(tr.data)
+    if anyData==0:
+        add_to_trace_history(tr, 'Trace is blank')
+        return 0
+    
+    # check for bit level noise
+    u = np.unique(tr.data)
+    num_unique_values = u.size
+    if num_unique_values > 32:
+        quality_factor += 1
+    else:
+        add_to_trace_history(tr, 'bit level noise suspected')
+        return 0
+
+    # check for sequences of 0 or 1
+    trace_good_flag = _check0andMinus1(tr.data)
+    if trace_good_flag:
+        quality_factor += 1
+    else:
+        add_to_trace_history(tr, 'sequences of 0 or -1 found')
+        
+    # check if trace clipped
+    upperClipped, lowerClipped = _detectClipping(tr) # can add another function to interpolate clipped values
+    if not upperClipped:
+        quality_factor += 1
+    if not lowerClipped:
+        quality_factor += 1
+         
+    # check for outliers
+    outlier_count, outlier_indices = _mad_based_outlier(tr, thresh=50.0)
+    print('Outliers: %d' % outlier_count)
+    if outlier_count == 0:
+        quality_factor += 1
+    else:
+        add_to_trace_history(tr, '%d outliers found' % outlier_count)
+        tr.stats['outlier_indices'] = outlier_indices    
+       
+    return quality_factor    
+
+def _mad_based_outlier(tr, thresh=3.5):
+    tr2 = tr.copy()
+    tr2.detrend()
+    points = tr2.data
+    if len(points.shape) == 1:
+        points = points[:,None]
+    #points = np.absolute(points)
+    median = np.median(points, axis=0)
+    diff = np.sum((points - median)**2, axis=-1)
+    diff = np.sqrt(diff)
+    med_abs_deviation = np.median(diff)
+
+    modified_z_score = 0.6745 * diff / med_abs_deviation
+    
+    outlier_indices = np.array(np.where(modified_z_score > thresh))
+    outlier_count = outlier_indices.size
+    if outlier_count > 0:
+        print('size diff = %d, median = %e, med_abs_deviation = %e ' % (diff.size, median, med_abs_deviation))
+        mzs = sorted(modified_z_score)
+        print(mzs[-10:])
+    
+    return outlier_count, outlier_indices
+
+def _check0andMinus1(liste):
 # function bool_good_trace = check0andMinus1(tr.data)
     liste=list(liste)
     listStr=''.join(str(i) for i in liste)
@@ -53,49 +225,9 @@ def signaltonoise(tr):
         print(M.shape)
     return (snr, highval, lowval,)
 
-def compute_metrics(tr):
-# function tr, quality_factor, snr = compute_metrics(tr)
-# This function wraps all others
-    # Here we compute simple metrics on each trace and write them to NET.STA.CHAN files. 
-    # These metrics are:
-    #     1. duration of signal
-    #     2. signal amplitude
-    #     3. noise amplitude
-    #     4. signal-to-noise ratio
 
-    duration = tr.stats.npts /  tr.stats.sampling_rate
-    quality_factor = trace_quality_factor(tr)
-    snr = (-1, -1, -1)
-    if quality_factor > 0:
 
-        clean_trace(tr)
-        correct_nslc(tr)
 
-        # estimate signal-to-noise ratio
-        snr = signaltonoise(tr)
-        if snr[0] <= 1:
-            quality_factor = quality_factor * 0.5
-
-    return (tr, quality_factor, snr)
-
-def trace_quality_factor(tr):
-# function quality_factor = trace_quality_factor(tr)
-    quality_factor = 1
-
-    # ignore blank trace
-    anyData = np.count_nonzero(tr.data)
-    if anyData==0:
-        quality_factor = 0 
-        return quality_factor
-
-    # check for sequences of 0 or 1
-    trace_good_flag = check0andMinus1(tr.data)
-
-    if not trace_good_flag:
-        quality_factor = 0
-        return quality_factor
-
-    return quality_factor
 
 def ssam(tr, f, S):
     if not f.size==S.size:
@@ -159,7 +291,7 @@ def peak_amplitudes(st):
             md = ls.max_3c(st3cD)
             mv = ls.max_3c(st3cV)
             ma = ls.max_3c(st3cA)
-            d = dict('traceID':thisID, 'PGD':md[0], 'PGV':mv[0], 'PGA':ma[0], 'calib':tr.stats.calib, 'units':tr.stats.units)
+            d = {'traceID':thisID, 'PGD':md[0], 'PGV':mv[0], 'PGA':ma[0], 'calib':tr.stats.calib, 'units':tr.stats.units}
             seismic3d_list.append(d)              
     seismic3d = pd.DataFrame(seismic3d_list)
     
@@ -169,7 +301,7 @@ def peak_amplitudes(st):
         md = max(abs(stD[c].data))
         mv = max(abs(stV[c].data))
         ma = max(abs(stA[c].data))  
-        d = dict('traceID':stV[c].id, 'PGD':md[0], 'PGV':mv[0], 'PGA':ma[0], 'calib':stV[c].stats.calib, 'units':stV[c].stats.units)
+        d = {'traceID':stV[c].id, 'PGD':md[0], 'PGV':mv[0], 'PGA':ma[0], 'calib':stV[c].stats.calib, 'units':stV[c].stats.units}
         seismic1d_list.append(d)    
     seismic1d = pd.DataFrame(seismic1d_list)        
             
@@ -180,7 +312,7 @@ def peak_amplitudes(st):
     for c in range(len(stP)):
         mb = max(abs(stP[c].data))
         mn = max(abs(stPF[c].data)) 
-        d = dict('traceID':stP[c].id, 'PP':mb[0], 'PPF':mn[0], 'calib':stP[c].stats.calib, 'units':stP[c].stats.units)
+        d = {'traceID':stP[c].id, 'PP':mb[0], 'PPF':mn[0], 'calib':stP[c].stats.calib, 'units':stP[c].stats.units}
         infrasound_list.append(d)  
     infrasound = pd.DataFrame(infrasound_list)    
     

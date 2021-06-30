@@ -90,19 +90,6 @@ def smart_merge_traces(trace_pair):
         indices = np.where(other_tr.data == 0)
         other_tr.data[indices] = this_tr.data[indices]
         return other_tr
-
-def detectClipping(tr):
-    countThresh = 10
-    y = tr.data
-    mu = np.nanmax(y)
-    md = np.nanmin(y)
-    countu = (tr.data == mu).sum()
-    countd = (tr.data == md).sum()
-    if countu + countd >= countThresh:
-        print('Trace %s appears to be clipped from %d (count=%d) to %d (count=%d)' % (tr.id, mu, countu, md, countd) )
-        return True
-    else:
-        return False
         
 
 def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0], corners=2, zerophase=True, inv=None):
@@ -110,13 +97,12 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
     Clean Trace object in place.
     clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0], corners=2, zerophase=True, inv=None)
     """
-    traceIsClipped = detectClipping(tr) # can add another function to interpolate clipped values
 
     if not 'history' in tr.stats:
         tr.stats['history'] = list()    
     
     # remove absurd values
-    clip_trace(tr)
+    clip_trace(tr) # could add function here to correct for clipping - algorithms exist
     
     # save the start and end times for later 
     startTime = tr.stats.starttime
@@ -151,11 +137,11 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
         tr.filter(filterType, freqmin=freq[0], freqmax=freq[1], corners=corners, zerophase=zerophase)
     else:    
         tr.filter(filterType, freq=freq, corners=corners, zerophase=zerophase)
-    update_trace_filter(tr, filterType, freq[0], zerophase)
+    update_trace_filter(tr, filterType, freq, zerophase)
     add_to_trace_history(tr, filterType)    
         
     # deconvolve
-    if inv and not 'deconvolved' in tr.stats.history::
+    if inv and not 'deconvolved' in tr.stats.history:
         if tr.stats.channel[1]=='H': # a seismic velocity channel
             tr.remove_response(inventory=inv, output="VEL")  
             add_to_trace_history(tr, 'deconvolved')
