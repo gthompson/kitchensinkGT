@@ -10,8 +10,9 @@ import obspy.core
 #from sys import exit
 import os
 import glob
-from libseisGT import eventStatistics, inventory2traceid, get_FDSN_inventory, get_FDSN_Stream, removeInstrumentResponse
+from libseisGT import inventory2traceid, get_FDSN_inventory, get_FDSN_Stream, removeInstrumentResponse
 from libgeoGT import km2deg
+from metrics import eventStatistics
 
 # constants
 TOPDIR = '/home/seisan/MiamiLakes'
