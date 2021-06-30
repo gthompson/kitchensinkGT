@@ -20,11 +20,265 @@ from obspy.taup import TauPyModel
 
 # Glenn Thompson, Feb 2021
 
+#######################################################################
+##                Trace  tools                                       ##
+#######################################################################
 
+def add_to_trace_history(tr, str):
+    if not 'history' in tr.stats:
+        tr.stats['history'] = list()
+    if not str in tr.stats.history:
+        tr.stats.history.append(str)
+
+def update_trace_filter(tr, filtertype, freq, zerophase):
+    if not filter in tr.stats:
+        tr.stats['filter'] = {'freqmin':0, 'freqmax':tr.stats.sampling_rate/2, 'zerophase': False}
+    if filtertype == 'highpass':    
+        tr.stats.filter["freqmin"] = max([freq, tr.stats.filter["freqmin"]])
+    if filtertype == 'bandpass':
+        tr.stats.filter["freqmin"] = max([freq[0], tr.stats.filter["freqmin"]]) 
+        tr.stats.filter["freqmax"] = min([freq[1], tr.stats.filter["freqmax"]])
+    if filtertype == 'lowpass':
+        tr.stats.filter["freqmax"] = min([freq, tr.stats.filter["freqmax"]])
+    tr.stats.filter['zerophase'] = zerophase
+
+def clip_trace(tr, AMP_LIMIT = 10000000):     
+# function tr = clip_trace(tr, maxamp)
+    # remove absurdly large values
+    a = tr.data
+    np.clip(a, -AMP_LIMIT, AMP_LIMIT, out=a)
+    np.where(a == AMP_LIMIT, 0, a)
+    tr.data = a    
+    
+def smart_merge_traces(trace_pair):
+    """
+    Clever way to merge overlapping traces. Uses all non-zero data values from both.
+    """
+    this_tr = trace_pair[0] 
+    other_tr = trace_pair[1]
+
+    error_flag = False
+
+
+    if not (this_tr.id == other_tr.id):
+        print('Different trace IDs. Cannot merge.')
+        error_flag = True
+
+    if not (this_tr.stats.sampling_rate == other_tr.stats.sampling_rate):
+        print('Different sampling rates. Cannot merge.')
+        error_flag = True
+
+    if (abs(this_tr.stats.starttime - other_tr.stats.starttime) > this_tr.stats.delta/4):
+        print('Different start times. Cannot merge.')
+        error_flag = True
+
+    if (abs(this_tr.stats.endtime - other_tr.stats.endtime) > this_tr.stats.delta/4):
+        print('Different end times. Cannot merge.')
+        error_flag = True
+
+    if error_flag: # traces incompatible, so return the trace with the most non-zero values
+        this_good = np.count_nonzero(this_tr.data)
+        #print(this_tr.stats)
+        other_good = np.count_nonzero(other_tr.data)
+        #print(other_tr.stats)
+        if other_good > this_good:
+            return other_tr
+        else:
+            return this_tr
+
+    else: # things are good
+        indices = np.where(other_tr.data == 0)
+        other_tr.data[indices] = this_tr.data[indices]
+        return other_tr
+
+def detectClipping(tr):
+    countThresh = 10
+    y = tr.data
+    mu = np.nanmax(y)
+    md = np.nanmin(y)
+    countu = (tr.data == mu).sum()
+    countd = (tr.data == md).sum()
+    if countu + countd >= countThresh:
+        print('Trace %s appears to be clipped from %d (count=%d) to %d (count=%d)' % (tr.id, mu, countu, md, countd) )
+        return True
+    else:
+        return False
+        
+
+def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0], corners=2, zerophase=True, inv=None):
+    """
+    Clean Trace object in place.
+    clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0], corners=2, zerophase=True, inv=None)
+    """
+    traceIsClipped = detectClipping(tr) # can add another function to interpolate clipped values
+
+    if not 'history' in tr.stats:
+        tr.stats['history'] = list()    
+    
+    # remove absurd values
+    clip_trace(tr)
+    
+    # save the start and end times for later 
+    startTime = tr.stats.starttime
+    endTime = tr.stats.endtime
+        
+    # pad the Trace
+    y = tr.data
+    npts = tr.stats.npts
+    npts_pad = int(taperFraction * npts)
+    npts_pad_seconds = npts_pad * tr.stats.delta
+    if npts_pad_seconds < 10.0: # impose a minimum pad length of 10-seconds
+        npts_pad = int(10.0 / tr.stats.delta)
+    y_prepend = np.flip(y[0:npts_pad])
+    y_postpend = np.flip(y[-npts_pad:])
+    y = np.concatenate( [y_prepend, y, y_postpend ] )
+    padStartTime = startTime - npts_pad * tr.stats.delta
+    tr.data = y
+    add_to_trace_history(tr, 'padded')
+    tr.stats.starttime = padStartTime
+    max_fraction = npts_pad / tr.stats.npts
+    
+    # clean
+    if not 'detrended' in tr.stats.history:
+        tr.detrend('linear')
+        add_to_trace_history(tr, 'detrended')
+        
+    if not 'tapered' in tr.stats.history:
+        tr.taper(max_percentage=max_fraction, type="hann") 
+        add_to_trace_history(tr, 'tapered')        
+    
+    if filterType == 'bandpass':
+        tr.filter(filterType, freqmin=freq[0], freqmax=freq[1], corners=corners, zerophase=zerophase)
+    else:    
+        tr.filter(filterType, freq=freq, corners=corners, zerophase=zerophase)
+    update_trace_filter(tr, filterType, freq[0], zerophase)
+    add_to_trace_history(tr, filterType)    
+        
+    # deconvolve
+    if inv and not 'deconvolved' in tr.stats.history::
+        if tr.stats.channel[1]=='H': # a seismic velocity channel
+            tr.remove_response(inventory=inv, output="VEL")  
+            add_to_trace_history(tr, 'deconvolved')
+            
+    # remove the pad
+    tr.trim(starttime=startTime, endtime=endTime)
+    add_to_trace_history(tr, 'unpadded')        
+                        
+   
+    
 #######################################################################
 ##                Stream tools                                       ##
 #######################################################################
 
+def get_seed_band_code(sr, shortperiod = False):
+    bc = '_'
+    if sr >= 1 and sr < 10:
+        bc = 'M'
+    if sr >= 10 and sr < 80:
+        if shortperiod:
+            bc = 'S'
+        else:
+            bc = 'B'
+    if sr >= 80:
+        if shortperiod:
+            bc = 'E'
+        else:
+            bc = 'H'
+    return bc
+        
+def fix_seed_band_code(st, shortperiod = False):
+    for tr in st:
+        sr = tr.stats.sampling_rate
+        bc = libseisGT.get_seed_band_code(sr, shortperiod=shortperiod)
+        if not bc == tr.stats.channel[0]:
+            tr.stats.channel = bc + tr.stats.channel[1:]
+            add_to_trace_history(tr, 'bandcode_fixed') 
+
+
+                  
+def smart_merge(st):
+    # need to loop over st and find traces with same ids
+    ##### GOT HERE
+    newst = Stream()
+    all_ids = []
+    for tr in st:
+        if not tr.id in all_ids:
+            all_ids.append(tr.id)
+
+    for this_id in all_ids: # loop over all nsl combinations
+        these_traces = st.copy().select(id=this_id).sort() # find all traces for this nsl combination
+        
+        # remove duplicates
+        traces_to_remove = []
+        for c in range(len(these_traces)-1):
+            s0 = these_traces[c].stats
+            s1 = these_traces[c].stats
+            if s0.starttime == s1.starttime and s0.endtime == s1.endtime and s0.sampling_rate == s1.sampling_rate:
+                traces_to_remove.append(c)
+                
+        print(these_traces)
+        print(traces_to_remove)
+        if traces_to_remove:
+            for c in traces_to_remove:
+                these_traces.remove(these_traces[c])
+                
+        if len(these_traces)==1: # if only 1 trace, append it, and go to next trace id
+            newst.append(these_traces[0]) 
+            continue
+        
+        # must have more than 1 trace
+        try: # try regular merge now duplicates removed
+            merged_trace = these_traces.copy().merge()
+            print('- regular merge of these traces success')
+        except:
+            print('- regular merge of these traces failed')   
+            # need to try merging traces in pairs instead
+            N = len(these_traces)
+            these_traces.sort() # sort the traces
+            for c in range(N-1): # loop over traces in pairs
+                appended = False
+                
+                # choose pair
+                if c==0:
+                    trace_pair = these_traces[0:2]
+                else:
+                    trace_pair = Stream(traces=[merged_trace, these_traces[c+1] ] )
+                                        
+                # merge these two traces together    
+                try: # standard merge
+                    merged_trace = trace_pair.copy().merge()
+                    print('- regular merge of trace pair success')
+                except: # smart merge
+                    print('- regular merge of trace pair failed')
+                    try:
+                        min_stime, max_stime, min_etime, max_etime = ls.Stream_min_starttime(trace_pair)
+                        trace_pair.trim(starttime=min_stime, endtime=max_etime, pad=True, fill_value=0)
+                        merged_trace = Stream.append(smart_merge_traces(trace_pair)) # this is a trace, not a Stream
+                    except:
+                        print('- smart_merge of trace pair failed')
+                        
+            # we have looped over all pairs and merged_trace should now contain everything
+            # we should only have 1 trace in merged_trace
+            print(merged_trace)
+            if len(merged_trace)==1:
+                try:
+                    newst.append(merged_trace[0])
+                    appended = True
+                except:
+                    pass
+                
+            if not appended:
+                print('\n\nTrace conflict\n')
+                trace_pair.plot()
+                for c in range(len(trace_pair)):
+                    print(c, trace_pair[c])
+                choice = int(input('Keep which trace ? '))
+                newst.append(trace_pair[choice])  
+                appended = True                
+                             
+    return newst 
+        
+        
 def Stream_min_starttime(all_traces):
     """
     Take a Stream object, and return the minimum starttime
@@ -66,56 +320,6 @@ def removeInstrumentResponse(st, preFilter = (1, 1.5, 30.0, 45.0), outputType = 
                 print("- Not able to correct data for %s " %  tr.id)
                 st.remove(tr)
     return
-
-
-def eventStatistics(st):
-    """ 
-    Take a Stream object, measure some basic metrics 
-    
-    Example: 
-        eventStatistics(Stream)
-
-    Returns: 
-        list of dictionaries (one per trace)  with keywords id, sample, time, peakamp, energy
-
-
-    Created for MiamiLakes project.
-    
-    Note: replace this with method from STA/LTA detection
-
-    """
-    # create an empty list of dictionaries
-    list_of_dicts = []
-
-    # for each trace, add a new dictionary to the list
-    for tr in st:
-        thisrow = dict()  # each dictionary will become a row of a dataframe
-
-        # if we use absolute function, we don't need to check if maxy > -miny
-        tr.detrend()
-        y = np.absolute(tr.data)
-
-        # we did this before
-        maxy = y.max()
-        maxy_i = y.argmax()
-        maxy_t = tr.stats.starttime + maxy_i / tr.stats.sampling_rate
-
-        # add new elements to dictionary
-        thisrow['id'] = tr.id
-        thisrow['sample'] = maxy_i
-        thisrow['time'] = maxy_t
-        thisrow['peakamp'] = maxy
-
-        # add a new measurement: energy
-        thisrow['energy'] = np.sum(np.square(y)) / tr.stats.sampling_rate
-
-        # add row (dict) to list
-        list_of_dicts.append(thisrow)
-
-    # Convert list of dicts to dataframe
-    df = pd.DataFrame.from_dict(list_of_dicts)
-
-    return df
 
 
 
@@ -218,71 +422,7 @@ def mulplt(st, bottomlabel='', ylabels=[]):
     #st.mulplt = types.MethodType(mulplt,st)    
     
     return fh, axh
-    
-    
-def iceweb_spectrogram(st):
-    """ Create a plot of a Stream object similar to an IceWeb spectrogram """
-    fh = plt.figure()
-
-    # Only do this if want to use a common x-axis
-    MAXPANELS =6
-    n = np.min([MAXPANELS, len(st)])
-
-    # start time of the record section
-    startepoch = st[0].stats.starttime.timestamp
-
-    # create empty set of subplot handles - without this any change to one affects all
-    axh = []
-
-    # loop over all stream objects
-
-    for i in range(n):
-        # add new axes handle for new subplot
-        #axh.append(plt.subplot(n, 1, i+1, sharex=ax))
-        axh.append(plt.subplot(2*n, 1, i*2+1))
-
-        # time vector, t, in seconds since start of record section
-        t = np.linspace(st[i].stats.starttime.timestamp - startepoch,
-                        st[i].stats.endtime.timestamp - startepoch,
-                        st[i].stats.npts)
-
-        # We could detrend, but in case of spikes, subtracting the median may be better
-        #st[i].detrend()
-        offset = np.median(st[i].data)
-        y = st[i].data - offset
-
-        # PLOT THE DATA
-        axh[i*2+1].plot(t, y)
-
-        # remove yticks because we will add text showing max and offset values
-        axh[i*2+1].yaxis.set_ticks([])
-
-        # remove xticklabels for all but the bottom subplot
-        if i < n*2-1:
-            axh[i].xaxis.set_ticklabels([])
-        else:
-            # for the bottom subplot, also add an xlabel with wavfilename and start time
-            plt.xlabel("WAV file %s\n Starting at %s" % (wavfile, st[0].stats.starttime) )
-
-        # ylabel is station.channel
-        plt.ylabel(st[i].stats.station + "." + st[i].stats.channel, rotation=0)
-
-        # explicitly give the maximum amplitude and offset(median)
-        plt.text(0, 1, "max=%.1e offset=%.1e" % (np.max(np.abs(y)), offset),
-                horizontalalignment='left',
-                verticalalignment='top',transform=axh[i].transAxes)
-
-        # PLOT SPECTROGRAM
-        axh.append(plt.subplot(n*2, 1, i*2+2))
-        #st[i].plot(color='black') # problem here with attaching to subplot
-        st[i].spectrogram(axes=axh[i*2+2], log=True, title=st[i].stats.station + " " + str(st[i].stats.starttime))
-
-    # change all font sizes
-    plt.rcParams.update({'font.size': 8})
-
-    # show the figure
-    plt.show()
-
+  
     
 
 def max_3c(st):
@@ -299,6 +439,46 @@ def max_3c(st):
             y = np.sqrt(np.square(y1) + np.square(y2) + np.square(y3))
             m.append(max(y))
     return m    
+    
+
+
+
+def plot_stream_types(st, eventdir, maxchannels=10): 
+    # assumes input traces are in velocity or pressure units and cleaned
+      
+    # velocity, displacement, acceleration seismograms
+    stV = st.copy().select(channel='[ESBH]H?') 
+    if len(stV)>maxchannels:
+        stV = stV.select(channel="[ESBH]HZ") # just use vertical components then
+        if len(stV)>maxchannels:
+            stV=stV[0:maxchannels]
+    stD = stV.copy().integrate()   
+    stA = stV.copy().differentiate()
+
+    # Infrasound data
+    stP = st.copy().select(channel="[ESBH]D?")
+    if len(stP)>maxchannels:
+        stP=stP[0:maxchannels]
+        
+    # Plot displacement seismogram
+    if stD:
+        dpngfile = os.path.join(eventdir, 'seismogram_D.png')
+        stD.plot(equal_scale=False, outfile=dpngfile)    
+    
+    # Plot velocity seismogram
+    if stV:
+        vpngfile = os.path.join(eventdir, 'seismogram_V.png')
+        stV.plot(equal_scale=False, outfile=vpngfile)
+         
+    # Plot acceleration seismogram
+    if stA:
+        apngfile = os.path.join(eventdir, 'seismogram_A.png')
+        stA.plot(equal_scale=False, outfile=apngfile)
+        
+    # Plot pressure acoustograms
+    if stP:
+        ppngfile = os.path.join(eventdir, 'seismogram_P.png')
+        stP.plot(equal_scale=False, outfile=ppngfile)     
     
     
 #######################################################################    
