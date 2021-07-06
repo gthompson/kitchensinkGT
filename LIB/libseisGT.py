@@ -140,11 +140,18 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
     update_trace_filter(tr, filterType, freq, zerophase)
     add_to_trace_history(tr, filterType)    
         
-    # deconvolve
-    if inv and not 'deconvolved' in tr.stats.history:
-        if tr.stats.channel[1]=='H': # a seismic velocity channel
-            tr.remove_response(inventory=inv, output="VEL")  
-            add_to_trace_history(tr, 'deconvolved')
+    # deconvolve - currently assumes velocity seismograms and ignores infrasound - we can fix this later
+    if not 'deconvolved' in tr.stats.history:
+        if not 'units' in tr.stats:
+            tr.stats['units'] = 'Counts'   
+    if inv and tr.stats['units'] == 'Counts':
+        tr.remove_response(inventory=inv, output="VEL") 
+        tr.stats['units'] = 'm/s'
+        add_to_trace_history(tr, 'deconvolved')
+    if not inv and tr.stats.calib and not 'calibrated' in tr.stats.history:
+        tr.data = tr.data * tr.stats.calib
+        tr.stats['units'] = 'm/s'
+        add_to_trace_history(tr, 'calibrated')
             
     # remove the pad
     tr.trim(starttime=startTime, endtime=endTime)
@@ -288,10 +295,12 @@ def Stream_min_starttime(all_traces):
     return min_stime, max_stime, min_etime, max_etime
 
 
-def removeInstrumentResponse(st, preFilter = (1, 1.5, 30.0, 45.0), outputType = "VEL", inventory = ""):  
+def removeInstrumentResponse(st, preFilter = (1, 1.5, 30.0, 45.0), outputType = "VEL", inventory = None):  
     """
     Remove instrument response - assumes inventories have been added to Stream object
     Written for Miami Lakes
+    
+    This function may be obsolete. Use clean_trace instead.
     """
     try:
         st.remove_response(output=outputType, pre_filt=preFilter)

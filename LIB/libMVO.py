@@ -26,6 +26,13 @@ def fix_trace_id(st, shortperiod=False):
     for tr in st:
         nslc = correct_nslc(tr.id, tr.stats.sampling_rate, shortperiod=shortperiod)
         tr.id = nslc
+        if 'deconvolved' in tr.stats.history or 'calibrated' in tr.stats.history:
+            if tr.stats.channel[1] == 'D':
+                tr.stats['units'] = 'Pa'
+            if tr.stats.channel[1] == 'H':
+                tr.stats['units'] = 'm/s'    
+        else:
+            tr.stats['units'] = 'Counts'
 
 def correct_nslc(traceID, Fs, shortperiod=False):
     # Montserrat trace IDs are often bad. return correct trace ID
