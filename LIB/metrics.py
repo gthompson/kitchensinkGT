@@ -4,9 +4,11 @@
 import os
 import numpy as np
 from scipy.stats import describe
+from obspy import Stream
 from obspy.signal.quality_control import MSEEDMetadata 
 #import libseisGT
 from libseisGT import add_to_trace_history, clean_trace
+import pandas as pd
 
 """
 Functions for computing data quality metrics and statistical metrics (such as amplitude, energy and frequency) 
@@ -38,10 +40,12 @@ def process_trace(tr, inv=None):
         
     """ RAW DATA QC METRICS """
     qcTrace(tr)
-         
     tr.stats["quality_factor"] = trace_quality_factor(tr) #0 = blank trace, 1 = has some 0s and -1s, 3 = all looks good
+    tr.stats.quality_factor -= tr.stats.metrics['num_gaps']
+    tr.stats.quality_factor -= tr.stats.metrics['num_overlaps']
+    tr.stats.quality_factor -= (100.0 - tr.stats.metrics['percent_availability'] )
 
-    if tr.stats.quality_factor == 0:
+    if tr.stats.quality_factor <= 0:
         return
 
     """ CLEAN (DETREND, BANDPASS, CORRECT) TRACE """
@@ -49,17 +53,19 @@ def process_trace(tr, inv=None):
 
     """ CLEAN DATA WAVEFORM METRICS """ 
     # estimate signal-to-noise ratio (after detrending)
-    #tr.stats["snr"] = (-1, -1, -1)
     tr.stats["snr"] = signaltonoise(tr)
     add_to_trace_history(tr, 'Signal to noise measured.')
-    if tr.stats["snr"][0] > 1:
-        tr.stats["quality_factor"] += 1 # good traces should now be a 4, some with 2 will be okay too
+    tr.stats["quality_factor"] += np.log10(tr.stats["snr"][0])
     
     tr.stats["duration"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending
 
     # SciPy stats
-    tr.stats["scipy"] = describe(tr.data, nan_policy = 'omit') # only do this after removing trend/high pass filtering
+    #tr.stats["scipy"] = describe(tr.data, nan_policy = 'omit') # only do this after removing trend/high pass filtering
+    tr.stats["scipy"] = describe(tr.data, nan_policy = 'omit')._asdict()
     add_to_trace_history(tr, 'scipy.stats metrics added as tr.stats.scipy.')
+    
+    # Update other stats
+    qcTrace(tr)
     
     
 def qcTrace(tr):
@@ -109,7 +115,7 @@ def trace_quality_factor(tr):
         return 0
     
     # ignore traces with weirdly low sampling rates
-    if tr.stats.sampling_rate < 19.0:
+    if tr.stats.sampling_rate < 19.99:
         add_to_trace_history(tr, 'Sampling rate too low')
         return 0
 
@@ -122,8 +128,8 @@ def trace_quality_factor(tr):
     # check for bit level noise
     u = np.unique(tr.data)
     num_unique_values = u.size
-    if num_unique_values > 32:
-        quality_factor += 1
+    if num_unique_values > 10:
+        quality_factor += np.log10(num_unique_values)
     else:
         add_to_trace_history(tr, 'bit level noise suspected')
         return 0
@@ -368,3 +374,31 @@ def eventStatistics(st):
     df = pd.DataFrame.from_dict(list_of_dicts)
 
     return df
+
+def choose_best_traces(st, MAX_TRACES=8, include_infrasound=False):
+    # st2 = limit_traces(st, MAX_TRACES=8)
+
+    if len(st)>MAX_TRACES:
+        priority = [float(tr.stats.quality_factor) for tr in st]
+        component = [tr.stats.channel[2] for tr in st]        
+        for i, tr in enumerate(st):
+            if component=="Z":
+                priority[i] *= 2
+            if tr.stats.channel[1]=='D':
+                if include_infrasound:
+                    priority[i] *= 2 
+                else:
+                    priority[i] *= 0                    
+        
+        j = np.argsort(priority)
+        chosen = j[-MAX_TRACES:]
+        
+        #print(chosen)
+        return chosen
+
+def select_by_index_list(st, chosen):
+    st2 = Stream()
+    for i, tr in enumerate(st):
+        if i in chosen:
+            st2.append(tr)
+    return st2
