@@ -11,6 +11,6 @@ from obspy import read_events
 import os
 import basemap
 HOME = os.getenv('HOME')
-cat = read_events('%s/Downloads/antilles_catalog.xml' % HOME)
+cat = read_events('%s/Dropbox/lesser_antilles_catalog.xml' % HOME)
 
 cat.plot()

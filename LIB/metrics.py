@@ -36,16 +36,18 @@ def process_trace(tr, inv=None):
     #     4. signal-to-noise ratio
     
     if not 'history' in tr.stats:
-        tr.stats['history'] = list()     
+        tr.stats['history'] = list()  
+        
+    tr.stats["duration"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending    
         
     """ RAW DATA QC METRICS """
     qcTrace(tr)
     tr.stats["quality_factor"] = trace_quality_factor(tr) #0 = blank trace, 1 = has some 0s and -1s, 3 = all looks good
     tr.stats.quality_factor -= tr.stats.metrics['num_gaps']
     tr.stats.quality_factor -= tr.stats.metrics['num_overlaps']
-    tr.stats.quality_factor -= (100.0 - tr.stats.metrics['percent_availability'] )
+    tr.stats.quality_factor *= tr.stats.metrics['percent_availability']/100.0
 
-    if tr.stats.quality_factor <= 0:
+    if tr.stats.quality_factor <= 0.0:
         return
 
     """ CLEAN (DETREND, BANDPASS, CORRECT) TRACE """
@@ -55,10 +57,9 @@ def process_trace(tr, inv=None):
     # estimate signal-to-noise ratio (after detrending)
     tr.stats["snr"] = signaltonoise(tr)
     add_to_trace_history(tr, 'Signal to noise measured.')
-    tr.stats["quality_factor"] += np.log10(tr.stats["snr"][0])
+    if tr.stats.snr[0]>1.0:
+        tr.stats["quality_factor"] += np.log10(tr.stats.snr[0])
     
-    tr.stats["duration"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending
-
     # SciPy stats
     #tr.stats["scipy"] = describe(tr.data, nan_policy = 'omit') # only do this after removing trend/high pass filtering
     tr.stats["scipy"] = describe(tr.data, nan_policy = 'omit')._asdict()
@@ -107,23 +108,23 @@ def _detectClipping(tr, countThresh = 10):
 def trace_quality_factor(tr):
     # trace_quality_factor(tr)
     # a good trace has quality factor 3, one with 0s and -1s has 1, bad trace has 0
-    quality_factor = 1
+    quality_factor = 1.0
     
     # ignore traces with few samples
     if tr.stats.npts < 100:
         add_to_trace_history(tr, 'Not enough samples')
-        return 0
+        return 0.0
     
     # ignore traces with weirdly low sampling rates
     if tr.stats.sampling_rate < 19.99:
         add_to_trace_history(tr, 'Sampling rate too low')
-        return 0
+        return 0.0
 
     # ignore blank trace
     anyData = np.count_nonzero(tr.data)
     if anyData==0:
         add_to_trace_history(tr, 'Trace is blank')
-        return 0
+        return 0.0
     
     # check for bit level noise
     u = np.unique(tr.data)
@@ -132,27 +133,35 @@ def trace_quality_factor(tr):
         quality_factor += np.log10(num_unique_values)
     else:
         add_to_trace_history(tr, 'bit level noise suspected')
-        return 0
+        return 0.0
 
     # check for sequences of 0 or 1
+    """
     trace_good_flag = _check0andMinus1(tr.data)
     if trace_good_flag:
-        quality_factor += 1
+        quality_factor += 1.0
     else:
         add_to_trace_history(tr, 'sequences of 0 or -1 found')
+    """
+    
+    # replacement for check0andMinus1
+    seq = tr.data
+    islands = get_islands(seq, np.r_[np.diff(seq) == 0, False]) 
+    maxList, maxLength = FindMaxLength(islands)
+    quality_factor /= maxLength
         
     # check if trace clipped
     upperClipped, lowerClipped = _detectClipping(tr) # can add another function to interpolate clipped values
-    if not upperClipped:
-        quality_factor += 1
-    if not lowerClipped:
-        quality_factor += 1
+    if upperClipped:
+        quality_factor /= 2.0
+    if lowerClipped:
+        quality_factor /= 2.0
          
     # check for outliers
     outlier_count, outlier_indices = _mad_based_outlier(tr, thresh=50.0)
-    print('Outliers: %d' % outlier_count)
+    #print('Outliers: %d' % outlier_count)
     if outlier_count == 0:
-        quality_factor += 1
+        quality_factor += 1.0
     else:
         add_to_trace_history(tr, '%d outliers found' % outlier_count)
         tr.stats['outlier_indices'] = outlier_indices    
@@ -175,13 +184,16 @@ def _mad_based_outlier(tr, thresh=3.5):
     
     outlier_indices = np.array(np.where(modified_z_score > thresh))
     outlier_count = outlier_indices.size
+    '''
     if outlier_count > 0:
         print('size diff = %d, median = %e, med_abs_deviation = %e ' % (diff.size, median, med_abs_deviation))
         mzs = sorted(modified_z_score)
         print(mzs[-10:])
+    '''
     
     return outlier_count, outlier_indices
 
+"""
 def _check0andMinus1(liste):
 # function bool_good_trace = check0andMinus1(tr.data)
     liste=list(liste)
@@ -189,8 +201,19 @@ def _check0andMinus1(liste):
     if  "000000000000" in listStr or "-1-1-1-1-1-1-1-1" in listStr :
         return False
     else:
-        return True   
+        return True  
+"""
     
+def get_islands(arr, mask):
+    mask_ = np.concatenate(( [False], mask, [False] ))
+    idx = np.flatnonzero(mask_ [1:] != mask_ [:-1])
+    return [arr[idx[i]:idx[i+1] + 1] for i in range(0, len(idx), 2)]
+
+def FindMaxLength(lst):
+    maxList = max(lst, key = len)
+    maxLength = max(map(len, lst))      
+    return maxList, maxLength      
+        
 def signaltonoise(tr):
 # function snr, highval, lowval = signaltonoise(tr)
     # Here we just make an estimate of the signal-to-noise ratio
@@ -202,37 +225,75 @@ def signaltonoise(tr):
     # * bandpass filter
     #
     # Processing:
-    #    1. ensure we still have at least 10 seconds
+    #    1. ensure we have at least 1 seconds
     #    2. take absolute values
     #    3. compute the maximum of each 1-s of data, call this time series M
     #    4. compute 95th and 5th percentile of M, call these M95 and M5
     #    5. estimate signal-to-noise ratio as M95/M5
+    #
+    # Correction. The above seems like a poor algorithm. Why not instead just take the ratio of the amplitudes of 
+    # the "loudest" second and the "quietest" second.
     
-    highval = -1
-    lowval = -1
-    snr = -1 
+    highval = 0.0
+    lowval = 0.0
+    snr = 0.0
     a = tr.data
 
     fsamp = int(tr.stats.sampling_rate)
     npts = tr.stats.npts
     numseconds = int(npts/fsamp)
-    if numseconds > 10:
+    if numseconds > 1:
         a = a[0:int(fsamp * numseconds - 1)]             # remove any fractional second from end of trace
         abs = np.absolute(a)                             # take absolute value of a        
         abs_resize = np.resize(abs, (fsamp, numseconds)) # resize so that each second is one row
         M = np.max(abs_resize,axis=0)                    # find max of each second / row
+        """ old algorithm
         highval = np.nanpercentile(M,95)                    # set highval to 95th percentile, to represent signal amplitude
-        if highval < 1:
-            highval = -1
-            return (snr, highval, lowval)
         lowval = np.nanpercentile(M,5)                      # set lowval to 5th percentile, to represent noise amplitude
+        """
+        # new algorithm
+        highval = np.max(M)
+        lowval = np.min(M)
         snr = highval / lowval
-        print(abs_resize.shape)
-        print(M.shape)
-    return (snr, highval, lowval,)
+    return (snr, highval, lowval)
 
 
+def choose_best_traces(st, MAX_TRACES=8, include_seismic=True, include_infrasound=False, include_uncorrected=False):
 
+    priority = np.array([float(tr.stats.quality_factor) for tr in st])      
+    for i, tr in enumerate(st):           
+        if tr.stats.channel[1]=='H':
+            if include_seismic:
+                if tr.stats.channel[2] == 'Z':
+                    priority[i] *= 2
+            else:
+                priority[i] = 0
+        if tr.stats.channel[1]=='D':
+            if include_infrasound:
+                priority[i] *= 2 
+            else:
+                priority[i] = 0
+        if not include_uncorrected:
+            if 'units' in tr.stats:
+                if tr.stats.units == 'Counts':
+                    priority[i] = 0
+            else:
+                priority[i] = 0
+
+    n = np.count_nonzero(priority > 0.0)
+    n = min([n, MAX_TRACES])
+    j = np.argsort(priority)
+    chosen = j[-n:]  
+    return chosen
+
+        
+        
+def select_by_index_list(st, chosen):
+    st2 = Stream()
+    for i, tr in enumerate(st):
+        if i in chosen:
+            st2.append(tr)
+    return st2
 
 
 def ssam(tr, f, S):
@@ -247,29 +308,51 @@ def ssam(tr, f, S):
         S_selected = S[f_indexes]
         ssamValues.append(np.nanmean(S_selected) )
     tr.stats['ssam'] = ssamValues 
+
+def ampengfft(tr):
+    """ 
+    Measure peakamp and energy on a Trace 
+    """
     
-def ampengfft(st):
-    df = eventStatistics(st)
-    #print(df)
-    
-    for tr in st:
-        row = df[df['id'] == tr.id]
-        tr.stats['peaktime'] = row.iloc[0]['time']
-        tr.stats['peakamp'] = row.iloc[0]['peakamp']
-        tr.stats['energy'] = row.iloc[0]['energy']
+    # if we use absolute function, we don't need to check if maxy > -miny
+    if not 'detrended' in tr.stats.history:
+        tr.detrend(type='linear')
+    y = np.absolute(tr.data)
+    maxy = y.max()
+    maxy_i = y.argmax()
+    maxy_t = maxy_i / tr.stats.sampling_rate
+    tr.stats['peakamp'] = maxy
+    tr.stats['peaktime'] = maxy_t
+    tr.stats['energy'] = np.sum(np.square(y)) / tr.stats.sampling_rate
+    if 'spectrum' in tr.stats : # dict of T, F, S
+
+        #### Compute various frequency metrics
+          
         
-        # add SSAM
+        # SSAM
         if not 'ssam' in tr.stats:
-            secsPerFFT = np.ceil((tr.stats.delta * tr.stats.npts)/100)
-            [f, t, Zxx, A] = computeSingleSpectrogram(tr, secsPerFFT)
-            try:
-                S = np.mean(np.abs(Zxx), axis=0)
-                ssam(tr, f, S)
-            except:
-                print(f.shape, Zxx.shape, A.shape, S.shape)
-                return
+            sp = tr.stats.spectrogramdata
+            ssam(tr, sp['F'], sp['S'])
             
+        # peak F. See spectrum.peakF computed by IceWeb.py/compute_amplitude_spectrum
+        
+        # peakA. See spectrum.peakA ""
+        
+        # median F. See spectrum.medianF ""
+               
+        # frequency index. Not implemented yet.
+        
+        # archive spectrum for ESAM
+            
+            # record spectrum to binary files to make ESAM/event spectrograms later
+            # an alternative version might be to plot the sum of spectral data by event type per day,
+            # then plot those sums as an event spectrogram - against a daily sampling rate.
+            # 
+            # from either version could then pick the biggest events       
+
+
 def peak_amplitudes(st):   
+    """ Peak Ground Motion. Should rename it peakGroundMotion """
     
     seismic1d_list = []
     seismic3d_list = []
@@ -324,81 +407,3 @@ def peak_amplitudes(st):
     
     return (seismic3d, seismic1d, infrasound)
 
-
-
-def eventStatistics(st):
-    """ 
-    Take a Stream object, measure some basic metrics 
-    
-    Example: 
-        eventStatistics(Stream)
-
-    Returns: 
-        list of dictionaries (one per trace)  with keywords id, sample, time, peakamp, energy
-
-
-    Created for MiamiLakes project.
-    
-    Note: replace this with method from STA/LTA detection
-
-    """
-    # create an empty list of dictionaries
-    list_of_dicts = []
-
-    # for each trace, add a new dictionary to the list
-    for tr in st:
-        thisrow = dict()  # each dictionary will become a row of a dataframe
-
-        # if we use absolute function, we don't need to check if maxy > -miny
-        tr.detrend()
-        y = np.absolute(tr.data)
-
-        # we did this before
-        maxy = y.max()
-        maxy_i = y.argmax()
-        maxy_t = tr.stats.starttime + maxy_i / tr.stats.sampling_rate
-
-        # add new elements to dictionary
-        thisrow['id'] = tr.id
-        thisrow['sample'] = maxy_i
-        thisrow['time'] = maxy_t
-        thisrow['peakamp'] = maxy
-
-        # add a new measurement: energy
-        thisrow['energy'] = np.sum(np.square(y)) / tr.stats.sampling_rate
-
-        # add row (dict) to list
-        list_of_dicts.append(thisrow)
-
-    # Convert list of dicts to dataframe
-    df = pd.DataFrame.from_dict(list_of_dicts)
-
-    return df
-
-def choose_best_traces(st, MAX_TRACES=8, include_infrasound=False):
-    # st2 = limit_traces(st, MAX_TRACES=8)
-
-    if len(st)>MAX_TRACES:
-        priority = [float(tr.stats.quality_factor) for tr in st]
-        component = [tr.stats.channel[2] for tr in st]        
-        for i, tr in enumerate(st):
-            if component=="Z":
-                priority[i] *= 2
-            if tr.stats.channel[1]=='D':
-                if include_infrasound:
-                    priority[i] *= 2 
-                else:
-                    priority[i] *= 0                    
-        
-        j = np.argsort(priority)
-        chosen = j[-MAX_TRACES:]
-        
-        #print(chosen)
-        return chosen
-
-def select_by_index_list(st, chosen):
-    st2 = Stream()
-    for i, tr in enumerate(st):
-        if i in chosen:
-            st2.append(tr)
-    return st2
