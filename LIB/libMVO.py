@@ -24,6 +24,8 @@ def swap32(i):
 def fix_trace_id(st, shortperiod=False):
     # convenience method to wrap correct_nslc
     for tr in st:
+        if not 'history' in tr.stats:
+            tr.stats['history'] = list() 
         nslc = correct_nslc(tr.id, tr.stats.sampling_rate, shortperiod=shortperiod)
         tr.id = nslc
         if 'deconvolved' in tr.stats.history or 'calibrated' in tr.stats.history:
@@ -74,6 +76,25 @@ def correct_nslc(traceID, Fs, shortperiod=False):
 
     return net + "." + sta + "." + loc + "." + chan
 
+def inventory_fix_id_mvo(inv):
+    inv[0].code='MV'
+    net = inv[0].code
+    for station in inv[0].stations:
+        sta = station.code
+        for channel in station.channels:
+            chan = channel.code
+            if chan[0] in 'ES':
+                shortperiod = True
+            if chan[0] in 'BH':
+                shortperiod = False
+            Fs = channel.sample_rate
+            nslc = net + '.' + sta + '..' + chan
+            nslc = correct_nslc(nslc, Fs, shortperiod=shortperiod)
+            net, sta, loc, chan = nslc.split('.')
+            channel.code = chan
+        station.code = sta
+    inv[0].code = net
+    return inv
 
 if __name__ == '__main__':
     pass

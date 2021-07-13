@@ -18,6 +18,7 @@ from obspy.signal.trigger import classic_sta_lta, z_detect, plot_trigger, trigge
 from obspy.geodetics.base import gps2dist_azimuth, kilometers2degrees
 from obspy.taup import TauPyModel
 
+
 # Glenn Thompson, Feb 2021
 
 #######################################################################
@@ -107,6 +108,7 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
     # save the start and end times for later 
     startTime = tr.stats.starttime
     endTime = tr.stats.endtime
+    #print(tr.id, startTime, endTime)
         
     # pad the Trace
     y = tr.data
@@ -140,7 +142,8 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
     update_trace_filter(tr, filterType, freq, zerophase)
     add_to_trace_history(tr, filterType)    
         
-    # deconvolve - currently assumes velocity seismograms and ignores infrasound - we can fix this later
+
+    '''
     if not 'deconvolved' in tr.stats.history:
         if not 'units' in tr.stats:
             tr.stats['units'] = 'Counts'   
@@ -149,12 +152,36 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
         tr.stats['units'] = 'm/s'
         add_to_trace_history(tr, 'deconvolved')
     if not inv and tr.stats.calib and not 'calibrated' in tr.stats.history:
-        tr.data = tr.data * tr.stats.calib
-        tr.stats['units'] = 'm/s'
-        add_to_trace_history(tr, 'calibrated')
+        if not tr.stats.calib==1.0:
+            tr.data = tr.data * tr.stats.calib
+            tr.stats['units'] = 'm/s'
+            add_to_trace_history(tr, 'calibrated')
+          
+    '''
+    
+    if not 'units' in tr.stats:
+        tr.stats['units'] = 'Counts'   
+        
+    if tr.stats['units'] == 'Counts' and not 'calibrated' in tr.stats.history:
+        if inv:
+            try:
+                tr.remove_response(inventory=inv)
+            except:
+                print('No matching response info found')
+            else:
+                add_to_trace_history(tr, 'calibrated')
+        elif not tr.stats.calib==1.0:
+            tr.data = tr.data * tr.stats.calib
+            add_to_trace_history(tr, 'calibrated') 
+        if 'calibrated' in tr.stats.history:           
+            if tr.stats.channel[1]=='H':
+                tr.stats['units'] = 'm/s'
+            if tr.stats.channel[1]=='D':
+                tr.stats['units'] = 'Pa'  
             
     # remove the pad
-    tr.trim(starttime=startTime, endtime=endTime)
+    #print(tr.id, startTime, endTime)
+    tr.trim(starttime=startTime, endtime=endTime, pad=False)
     add_to_trace_history(tr, 'unpadded')        
                         
    
@@ -382,32 +409,30 @@ def mulplt(st, bottomlabel='', ylabels=[]):
         
         # PLOT THE DATA
         axh[i].plot(t, y)
+   
+        # remove yticks because we will add text showing max and offset values
+        axh[i].yaxis.set_ticks([])
 
-
-        
-    # remove yticks because we will add text showing max and offset values
-    axh[i].yaxis.set_ticks([])
-        
-    # remove xticklabels for all but the bottom subplot
-    if i < n-1:
-        axh[i].xaxis.set_ticklabels([])
-    else:
-        # for the bottom subplot, also add an xlabel with start time
-        if bottomlabel=='':
-            plt.xlabel("Starting at %s" % (st[0].stats.starttime) )
+        # remove xticklabels for all but the bottom subplot
+        if i < n-1:
+            axh[i].xaxis.set_ticklabels([])
         else:
-            plt.xlabel(bottomlabel)
-               
-    # default ylabel is station.channel
-    if ylabels==[]:
-        plt.ylabel(st[i].stats.station + "." + st[i].stats.channel, rotation=0)
-    else:
-        plt.ylabel(ylabels[i])
-            
-    # explicitly give the maximum amplitude and offset(median)
-    plt.text(0, 1, "max=%.1e offset=%.1e" % (np.max(np.abs(y)), offset),
-        horizontalalignment='left',
-        verticalalignment='top',transform=axh[i].transAxes)
+            # for the bottom subplot, also add an xlabel with start time
+            if bottomlabel=='':
+                plt.xlabel("Starting at %s" % (st[0].stats.starttime) )
+            else:
+                plt.xlabel(bottomlabel)
+
+        # default ylabel is station.channel
+        if ylabels==[]:
+            plt.ylabel(st[i].stats.station + "." + st[i].stats.channel, rotation=0)
+        else:
+            plt.ylabel(ylabels[i])
+
+        # explicitly give the maximum amplitude and offset(median)
+        plt.text(0, 1, "max=%.1e offset=%.1e" % (np.max(np.abs(y)), offset),
+            horizontalalignment='left',
+            verticalalignment='top',transform=axh[i].transAxes)
             
     # change all font sizes
     plt.rcParams.update({'font.size': 8})
@@ -949,6 +974,27 @@ def attach_station_coordinates_from_inventory(inventory, st):
                             tr.stats.latitude = cha.latitude
                             tr.stats.longitude = cha.longitude
     return
+
+'''
+def inventory_fix_id(inv, networkcode=None, stationcode=None, channelcode=None):
+    for networkObject in inv:
+        if stationcode:
+            networkObject = networkObject.select(station=stationcode)        
+        if channelcode:
+            networkObject = networkObject.select(channel=chancode)
+        stationObjects = networkObject.stations
+
+        for stationObject in stationObjects:
+            channelObjects = stationObject.channels
+            for channelObject in channelObjects:
+                if networkcode:
+                    networkObject.code = networkcode
+                if stationcode:
+                    stationObject.code = stationcode
+                if channelcode:
+                    channelObject.code = channelcode
+    return inv
+'''
 
 
 ######################################################################
