@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore")
 import matplotlib.pyplot as plt
 import datetime
 #from sys import exit
-from obspy.signal.trigger import classic_sta_lta, z_detect, plot_trigger, trigger_onset
+from obspy.signal.trigger import z_detect, trigger_onset
 from obspy.geodetics.base import gps2dist_azimuth, kilometers2degrees
 from obspy.taup import TauPyModel
 
@@ -343,46 +343,101 @@ def removeInstrumentResponse(st, preFilter = (1, 1.5, 30.0, 45.0), outputType = 
                 st.remove(tr)
     return
 
-
-
-def detectEvent(st, pretrig=30, posttrig=30):
-    """ 
-    Take a Stream object and run an STA/LTA on each channel. Clip out Stream corresponding to first ON trigger and last OFF trigger
-    
-    Optional inputs: pretrig and posttrig (in seconds).
-    
+def detect_network_event(st, minchans=None, threshon=3.5, threshoff=1.0, sta=0.5, lta=5.0):
     """
-    starttime = st[0].stats.starttime
-    mintrig =  999999
-    maxtrig = -999999
-    for tr in st:
-        df = tr.stats.sampling_rate
-
-        print('- detecting')
-        cft = z_detect(tr.data, int(10 * df))
-        triggerlist = trigger_onset(cft, 0.5, 0.0, max_len = 60 * df)
-
-        for trigpair in triggerlist:
-            if trigpair[0] < mintrig:
-                mintrig = trigpair[0]
-            if trigpair[1] > maxtrig:
-                maxtrig = trigpair[1]
-
-    # 30-s before first trigger time or 240 seconds, whichever is greatest as we do not want to trigger more than 1 minute before Steve's times in Excel
-    onset_seconds = max([mintrig/df - pretrig, 240])
-    # 30-s after last trigger time or 420 seconds, whichever is least as we do not want to trigger more than 2 minutes after Steve's times in Excel
-    offset_seconds = min([maxtrig/df + posttrig, 420])
-    stime = st[0].stats.starttime + onset_seconds
-    etime = st[0].stats.starttime + offset_seconds
-    st.trim(starttime = stime, endtime = etime)
-    return
+    Run a full network event detector/associator 
+    
+    Note that if you run a 5-s LTA, you need at least 5-s of noise before the signal.
+    
+    Output is a list of dicts like:
+    
+    {'cft_peak_wmean': 19.561900329259956,
+ 'cft_peaks': [19.535644192544272,
+               19.872432918501264,
+               19.622171410201297,
+               19.217352795792998],
+ 'cft_std_wmean': 5.4565629691954713,
+ 'cft_stds': [5.292458320417178,
+              5.6565387957966404,
+              5.7582248973698507,
+              5.1190298631982163],
+ 'coincidence_sum': 4.0,
+ 'duration': 4.5299999713897705,
+ 'stations': ['UH3', 'UH2', 'UH1', 'UH4'],
+ 'time': UTCDateTime(2010, 5, 27, 16, 24, 33, 190000),
+ 'trace_ids': ['BW.UH3..SHZ', 'BW.UH2..SHZ', 'BW.UH1..SHZ', 'BW.UH4..SHZ']}
+ 
+ 
+    Any trimming of the Stream object can then by done with trim_to_event.
+ 
+    """
+    from obspy.signal.trigger import coincidence_trigger
+    if not minchans:
+        N = len(st)
+        minchans = int(N/3)
+        if minchans<3:
+            minchans=N
+    print('minchans=',minchans)
+    trig = coincidence_trigger("recstalta", threshon, threshoff, st, minchans, sta=sta, lta=lta, details=True) # 0.5s, 10s
+    ontimes = [t['time'] for t in trig]
+    offtimes = [t['time']+t['duration'] for t in trig]
+    return trig, ontimes, offtimes
     
 
+def add_channel_detections(st, lta=5.0, threshon=0.5, threshoff=0.0, max_duration=120):
+    """ 
+    Runs a single channel detection on each Trace. No coincidence trigger/association into event.
+        
+    Take a Stream object and run an STA/LTA on each channel, adding a triggers list to Trace.stats.
+    This should be a list of 2-element numpy arrays with trigger times on and off as UTCDateTime
+    
+    Note that if you run a 5-s LTA, you need at least 5-s of noise before the signal.
 
-def mulplt(st, bottomlabel='', ylabels=[]):
+    """
+    for tr in st:
+        tr.stats['triggers'] = []
+        Fs = tr.stats.sampling_rate
+        cft = z_detect(tr.data, int(lta * Fs)) 
+        triggerlist = trigger_onset(cft, threshon, threshoff, max_len = max_duration * Fs)
+        for trigpair in triggerlist:
+            trigpairUTC = [tr.stats.starttime + samplenum/Fs for samplenum in trigpair]
+            tr.stats.triggers.append(trigpairUTC)
+
+
+def get_event_window(st, pretrig=30, posttrig=30):
+    """ 
+    Take a Stream object and run an STA/LTA on each channel. Return first trigger on and last trigger off time.
+    Assumes that tr.stats has triggers lists added already with add_channel_detections
+    Any trimming of the Stream taking into account pretrig and posttrig seconds can by done with trim_to_event
+    """
+
+    mintime = []
+    maxtime = []
+    
+    for tr in st:
+        if 'triggers' in tr.stats:
+            if len(tr.stats.triggers)==0:
+                continue
+            trigons = [thistrig[0] for thistrig in tr.stats.triggers]
+            trigoffs = [thistrig[1] for thistrig in tr.stats.triggers]   
+            mintime.append(min(trigons))
+            maxtime.append(max(trigoffs))           
+    
+    N = int(len(mintime)/2)
+    if len(mintime)>0:
+        return sorted(mintime)[N], sorted(maxtime)[N]
+    else:
+        return None, None
+    
+
+def trim_to_event(st, mintime, maxtime, pretrig=10, posttrig=10):
+    """ Trims a Stream based on mintime and maxtime which could come from detect_network_event or get_event_window """
+    st.trim(starttime=mintime-pretrig, endtime=maxtime+posttrig)
+    
+    
+def mulplt(st, bottomlabel='', ylabels=[], MAXPANELS=6):
     """ Create a plot of a Stream object similar to Seisan's mulplt """
     fh = plt.figure()
-    MAXPANELS =6
     n = np.min([MAXPANELS, len(st)])
     
     # start time as a Unix epoch
@@ -442,27 +497,9 @@ def mulplt(st, bottomlabel='', ylabels=[]):
     #st.mulplt = types.MethodType(mulplt,st)    
     
     return fh, axh
-  
+   
+   
     
-
-def max_3c(st):
-    """ max of a 3-component seismogram """
-    N = len(st)/3
-    m = []
-
-    if N.is_integer():
-        st.detrend()
-        for c in range(int(N)):
-            y1 = st[c*3+0].data
-            y2 = st[c*3+1].data
-            y3 = st[c*3+2].data
-            y = np.sqrt(np.square(y1) + np.square(y2) + np.square(y3))
-            m.append(max(y))
-    return m    
-    
-
-
-
 def plot_stream_types(st, eventdir, maxchannels=10): 
     # assumes input traces are in velocity or pressure units and cleaned
       
