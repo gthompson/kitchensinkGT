@@ -4,22 +4,21 @@ from glob import glob
 import numpy as np
 import pandas as pd
 import datetime as dt
-import numpy as np
+from pprint import pprint
+import matplotlib.pyplot as plt
+
 from obspy import read, read_inventory, Stream
 from obspy.io.xseed.core import _read_resp
 from obspy.imaging.cm import obspy_sequential
+
 sys.path.append('/Users/thompsong/src/kitchensinkGT/LIB')
 from libMVO import fix_trace_id, inventory_fix_id_mvo
 from metrics import process_trace, choose_best_traces, select_by_index_list, ampengfft
-from libseisGT import Stream_min_starttime
+from libseisGT import Stream_min_starttime, detect_network_event
+
 sys.path.append('/Users/thompsong/src/icewebPy')
 import IceWeb
 
-SEISAN_DATA = os.environ['SEISAN_DATA']
-if not SEISAN_DATA:
-    SEISAN_DATA = os.environ['SEISAN_TOP']
-    if not SEISAN_DATA:
-        SEISAN_DATA = "./seismo"
 """ 
 A set of tools to process Seisan databases (REA and WAV directories)
 Created for Montserrat catalog work.
@@ -453,9 +452,21 @@ def create_event_picklefiles(SEISAN_DATA, DB, YYYY, MM, shortperiod, MAX_FILES_T
             # at start of this block, before loop tr in st
             ######################### END OF CLEAN/CORRECT BLOCK ######################
           
-            for tr in st:
-                if tr.stats.quality_factor <= 0.0:
-                    st.remove(tr)
+            logfile = picklefile.replace('.pickle', '.log')
+            with open(logfile,'w') as fout:
+                for tr in st:
+
+                    # print trace history
+                    pprint(tr.stats, stream=fout)
+                    fout.write('\n')
+                    """
+                    for key in tr.stats:
+                        pprint(tr.stats[key], stream=fout)
+                        print('\n')
+                    """
+
+                    if tr.stats.quality_factor <= 0.0:
+                        st.remove(tr)
                     
             if len(st) == 0:
                 continue
@@ -522,27 +533,11 @@ def create_event_spectrograms(SEISAN_DATA, DB, YYYY, MM):
             # Flatten the spectrogramdata to spectrum, then remove. we use the spectum later.
             iwsobj.compute_amplitude_spectrum(compute_bandwidth=True) # adds tr.stats.spectrum
             for tr in iwsobj.stream:
-                ampengfft(tr)
+                ampengfft(tr, eventdir)
                 tr.stats.pop('spectrogramdata', None) # Remove spectrogramdata as it is too large for picklefile
                 #tr.stats.spectrogramdata = {}
             iwsobj.stream.write(picklefullpath, 'PICKLE') # Rewrite pickle file with extra attributes
 
-            """
-            TO DO:
-            # 1. archive tr.stats.spectrum for ESAM/event spectrograms and frequency index later?
-            # 2. archive SSAM? Presumably in same format as for the Montserrat SSAM files.
-            # 3. compute RSAM? Where is my code from New Zealand / ObsPy core?
-            # 4. write an AEF-file? e.g.
-            fptr = open(aeffile, 'w')
-            fptr.write('NSLC, amp, eng, f0-1, f1-2, f2-3, f3-4, f4-5, f5-6, f6-7, f7-8, f8-9, f9-10, f10-11, f11-12, f12-13, f13-14, f14-15, f15-16\n')
-            for tr in st:
-                fptr.write('%s, %4.2e, %4.2e' % (tr.id, tr.stats.peakamp, tr.stats.energy))
-                if 'ssam' in tr.stats:
-                    for x in tr.stats.ssam:
-                        fptr.write(', %4.2e' % (x/tr.stats.peakamp))
-                fptr.write('\n')
-            fptr.close()
-            """
             
 def pickle2csv(SEISAN_DATA, DB, YYYY, MM, MAX_FILES_TO_PROCESS=999999):
     # what metrics do we put into dataframe here. spectraldata. 
@@ -569,24 +564,35 @@ def pickle2csv(SEISAN_DATA, DB, YYYY, MM, MAX_FILES_TO_PROCESS=999999):
             list_of_rows = []
             for tr in st:
                 s = tr.stats
-                m = s.metrics
-                row = {'id':tr.id, 'starttime':m['start_time'], 
+                row = {'id':tr.id, 'starttime':s['starttime'], 
                        'Fs':s.sampling_rate, 'secs':s.duration,
                        'calib':s.calib, 'units':s.units, 
-                       'original_id':m.seed_id, 'availability':m.percent_availability,
                        'quality':s.quality_factor,
-                       'ngaps':m.num_gaps, 'snr':s.snr[0], 'signal':s.snr[1], 'noise':s.snr[2],                   
-                       'min':m.sample_min/s.snr[1], 'max':m.sample_max/s.snr[1], 'rms':m.sample_stdev/s.snr[1]}
-                if 'peakamp' in s:
-                       #row['maxamp'] = s.peakamp
-                       row['maxt'] = s.peaktime
-                       row['energy'] = s.energy
+                       'snr':s.snr[0], 'signal':s.snr[1], 'noise':s.snr[2]}
                 if 'spectrum' in s: 
-                    row['peakF'] = s.spectrum.peakF, 
-                    row['medianF'] = s.spectrum.medianF
-                    if 'bw_min' in s.spectrum:
-                        row['bw_min'] = s.spectrum.bw_min
-                        row['bw_max'] = s.spectrum.bw_max
+                    for item in ['medianF', 'peakF', 'peakA', 'bw_min', 'bw_max']:
+                        try:
+                            row[item] = s.spectrum[item]
+                        except:
+                            pass
+
+                if 'metrics' in s:
+                    m = s.metrics
+                    for item in ['peakamp', 'peaktime', 'energy', 'RSAM_high', 'RSAM_low', 'band_ratio',
+                                 'sample_min', 'sample_max', 'sample_mean', 'sample_median', 
+                                 'sample_lower_quartile', 'sample_upper_quartile', 'sample_rms', 
+                                 'sample_stdev', 'percent_availability', 'num_gaps']:
+                                 #'start_gap', 'num_gaps', 'end_gap', 'sum_gaps', 'max_gap', 
+                                 #'num_overlaps', 'sum_overlaps', 'num_records', 'record_length', 
+                        try:
+                            row[item] = m[item]
+                        except:
+                            pass  
+                        
+                if 'sci' in s:
+                    row['skewness'] = s.sci.skewness
+                    row['kurtosis'] = s.sci.kurtosis                        
+                        
                 list_of_rows.append(row)
             df = pd.DataFrame(list_of_rows)
             df = df.round({'Fs': 2, 'secs': 2, 'quality':2, 'snr':2, 'min':2, 'max':2, 'rms':2})
@@ -699,13 +705,92 @@ def build_event_webpage(allwebpages, c, streamdf=None, streamplot=None, sgramplo
     # Write HTML String to file.html
     fptr = open(htmlfile, "w")
     fptr.write(html)
-    fptr.close()    
+    fptr.close() 
+    
+    
+def summarize_each_event(SEISAN_DATA, DB, YYYY, MM):
+    eventdir = os.path.join(SEISAN_DATA, 'PICKLE', DB, YYYY, MM)
+    traceCSVfiles = sorted(glob(os.path.join(eventdir, '[21]*.csv')))
+    summaryCSVfile = os.path.join(eventdir, 'summary%s%s%s.csv' % (DB,YYYY,MM))
+    summaryLoD = []
+    for traceCSVfile in traceCSVfiles: 
+
+        # read pickle file
+        picklefile = traceCSVfile.replace('.csv','.pickle')
+        st = read(picklefile)
+        st.filter("highpass", freq=0.5) 
+        chosen = choose_best_traces(st, MAX_TRACES=1, include_seismic=True, 
+                                    include_infrasound=False, include_uncorrected=False)
+        tr = st[chosen[0]]
+
+        # plot best trace
+        plt.figure()
+        plt.plot(tr.times(), tr.data)
+        plt.ylabel(tr.id)   
+
+        # read CSV file
+        df = pd.read_csv(traceCSVfile)
+        numOfRows = df.shape[0]
+        df.sort_values(by=['quality'], inplace=True)
+
+        # get median of 10 best rows
+        df = df.head(10)
+        row = df.median(axis = 0, skipna = True).to_dict()
+
+        # add columns
+        row['WAV']=os.path.basename(traceCSVfile).replace('.csv','')
+        row['traces']=numOfRows
+
+        # detect network events
+        trig, ontimes, offtimes = detect_network_event(st, sta=0.4, lta=5.0, threshon=6.0, threshoff=0.24)
+        print('%s: %d events detected' % (picklefile, len(ontimes)))
+        durations = [t['duration'] for t in trig]
+        if len(durations)>0:
+            bestevent = np.argmax(durations)
+            thistrig=trig[int(np.argmax(durations))]
+            row['detection_quality']=thistrig['coincidence_sum']*thistrig['cft_peak_wmean']*thistrig['cft_std_wmean']
+            for item in columns[2:-1]:
+                row[item]=thistrig[item]
+            row['offtime']=thistrig['time']+thistrig['duration']
+
+            # add detection lines on plot
+            t0 = tr.stats.starttime
+            bottom, top = plt.ylim()
+            plt.vlines([row['time']-t0, row['offtime']-t0], bottom, top )
+
+        plt.show()
+
+        # append row to list of dicts
+        #pprint(row)
+        summaryLoD.append(row)
+
+    summaryDF = pd.DataFrame(summaryLoD)
+    summaryDF = summaryDF.rename(columns={'time': 'ontime'})
+    summaryDF.drop(summaryDF.filter(regex="Unname"),axis=1, inplace=True)
+    summaryDF = summaryDF.set_index('WAV')
+    """
+    print(summaryDF)
+    for col in summaryDF.columns:
+        print('*%s*' % col"""
+    summaryDF.to_csv(summaryCSVfile, index=True)
                 
+def processREAfiles(SEISAN_DATA, DB, YYYY, MM, MAXFILES=3):
+    pass
+              
+def processWAVfiles(SEISAN_DATA, DB, YYYY, MM, MAXFILES=3):
+    # processWAVfiles('/Users/thompsong/seismo', 'MVOE_', '2005', '05', MAXFILES=10)
+    badWAVfiles = create_event_picklefiles(SEISAN_DATA, DB, YYYY, MM, shortperiod, MAX_FILES_TO_PROCESS=MAXFILES)
+    create_event_spectrograms(SEISAN_DATA, DB, YYYY, MM)
+    pickle2csv(SEISAN_DATA, DB, YYYY, MM, MAX_FILES_TO_PROCESS=MAXFILES)
+    create_catalog_website(SEISAN_DATA, DB, YYYY, MM)
+    summarize_each_event(SEISAN_DATA, DB, YYYY, MM)
+    print(badWAVfiles)
+    # could still add ar_pick to this workflow to try to identify P and S waves for regional, VT and hybrid earthquakes
+    # this would be at the Trace level
+    
+def choose_best_events(SEISAN_DATA, NUM_EVENTS, mainclass, subclass):
+    # choose_best_events(SEISAN_DATA, 100, 'LV', 't') to choose the best 100 volcano-tectonic events
+    pass
 
 if __name__ == "__main__":
     pass
-    # could read in Sfiles then 
-    # export to ObsPy event object
-    #e = s1.to_css()
-    #print e
-

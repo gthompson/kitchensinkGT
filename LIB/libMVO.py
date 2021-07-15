@@ -7,18 +7,13 @@ from libseisGT import get_seed_band_code
 
 
 def change_last_sample(tr):
-# function tr = change_last_sample(tr)
     # For some SEISAN files from Montserrat - possibly from SEISLOG conversion,
     # the last value in the time series was always some absurdly large value
-    # This sections was to change last value to be the mean of the rest
-    #a = tr.data
-    #a = np.delete(a,[np.size(a) - 1])
-    #m = np.mean(a)
-    #tr.data[-1] = m
-    return tr
+    # So remove the last sample
+    tr.data = tr.data[0:-2]
 
 def swap32(i):
-# function tr.data = swap(tr.data)
+    # Change the endianess
     return struct.unpack("<i", struct.pack(">i", i))[0]
 
 def fix_trace_id(st, shortperiod=False):

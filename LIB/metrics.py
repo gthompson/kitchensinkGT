@@ -4,6 +4,7 @@
 import os
 import numpy as np
 from scipy.stats import describe
+from scipy.interpolate import interp1d
 from obspy import Stream
 from obspy.signal.quality_control import MSEEDMetadata 
 #import libseisGT
@@ -23,7 +24,6 @@ In terms of order of application:
 5. Compute statistical metrics.
 
 """
-
 
 def process_trace(tr, inv=None):
 # function tr, quality_factor, snr = compute_metrics(tr)
@@ -58,7 +58,8 @@ def process_trace(tr, inv=None):
     tr.stats["snr"] = signaltonoise(tr)
     add_to_trace_history(tr, 'Signal to noise measured.')
     if tr.stats.snr[0]>1.0:
-        tr.stats["quality_factor"] += np.log10(tr.stats.snr[0])
+        #tr.stats["quality_factor"] += np.log10(tr.stats.snr[0])
+        tr.stats["quality_factor"] * tr.stats.snr[0]
     
     # SciPy stats
     #tr.stats["scipy"] = describe(tr.data, nan_policy = 'omit') # only do this after removing trend/high pass filtering
@@ -104,27 +105,39 @@ def _detectClipping(tr, countThresh = 10):
         add_to_trace_history(tr, 'Trace %s appears to be clipped at lower limit %e (count=%d)' % (tr.id, mu, countu) )       
         lower_clipped = True
     return upper_clipped, lower_clipped
+
     
+def _get_islands(arr, mask):
+    mask_ = np.concatenate(( [False], mask, [False] ))
+    idx = np.flatnonzero(mask_ [1:] != mask_ [:-1])
+    return [arr[idx[i]:idx[i+1] + 1] for i in range(0, len(idx), 2)]
+
+def _FindMaxLength(lst):
+    maxList = max(lst, key = len)
+    maxLength = max(map(len, lst))      
+    return maxList, maxLength  
+
 def trace_quality_factor(tr):
     # trace_quality_factor(tr)
     # a good trace has quality factor 3, one with 0s and -1s has 1, bad trace has 0
     quality_factor = 1.0
+    is_bad_trace = False
     
     # ignore traces with few samples
     if tr.stats.npts < 100:
         add_to_trace_history(tr, 'Not enough samples')
-        return 0.0
+        is_bad_trace = True
     
     # ignore traces with weirdly low sampling rates
     if tr.stats.sampling_rate < 19.99:
         add_to_trace_history(tr, 'Sampling rate too low')
-        return 0.0
+        is_bad_trace = True
 
     # ignore blank trace
     anyData = np.count_nonzero(tr.data)
     if anyData==0:
         add_to_trace_history(tr, 'Trace is blank')
-        return 0.0
+        is_bad_trace = True
     
     # check for bit level noise
     u = np.unique(tr.data)
@@ -133,31 +146,34 @@ def trace_quality_factor(tr):
         quality_factor += np.log10(num_unique_values)
     else:
         add_to_trace_history(tr, 'bit level noise suspected')
-        return 0.0
+        is_bad_trace = True
 
     # check for sequences of 0 or 1
-    """
     trace_good_flag = _check0andMinus1(tr.data)
-    if trace_good_flag:
-        quality_factor += 1.0
-    else:
+    if not trace_good_flag:
         add_to_trace_history(tr, 'sequences of 0 or -1 found')
-    """
+        is_bad_trace = True
     
     # replacement for check0andMinus1
     seq = tr.data
-    islands = get_islands(seq, np.r_[np.diff(seq) == 0, False]) 
-    maxList, maxLength = FindMaxLength(islands)
-    quality_factor /= maxLength
+    islands = _get_islands(seq, np.r_[np.diff(seq) == 0, False]) 
+    maxList, maxLength = _FindMaxLength(islands)
+    add_to_trace_history(tr, 'longest flat sequence found: %d samples' % maxLength)
+    if maxLength >= tr.stats.sampling_rate:
+        is_bad_trace = True
         
-    # check if trace clipped
+    # time to exit?
+    if is_bad_trace:
+        return 0.0
+        
+    # check if trace clipped - but so far I don't see clipped trace as terminal
     upperClipped, lowerClipped = _detectClipping(tr) # can add another function to interpolate clipped values
     if upperClipped:
         quality_factor /= 2.0
     if lowerClipped:
         quality_factor /= 2.0
          
-    # check for outliers
+    # check for outliers - but I haven't tuned this yet, so not making it a decision between quality 0.0 and continue
     outlier_count, outlier_indices = _mad_based_outlier(tr, thresh=50.0)
     #print('Outliers: %d' % outlier_count)
     if outlier_count == 0:
@@ -193,7 +209,7 @@ def _mad_based_outlier(tr, thresh=3.5):
     
     return outlier_count, outlier_indices
 
-"""
+
 def _check0andMinus1(liste):
 # function bool_good_trace = check0andMinus1(tr.data)
     liste=list(liste)
@@ -202,17 +218,8 @@ def _check0andMinus1(liste):
         return False
     else:
         return True  
-"""
-    
-def get_islands(arr, mask):
-    mask_ = np.concatenate(( [False], mask, [False] ))
-    idx = np.flatnonzero(mask_ [1:] != mask_ [:-1])
-    return [arr[idx[i]:idx[i+1] + 1] for i in range(0, len(idx), 2)]
 
-def FindMaxLength(lst):
-    maxList = max(lst, key = len)
-    maxLength = max(map(len, lst))      
-    return maxList, maxLength      
+    
         
 def signaltonoise(tr):
 # function snr, highval, lowval = signaltonoise(tr)
@@ -284,9 +291,7 @@ def choose_best_traces(st, MAX_TRACES=8, include_seismic=True, include_infrasoun
     n = min([n, MAX_TRACES])
     j = np.argsort(priority)
     chosen = j[-n:]  
-    return chosen
-
-        
+    return chosen        
         
 def select_by_index_list(st, chosen):
     st2 = Stream()
@@ -296,60 +301,124 @@ def select_by_index_list(st, chosen):
     return st2
 
 
-def ssam(tr, f, S):
+def _ssam(tr, f, S):
     if not f.size==S.size:
         return
     # use actual amplitude, not dB. 
     ssamValues = []
-    tr.stats['spectral_amplitude'] = S
-    tr.stats['spectral_frequencies'] = f
-    for fmin in np.arange(0.0, 16.0, 1.0):
+    #tr.stats['spectral_amplitude'] = S
+    #tr.stats['spectral_frequencies'] = f
+    freqs = np.arange(0.0, 16.0, 1.0)
+    for fmin in freqs:
         f_indexes = np.intersect1d(np.where(f>=fmin), np.where(f<fmin+1.0))
         S_selected = S[f_indexes]
         ssamValues.append(np.nanmean(S_selected) )
-    tr.stats['ssam'] = ssamValues 
+    tr.stats['ssam'] = {'f': freqs, 'A': ssamValues}
 
-def ampengfft(tr):
+    
+def _band_ratio(tr, freqlims = [1, 6, 11]):    
+    # compute band ratio as log2(amplitude > 6 Hz/amplitude < 6 Hz)
+    # After Rodgers et al., 2015: https://doi.org/10.1016/j.jvolgeores.2014.11.012
+    if 'ssam' in tr.stats:
+        A = np.array(tr.stats.ssam.A)
+        f = tr.stats.ssam.f
+        f_indexes_low = np.intersect1d(np.where(f>freqlims[0]), np.where(f<freqlims[1]))
+        f_indexes_high = np.intersect1d(np.where(f>freqlims[1]), np.where(f<freqlims[2]))       
+        A_low = A[f_indexes_low]        
+        A_high = A[f_indexes_high]                 
+        tr.stats.metrics['band_ratio'] = np.log2(sum(A_high)/sum(A_low))
+        tr.stats.metrics['RSAM_high'] = sum(A_high)
+        tr.stats.metrics['RSAM_low'] = sum(A_low)
+
+def ampengfft(tr, outdir):
     """ 
-    Measure peakamp and energy on a Trace 
+    Measure peakamp and energy on a Trace and add to tr.stats.metrics
+    Call ssam to add ssam dict to tr.stats
+    
+    TO DO:
+            # 1. For continuous data, I will want to break into 1-minute chunks before computing spectra and metrics.
+            # 2. compute RSAM? Where is my code from New Zealand / ObsPy core? Or I could just do RSAM in two frequency bands, the same ones used in band_ratio calculation. 
+    
     """
     
     # if we use absolute function, we don't need to check if maxy > -miny
     if not 'detrended' in tr.stats.history:
         tr.detrend(type='linear')
+        add_to_trace_history(tr, 'detrended')
     y = np.absolute(tr.data)
     maxy = y.max()
     maxy_i = y.argmax()
     maxy_t = maxy_i / tr.stats.sampling_rate
-    tr.stats['peakamp'] = maxy
-    tr.stats['peaktime'] = maxy_t
-    tr.stats['energy'] = np.sum(np.square(y)) / tr.stats.sampling_rate
-    if 'spectrum' in tr.stats : # dict of T, F, S
+    if not 'metrics' in tr.stats:
+        tr.stats.metrics = {}
+    tr.stats.metrics['peakamp'] = maxy
+    tr.stats.metrics['peaktime'] = maxy_t
+    tr.stats.metrics['energy'] = np.sum(np.square(y)) / tr.stats.sampling_rate
+    
+    
+    if 'spectrum' in tr.stats:
+        _ssam(tr, tr.stats.spectrum['F'], tr.stats.spectrum['A'])
+        _band_ratio(tr) 
+        _save_esam(tr, outdir)
+        add_to_trace_history(tr, 'ampengfft')
+    else:
+        print("""No tr.stats.spectrum. Cannot compute SSAM data. You need to use:
+                        iwsobj = IceWeb.icewebSpectrogram(stream=st)
+                        iwsobj = iwsobj.precompute()
+                        iwsobj.compute_amplitude_spectrum(compute_bandwidth=True)""")
+        add_to_trace_history(tr, 'ampeng')
 
-        #### Compute various frequency metrics
-          
-        
-        # SSAM
-        if not 'ssam' in tr.stats:
-            sp = tr.stats.spectrogramdata
-            ssam(tr, sp['F'], sp['S'])
-            
-        # peak F. See spectrum.peakF computed by IceWeb.py/compute_amplitude_spectrum
-        
-        # peakA. See spectrum.peakA ""
-        
-        # median F. See spectrum.medianF ""
-               
-        # frequency index. Not implemented yet.
-        
-        # archive spectrum for ESAM
-            
-            # record spectrum to binary files to make ESAM/event spectrograms later
-            # an alternative version might be to plot the sum of spectral data by event type per day,
-            # then plot those sums as an event spectrogram - against a daily sampling rate.
-            # 
-            # from either version could then pick the biggest events       
+    # To do:
+    # an alternative version might be to plot the sum of spectral data by event type per day,
+    # then plot those sums as an event spectrogram - against a daily sampling rate.
+    # 
+    # from either version could then pick the biggest events       
 
+def _save_esam(tr, outdir):
+    """ interpolate F and A to a fixed F2 vector. """
+    F = tr.stats.spectrum['F']
+    A = tr.stats.spectrum['A']
+    
+    # interpolate onto regular frequency vector
+    # actual frequency interval is 0.09765625 for 100 Hz data with 512 NFFT
+    F2 = np.arange(0.0, 20.0, 0.1)
+    fn = interp1d(F, A)
+    A2 = fn(F2)
+    
+    # save to file    
+    esamfile = tr.stats.starttime.strftime(os.path.join(outdir,'ESAM%Y%m%d.csv'))
+    if not os.path.exists(esamfile):
+        fptr = open(esamfile, 'w')
+        columns = ['id', 'time']    
+        for thisF in F2:
+            columns.append(str(thisF))
+        sep = ','
+        fptr.write( sep.join(columns)+'\n' )        
+    else:   
+        fptr = open(esamfile, 'a')
+
+    fptr.write('%s, %s, ' % (tr.id, tr.stats.starttime.__str__())  )
+    for thisA in A2:
+        fptr.write('%.2e, ' % thisA)
+    fptr.write('\n')
+    fptr.close()
+    
+        
+
+def max_3c(st):
+    """ max of a 3-component seismogram """
+    N = len(st)/3
+    m = []
+
+    if N.is_integer():
+        st.detrend()
+        for c in range(int(N)):
+            y1 = st[c*3+0].data
+            y2 = st[c*3+1].data
+            y3 = st[c*3+2].data
+            y = np.sqrt(np.square(y1) + np.square(y2) + np.square(y3))
+            m.append(max(y))
+    return m 
 
 def peak_amplitudes(st):   
     """ Peak Ground Motion. Should rename it peakGroundMotion """
