@@ -565,7 +565,7 @@ def pickle2csv(SEISAN_DATA, DB, YYYY, MM, MAX_FILES_TO_PROCESS=999999):
             for tr in st:
                 s = tr.stats
                 row = {'id':tr.id, 'starttime':s['starttime'], 
-                       'Fs':s.sampling_rate, 'secs':s.duration,
+                       'Fs':s.sampling_rate, 'twin':s.duration,
                        'calib':s.calib, 'units':s.units, 
                        'quality':s.quality_factor,
                        'snr':s.snr[0], 'signal':s.snr[1], 'noise':s.snr[2]}
@@ -589,9 +589,9 @@ def pickle2csv(SEISAN_DATA, DB, YYYY, MM, MAX_FILES_TO_PROCESS=999999):
                         except:
                             pass  
                         
-                if 'sci' in s:
-                    row['skewness'] = s.sci.skewness
-                    row['kurtosis'] = s.sci.kurtosis                        
+                if 'scipy' in s:
+                    row['skewness'] = s.scipy.skewness
+                    row['kurtosis'] = s.scipy.kurtosis                        
                         
                 list_of_rows.append(row)
             df = pd.DataFrame(list_of_rows)
@@ -748,15 +748,16 @@ def summarize_each_event(SEISAN_DATA, DB, YYYY, MM):
         if len(durations)>0:
             bestevent = np.argmax(durations)
             thistrig=trig[int(np.argmax(durations))]
-            row['detection_quality']=thistrig['coincidence_sum']*thistrig['cft_peak_wmean']*thistrig['cft_std_wmean']
-            for item in columns[2:-1]:
+            row['ontime'] = thistrig['time']
+            row['offtime']=thistrig['time']+thistrig['duration']            
+            for item in ['duration', 'coincidence_sum', 'cft_peak_wmean', 'cft_std_wmean']:
                 row[item]=thistrig[item]
-            row['offtime']=thistrig['time']+thistrig['duration']
+            row['detection_quality']=thistrig['coincidence_sum']*thistrig['cft_peak_wmean']*thistrig['cft_std_wmean']
 
             # add detection lines on plot
             t0 = tr.stats.starttime
             bottom, top = plt.ylim()
-            plt.vlines([row['time']-t0, row['offtime']-t0], bottom, top )
+            plt.vlines([row['ontime']-t0, row['offtime']-t0], bottom, top )
 
         plt.show()
 
@@ -779,6 +780,9 @@ def processREAfiles(SEISAN_DATA, DB, YYYY, MM, MAXFILES=3):
               
 def processWAVfiles(SEISAN_DATA, DB, YYYY, MM, MAXFILES=3):
     # processWAVfiles('/Users/thompsong/seismo', 'MVOE_', '2005', '05', MAXFILES=10)
+    shortperiod = False
+    if DB[0:4]=='ASNE':
+        shortperiod = True
     badWAVfiles = create_event_picklefiles(SEISAN_DATA, DB, YYYY, MM, shortperiod, MAX_FILES_TO_PROCESS=MAXFILES)
     create_event_spectrograms(SEISAN_DATA, DB, YYYY, MM)
     pickle2csv(SEISAN_DATA, DB, YYYY, MM, MAX_FILES_TO_PROCESS=MAXFILES)
