@@ -157,9 +157,12 @@ def trace_quality_factor(tr):
     # replacement for check0andMinus1
     seq = tr.data
     islands = _get_islands(seq, np.r_[np.diff(seq) == 0, False]) 
-    maxList, maxLength = _FindMaxLength(islands)
-    add_to_trace_history(tr, 'longest flat sequence found: %d samples' % maxLength)
-    if maxLength >= tr.stats.sampling_rate:
+    try:
+        maxList, maxLength = _FindMaxLength(islands)
+        add_to_trace_history(tr, 'longest flat sequence found: %d samples' % maxLength)
+        if maxLength >= tr.stats.sampling_rate:
+            is_bad_trace = True
+    except:
         is_bad_trace = True
         
     # time to exit?
