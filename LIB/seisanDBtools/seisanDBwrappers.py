@@ -11,12 +11,13 @@ from obspy import read, read_inventory, Stream
 from obspy.io.xseed.core import _read_resp
 from obspy.imaging.cm import obspy_sequential
 
-sys.path.append('/Users/thompsong/src/kitchensinkGT/LIB')
+LIBpath = os.path.join( os.getenv('HOME'),'src','kitchensinkGT', 'LIB')
+sys.path.append(LIBpath)
 from libMVO import fix_trace_id, inventory_fix_id_mvo
 from metrics import process_trace, choose_best_traces, select_by_index_list, ampengfft
 from libseisGT import Stream_min_starttime, detect_network_event
 
-sys.path.append('/Users/thompsong/src/icewebPy')
+sys.path.append(os.path.join( os.getenv('HOME'),'src', 'icewebPy') )
 import IceWeb
 
 """ 
@@ -498,31 +499,26 @@ def create_event_spectrograms(SEISAN_DATA, DB, YYYY, MM):
             if not '.pickle' in file:
                 continue
                 
-            print('Processing %s' % file)
+            print('Processing %s.' % file, end = ' ')
             picklefullpath = os.path.join(root, file) 
+            sgramfile = picklefullpath.replace('.pickle', '_sgram.png').replace('PICKLE', 'HTML') 
+            sgramfixed = picklefullpath.replace('.pickle', '_sgram_fixed.png').replace('PICKLE', 'HTML')
+            if os.path.exists(sgramfile) and os.path.exists(sgramfixed):
+                print('Skipping.')
+                continue
+                     
             st = read(picklefullpath)
-            #print(st)
       
             iwsobj = IceWeb.icewebSpectrogram(stream=st)
             iwsobj = iwsobj.precompute()
      
-            # free scale
-            sgramfile = picklefullpath.replace('.pickle', '_sgram.png').replace('PICKLE', 'HTML')   
-            print('Creating ',sgramfile)            
+            # free scale  
+            print('Creating %s.' % sgramfile, end = ' ')            
             titlestr = os.path.basename(sgramfile) 
             chosen = choose_best_traces(st, MAX_TRACES=10)            
             iwsobj.plot(outfile=sgramfile, log=False, equal_scale=False, add_colorbar=True, dbscale=True, title=titlestr, trace_indexes=chosen);
 
-            '''
-            # equal scale
-            sgramequal = picklefullpath.replace('.pickle', '_sgram_equal.png').replace('PICKLE', 'HTML')            
-            titlestr = os.path.basename(sgramequal)           
-            iwsobj.plot(outfile=sgramequal, log=False, equal_scale=True, add_colorbar=True, dbscale=True, title=titlestr, trace_indexes=chosen);
-            '''
-                        
-            
-            # fixed scale
-            sgramfixed = picklefullpath.replace('.pickle', '_sgram_fixed.png').replace('PICKLE', 'HTML')            
+            # fixed scale                        
             titlestr = os.path.basename(sgramfixed)
             clim_in_dB = [-160, -100]
             clim_in_units = [ IceWeb.dB2amp(clim_in_dB[0]),  IceWeb.dB2amp(clim_in_dB[1]) ]
@@ -531,11 +527,13 @@ def create_event_spectrograms(SEISAN_DATA, DB, YYYY, MM):
             # need separate plots for any infrasound channels
             
             # Flatten the spectrogramdata to spectrum, then remove. we use the spectum later.
+            print('Computing spectrum.', end = ' ')  
             iwsobj.compute_amplitude_spectrum(compute_bandwidth=True) # adds tr.stats.spectrum
             for tr in iwsobj.stream:
                 ampengfft(tr, eventdir)
                 tr.stats.pop('spectrogramdata', None) # Remove spectrogramdata as it is too large for picklefile
                 #tr.stats.spectrogramdata = {}
+            print('Writing enhanced pickle file.')     
             iwsobj.stream.write(picklefullpath, 'PICKLE') # Rewrite pickle file with extra attributes
 
             
@@ -551,14 +549,20 @@ def pickle2csv(SEISAN_DATA, DB, YYYY, MM, MAX_FILES_TO_PROCESS=999999):
         files = sorted(files)
         for file in files:        
             if num_files_processed >= MAX_FILES_TO_PROCESS:
-                print('Have reached MAX_FILES_TO_PROCESS limit')
+                print('Have reached MAX_FILES_TO_PROCESS limit.')
                 break
 
             if not '.pickle' in file:
                 continue
                 
-            print('Processing %s' % file)
+            print('Processing %s.\n- Building metrics dataframe.' % file, end = ' ')
             picklefullpath = os.path.join(root, file) 
+            csvfile = picklefullpath.replace('.pickle', '.csv')
+            if os.path.exists(csvfile):
+                print('Skipping.')
+                continue
+            
+            print('- Building metrics dataframe.', end = ' ')
             st = read(picklefullpath)
             df = pd.DataFrame()
             list_of_rows = []
@@ -596,9 +600,10 @@ def pickle2csv(SEISAN_DATA, DB, YYYY, MM, MAX_FILES_TO_PROCESS=999999):
                 list_of_rows.append(row)
             df = pd.DataFrame(list_of_rows)
             df = df.round({'Fs': 2, 'secs': 2, 'quality':2, 'snr':2, 'min':2, 'max':2, 'rms':2})
-            csvfile = picklefullpath.replace('.pickle', '.csv')
+            
+            print('Saving to CSV.')
+            
             df.set_index('id')
-            #print(df)
             df.to_csv(csvfile)
             
             num_files_processed += 1
@@ -616,10 +621,14 @@ def create_catalog_website(SEISAN_DATA, DB, YYYY, MM):
             if not '_sgram.png' in file:
                 continue
                 
-            print('Processing %s' % file)
+            print('Processing %s.' % file, end = ' ')
             sgramfullpath = os.path.join(root, file) 
-            allsgramfiles.append(sgramfullpath)
             htmlfile = sgramfullpath.replace('_sgram.png','.html')
+            if os.path.exists(htmlfile):
+                print('Skipping.')
+                continue
+            print('Adding to list.')
+            allsgramfiles.append(sgramfullpath)                
             allwebpages.append(htmlfile) # need this for previous and next links
             
     for c, sgramfile in enumerate(allsgramfiles):
@@ -632,6 +641,7 @@ def build_event_webpage(allwebpages, c, streamdf=None, streamplot=None, sgramplo
     # put Python code inside % tags, e.g. <% for i in range(10): %>
     
     htmlfile = allwebpages[c]
+    print('Creating %s.' % htmlfile)
     lastwebpage = None
     nextwebpage = None
     ind = allwebpages.index(htmlfile)
@@ -709,14 +719,18 @@ def build_event_webpage(allwebpages, c, streamdf=None, streamplot=None, sgramplo
     
     
 def summarize_each_event(SEISAN_DATA, DB, YYYY, MM):
+    print("Summarizing WAV files at %s/%s/%s" % (DB, YYYY, MM))
     eventdir = os.path.join(SEISAN_DATA, 'PICKLE', DB, YYYY, MM)
     traceCSVfiles = sorted(glob(os.path.join(eventdir, '[21]*.csv')))
     summaryCSVfile = os.path.join(eventdir, 'summary%s%s%s.csv' % (DB,YYYY,MM))
     summaryLoD = []
+    
+    # we run this function everytime because we might have added new event files. And it is fast.
     for traceCSVfile in traceCSVfiles: 
 
         # read pickle file
         picklefile = traceCSVfile.replace('.csv','.pickle')
+        print("Processing: %s" % picklefile)
         st = read(picklefile)
         st.filter("highpass", freq=0.5) 
         chosen = choose_best_traces(st, MAX_TRACES=1, include_seismic=True, 
@@ -731,11 +745,12 @@ def summarize_each_event(SEISAN_DATA, DB, YYYY, MM):
         # read CSV file
         df = pd.read_csv(traceCSVfile)
         numOfRows = df.shape[0]
+        df = df[df["units"] == 'm/s']
         df.sort_values(by=['quality'], inplace=True)
-
+        
         # get median of 10 best rows
         df = df.head(10)
-        row = df.median(axis = 0, skipna = True).to_dict()
+        row = df.median(axis = 0, skipna = True).to_dict()        
 
         # add columns
         row['WAV']=os.path.basename(traceCSVfile).replace('.csv','')
@@ -774,6 +789,25 @@ def summarize_each_event(SEISAN_DATA, DB, YYYY, MM):
     for col in summaryDF.columns:
         print('*%s*' % col"""
     summaryDF.to_csv(summaryCSVfile, index=True)
+
+"""    
+def events_from_channel_detections(st): 
+    # event window based on channel detections
+    # testeed but never used as is inferior to network event detector
+    add_channel_detections(st, lta=5.0, threshon=3.0, threshoff=-0.5)
+    for tr in st:
+        if 'triggers' in tr.stats:
+            for trigpairUTC in tr.stats.triggers:
+                duration = trigpairUTC[1]-trigpairUTC[0]
+                print(tr.id, trigpairUTC, duration)
+
+    print(' ')            
+    [mint, maxt] = get_event_window(st)
+    if mint:
+        print('Event: ', mint, maxt, maxt-mint)
+    else:
+        print('No events')    
+"""        
                 
 def processREAfiles(SEISAN_DATA, DB, YYYY, MM, MAXFILES=3):
     pass
