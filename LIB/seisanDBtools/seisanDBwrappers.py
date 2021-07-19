@@ -26,7 +26,7 @@ Created for Montserrat catalog work.
 Note there are separate classes for loading individual Sfiles, AEFfiles and WAVfiles.
 """
 
-def get_sfile_list(DB, startdate, enddate): 
+def get_sfile_list(SEISAN_DATA, DB, startdate, enddate): 
     """
     make a list of Sfiles between 2 dates
     """
