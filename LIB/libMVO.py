@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 import sys
 import numpy as np
-sys.path.append('/Users/thompsong/src/kitchensinkGT/LIB')
+#import os
+#LIBpath = os.path.join( os.getenv('HOME'),'src','kitchensinkGT', 'LIB')
+#sys.path.append(LIBpath)
 from libseisGT import get_seed_band_code
 #import metrics
 
