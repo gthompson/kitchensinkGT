@@ -37,10 +37,15 @@ def correct_nslc(traceID, Fs, shortperiod=False):
     # Montserrat trace IDs are often bad. return correct trace ID
     oldnet, oldsta, oldloc, oldcha = traceID.split('.')
 
-    net = 'MV'
-    chan = oldcha
+    net = 'MV'    
     sta = oldsta
     loc = oldloc
+    chan = oldcha
+
+    if len(chan)>1:
+        if chan[1] in 'ZNE':
+            chan = chan[0] + 'H' + chan[1]
+
     #sta = oldsta.strip()
     #chan = oldcha.strip()
     
@@ -55,6 +60,7 @@ def correct_nslc(traceID, Fs, shortperiod=False):
     #print(bandcode)
     
     instrumentcode = 'H' # seismic velocity sensor is default
+    orientationcode = ''
         
     if chan[0]=='P' or chan[0:2]=='AP':
         instrumentcode ='D' # infrasound/acoustic
@@ -66,12 +72,15 @@ def correct_nslc(traceID, Fs, shortperiod=False):
         if len(chan)==2:
             orientationcode = loc
             loc = ''
-        else:
+        elif len(chan)>2:
             orientationcode = chan[2]
+    
 
     chan = bandcode + instrumentcode + orientationcode
 
-    return net + "." + sta + "." + loc + "." + chan
+    newID = net + "." + sta + "." + loc + "." + chan
+    #print(traceID,'->',newID)
+    return newID
 
 def inventory_fix_id_mvo(inv):
     inv[0].code='MV'

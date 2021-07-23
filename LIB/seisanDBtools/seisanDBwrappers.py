@@ -16,6 +16,7 @@ sys.path.append(LIBpath)
 from libMVO import fix_trace_id, inventory_fix_id_mvo
 from metrics import process_trace, choose_best_traces, select_by_index_list, ampengfft
 from libseisGT import Stream_min_starttime, detect_network_event
+from Sfile import spath2datetime, Sfile #, printEvents
 
 sys.path.append(os.path.join( os.getenv('HOME'),'src', 'icewebPy') )
 import IceWeb
@@ -30,6 +31,7 @@ def get_sfile_list(SEISAN_DATA, DB, startdate, enddate):
     """
     make a list of Sfiles between 2 dates
     """
+
     event_list=[]
     reapath = os.path.join(SEISAN_DATA, 'REA', DB)
     years=list(range(startdate.year,enddate.year+1))
@@ -45,8 +47,13 @@ def get_sfile_list(SEISAN_DATA, DB, startdate, enddate):
         for month in months:
             #print month
             yearmonthdir=os.path.join(reapath, "%04d" % year, "%02d" % month)
-            flist=glob(os.path.join(yearmonthdir,"*L.S*"))
-            event_list.extend(flist)
+            flist=sorted(glob(os.path.join(yearmonthdir,"*L.S*")))
+            for f in flist:
+                #fdt = sfilename2datetime(f)
+                fdt = spath2datetime(f)
+                #print(f, fdt)
+                if fdt>=startdate and fdt<enddate:
+                    event_list.append(f)
     return event_list 
 
 
@@ -722,7 +729,9 @@ def summarize_each_event(SEISAN_DATA, DB, YYYY, MM):
     print("Summarizing WAV files at %s/%s/%s" % (DB, YYYY, MM))
     eventdir = os.path.join(SEISAN_DATA, 'PICKLE', DB, YYYY, MM)
     traceCSVfiles = sorted(glob(os.path.join(eventdir, '[21]*.csv')))
-    summaryCSVfile = os.path.join(eventdir, 'summary%s%s%s.csv' % (DB,YYYY,MM))
+    if not traceCSVfiles:
+        return
+    wavCSVfile = os.path.join(SEISAN_DATA, 'wav_%s%s%s.csv' % (DB,YYYY,MM))
     summaryLoD = []
     
     # we run this function everytime because we might have added new event files. And it is fast.
@@ -780,15 +789,17 @@ def summarize_each_event(SEISAN_DATA, DB, YYYY, MM):
         #pprint(row)
         summaryLoD.append(row)
 
+        
     summaryDF = pd.DataFrame(summaryLoD)
     summaryDF = summaryDF.rename(columns={'time': 'ontime'})
     summaryDF.drop(summaryDF.filter(regex="Unname"),axis=1, inplace=True)
+    print(summaryDF)
     summaryDF = summaryDF.set_index('WAV')
     """
     print(summaryDF)
     for col in summaryDF.columns:
         print('*%s*' % col"""
-    summaryDF.to_csv(summaryCSVfile, index=True)
+    summaryDF.to_csv(wavCSVfile, index=True)
 
 """    
 def events_from_channel_detections(st): 
@@ -808,16 +819,123 @@ def events_from_channel_detections(st):
     else:
         print('No events')    
 """        
-                
+def sfiles2csv(SEISAN_DATA, DB, startdate, enddate, csvfile, MAXFILES=99999):
+    slist = sorted(get_sfile_list(SEISAN_DATA, DB, startdate, enddate))
+    sLoD = []
+    for i,sfile in enumerate(slist):
+        if i==MAXFILES:
+            break
+        s = Sfile(sfile, use_mvo_parser=True)
+        #s.printEvents()
+        d = s.to_dict()
+        sLoD.append(d)
+    df = pd.DataFrame(sLoD)
+    df.to_csv(csvfile)
+    
 def processREAfiles(SEISAN_DATA, DB, YYYY, MM, MAXFILES=3):
-    pass
-              
+    csvfile=os.path.join(SEISAN_DATA, 'REA', 'rea_%s%s%s.csv' % (DB, YYYY, MM) )
+    startdate = dt.datetime(int(YYYY), int(MM), 1)
+    if int(MM)<12:
+        enddate = dt.datetime(int(YYYY), int(MM)+1, 1)
+    else:
+        enddate = dt.datetime(int(YYYY+1), 1, 1)
+    sfiles2csv(SEISAN_DATA, DB, startdate, enddate, csvfile)
+    
+def processSeisanYearMonth(SEISAN_DATA, DB, YYYY, MM, MAXFILES=999999):
+    
+    # Process a month of WAV files. Ultimately this produces a CSV file with 1 line per event.
+    processWAVfiles(SEISAN_DATA, DB, YYYY, MM, MAXFILES=MAXFILES) 
+    
+    # Load the CSV file
+    wavCSVfile = os.path.join(SEISAN_DATA, 'wav_%s%s%s.csv' % (DB,YYYY,MM))
+    if not os.path.exists(wavCSVfile):
+        return
+    df = pd.read_csv(wavCSVfile) 
+    df['mainclass'] = None
+    df['subclass'] = None
+    
+    # We aim to add a couple of columns from the S-file, and save to this
+    reawavCSVfile=os.path.join(SEISAN_DATA, 'reawav_%s%s%s.csv' % (DB, YYYY, MM) )
+    
+    # Get s-file list
+    startdate = dt.datetime(int(YYYY), int(MM), 1)
+    if int(MM)<12:
+        enddate = dt.datetime(int(YYYY), int(MM)+1, 1)
+    else:
+        enddate = dt.datetime(int(YYYY+1), 1, 1)
+    slist = sorted(get_sfile_list(SEISAN_DATA, DB, startdate, enddate))
+    
+    for i,sfile in enumerate(slist):
+        if i==MAXFILES:
+            break
+        s = Sfile(sfile, use_mvo_parser=True)
+        #s.printEvents()
+        d = s.to_dict()
+        
+        # Are any wavfiles from this S-file in the dataframe?
+        for item in ['wavfile1', 'wavfile2']:
+            if d[item]:
+                wavbase = os.path.basename(d[item])
+                ind = df.index[df[item]==wavbase].tolist()
+                if ind:
+                    df.iloc[ind]['mainclass']=s.mainclass
+                    df.iloc[ind]['subclass']=s.subclass
+    df.to_csv(csvfile)
+
+def processSeisanYearMonth2(SEISAN_DATA, DB, YYYY, MM, MAXFILES=999999):
+    failedWAVfiles=[]
+    LoD = []
+    
+    # We aim to add a couple of columns from the S-file, and save to this
+    reawavCSVfile=os.path.join(SEISAN_DATA, 'reawav_%s%s%s.csv' % (DB, YYYY, MM) )
+    
+    # Get s-file list
+    startdate = dt.datetime(int(YYYY), int(MM), 1)
+    if int(MM)<12:
+        enddate = dt.datetime(int(YYYY), int(MM)+1, 1)
+    else:
+        enddate = dt.datetime(int(YYYY)+1, 1, 1)
+    slist = sorted(get_sfile_list(SEISAN_DATA, DB, startdate, enddate))
+    
+    for i,sfile in enumerate(slist):
+        print('Processing %d of %d: %s' % (i, len(slist), sfile) )
+        if i==MAXFILES:
+            break
+        s = Sfile(sfile, use_mvo_parser=True)
+        #s.printEvents()
+        d = s.to_dict()
+        
+        for item in ['wavfile1', 'wavfile2']:
+            if d[item]:
+                if os.path.exists(d[item]):
+                    wavbase = os.path.basename(d[item])
+                    if 'MVO' in wavbase:
+                        print('Processing ',d[item])
+                        eventrow=[]
+                        #try:
+                        eventrow = processWAV(d[item], shortperiod=False)
+                        #except:
+                        #    failedWAVfiles.append(wavbase)
+                        #else:
+                        if eventrow:
+                            eventrow['sfile']=os.path.basename(s.path)
+                            eventrow['mainclass']=s.mainclass
+                            eventrow['subclass']=s.subclass
+                            LoD.append(eventrow)
+    if LoD:
+        df = pd.DataFrame(LoD)
+        print('Writing ',reawavCSVfile)
+        df.drop(df.filter(regex="Unname"),axis=1, inplace=True)
+        df = df.set_index('WAV')       
+        df.to_csv(reawavCSVfile, index=True) 
+    return failedWAVfiles
+    
 def processWAVfiles(SEISAN_DATA, DB, YYYY, MM, MAXFILES=3):
     # processWAVfiles('/Users/thompsong/seismo', 'MVOE_', '2005', '05', MAXFILES=10)
     shortperiod = False
     if DB[0:4]=='ASNE':
         shortperiod = True
-    badWAVfiles = create_event_picklefiles(SEISAN_DATA, DB, YYYY, MM, shortperiod, MAX_FILES_TO_PROCESS=MAXFILES)
+    #badWAVfiles = create_event_picklefiles(SEISAN_DATA, DB, YYYY, MM, shortperiod, MAX_FILES_TO_PROCESS=MAXFILES)
     create_event_spectrograms(SEISAN_DATA, DB, YYYY, MM)
     pickle2csv(SEISAN_DATA, DB, YYYY, MM, MAX_FILES_TO_PROCESS=MAXFILES)
     create_catalog_website(SEISAN_DATA, DB, YYYY, MM)
@@ -829,6 +947,244 @@ def processWAVfiles(SEISAN_DATA, DB, YYYY, MM, MAXFILES=3):
 def choose_best_events(SEISAN_DATA, NUM_EVENTS, mainclass, subclass):
     # choose_best_events(SEISAN_DATA, 100, 'LV', 't') to choose the best 100 volcano-tectonic events
     pass
+
+def processWAV(wavfile, shortperiod=False, correct_data=False, make_png_files=False):
+
+    WAVDIR = os.path.dirname(wavfile)
+    wavbase = os.path.basename(wavfile)
+    CALDIR = WAVDIR.replace('WAV', 'CAL')
+    
+    HTMLDIR = WAVDIR.replace('WAV', 'HTML')
+    PICKLEDIR = WAVDIR.replace('WAV', 'PICKLE')     
+    if not os.path.exists(HTMLDIR):
+        os.makedirs(HTMLDIR)
+    if not os.path.exists(PICKLEDIR):
+        os.makedirs(PICKLEDIR)  
+        
+    rawpngfile = os.path.join(HTMLDIR, wavbase + '_raw.png')
+    correctedpngfile = rawpngfile.replace('_raw', '_corrected')
+    picklefile = os.path.join(PICKLEDIR, wavbase + '.pickle')
+    logfile = picklefile.replace('.pickle', '.log')
+    sgramfile = os.path.join(HTMLDIR, wavbase + '_sgram.png')
+    sgramfixed = sgramfile.replace('_sgram.png', '_sgram_fixed.png')  
+    traceCSVfile = picklefile.replace('.pickle', '.csv')
+    detectionfile = os.path.join(HTMLDIR, wavbase + '_detection.png')
+    wavrow={}
+    picklefile_loaded = False
+    
+    if os.path.exists(picklefile):
+        print(picklefile, ' exists')
+    else:
+        # We need to create the pickle file
+        # Try to read the WAV file
+        st = Stream()
+        print('Processing %s.' % wavbase, end=' ')
+        print('Reading.', end = ' ')
+        try:               
+            st = read(wavfile)
+        except:
+            print('ERROR. Could not load.')
+            return
+
+        if len(st)==0:
+            print('ERROR. No traces.')
+            return
+        else: 
+            print('Success.')
+        
+        # Raw stream plot of all channels
+        if not os.path.exists(rawpngfile) and make_png_files:
+            st.plot(equal_scale=False, outfile=rawpngfile, dpi=100);
+
+        ######################### START OF CLEAN/CORRECT BLOCK ######################
+        print('Cleaning/correcting')
+        fix_trace_id(st, shortperiod=shortperiod) 
+
+        for tr in st:
+
+            this_inv = None
+            
+            if correct_data: # try to find corresponding station XML
+                #tr.stats.network = 'MV' 
+                #xmlfile = os.path.join(caldir, "station.%s.%s.xml" % (tr.stats.network, tr.stats.station) )
+                if tr.stats.channel[1] in 'ES':
+                    matchcode = '[ES]'
+                elif tr.stats.channel[1] in 'BH':
+                    matchcode = '[BH]'
+                xmlfiles = glob(os.path.join(CALDIR, "station.MN.%s..%s*%s.xml" % (tr.stats.station, matchcode, tr.stats.channel[2]) ))
+
+                N = len(xmlfiles)
+                if N==1:
+                    xmlfile = xmlfiles[0]
+                    this_inv = read_inventory(xmlfile)   
+                    #print('Processing %s with %s' % (tr.id, xmlfile) )
+                    process_trace(tr, inv=this_inv)
+                else:
+                    #print('%d xmlfiles found' % N)
+                    process_trace(tr, inv=None)
+            else:
+                process_trace(tr, inv=None)
+
+
+        # if we fixed the NSLCs in the RESP/StationXML file, we would want to fix_trace_id
+        # at start of this block, before loop tr in st
+        ######################### END OF CLEAN/CORRECT BLOCK ######################
+            
+        # Write pickle file. This is now the best place to load stream data from in future, so replaces
+        # seisan/WAV directory with seisan/PICKLE
+        print('Writing ',picklefile)
+        st.write(picklefile, format='PICKLE')
+        picklefile_loaded = True
+        
+    # save log file
+    if not os.path.exists(logfile):
+        if not picklefile_loaded:
+            st = read(picklefile)
+            picklefile_loaded = True
+        print('Writing %s' % logfile)
+        with open(logfile,'w') as fout:
+            for tr in st:
+                # print trace history
+                pprint(tr.stats, stream=fout)
+                fout.write('\n')
+                
+    # Correct stream plot of best channels
+    if not os.path.exists(correctedpngfile) and make_png_files:
+        print('Writing ',correctedpngfile)
+        if not picklefile_loaded:
+            st = read(picklefile)   
+        for tr in st:    
+            if tr.stats.quality_factor <= 0.0:
+                st.remove(tr)               
+        chosen = choose_best_traces(st, MAX_TRACES=20, include_seismic=True, 
+                                    include_infrasound=False, include_uncorrected=False)
+        if len(chosen)>0:
+            st2 = select_by_index_list(st, chosen)
+            st2.plot(equal_scale=True, outfile=correctedpngfile)                    
+        # To do: need separate plots for seismic and infrasound channels, as they scale differently
+                
+    if not 'energy' in st[0].stats.metrics:
+        print('Computing spectrogram data')
+        if not picklefile_loaded:
+            st = read(picklefile)         
+        iwsobj = IceWeb.icewebSpectrogram(stream=st)
+        iwsobj = iwsobj.precompute()
+
+        if not os.path.exists(sgramfile) and make_png_files:
+            # free scale  
+            print('Creating %s.' % sgramfile, end = ' ')            
+            titlestr = os.path.basename(sgramfile) 
+            chosen = choose_best_traces(st, MAX_TRACES=10)            
+            iwsobj.plot(outfile=sgramfile, log=False, equal_scale=False, add_colorbar=True, dbscale=True, title=titlestr, trace_indexes=chosen);
+
+            # fixed scale 
+            print('Creating %s.' % sgramfixed, end = ' ')
+            titlestr = os.path.basename(sgramfixed)
+            clim_in_dB = [-160, -100]
+            clim_in_units = [ IceWeb.dB2amp(clim_in_dB[0]),  IceWeb.dB2amp(clim_in_dB[1]) ]
+            iwsobj.plot(outfile=sgramfixed, log=False, clim=clim_in_units, add_colorbar=True, dbscale=True, title=titlestr, trace_indexes=chosen);           
+            # need separate plots for any infrasound channels
+
+        # Flatten the spectrogramdata to spectrum, then remove. we use the spectrum later.
+        print('Computing spectrum.', end = ' ')  
+        iwsobj.compute_amplitude_spectrum(compute_bandwidth=True) # adds tr.stats.spectrum
+        for tr in iwsobj.stream:
+            ampengfft(tr, PICKLEDIR)
+            tr.stats.pop('spectrogramdata', None) # Remove spectrogramdata as it is too large for picklefile
+            #tr.stats.spectrogramdata = {}
+        print('Writing enhanced pickle file.')     
+        iwsobj.stream.write(picklefile, 'PICKLE') # Rewrite pickle file with extra attributes
+
+    if os.path.exists(traceCSVfile):
+        tracedf = pd.read_csv(traceCSVfile)
+    else: 
+        print('- Building metrics dataframe.', end = ' ')
+        if not picklefile_loaded:
+            st = read(picklefile) 
+        tracedf = pd.DataFrame()
+        list_of_rows = []
+        for tr in st:
+            s = tr.stats
+            row = {'id':tr.id, 'starttime':s['starttime'], 
+                   'Fs':s.sampling_rate, 'twin':s.duration,
+                   'calib':s.calib, 'units':s.units, 
+                   'quality':s.quality_factor,
+                   'snr':s.snr[0], 'signal':s.snr[1], 'noise':s.snr[2]}
+            if 'spectrum' in s: 
+                for item in ['medianF', 'peakF', 'peakA', 'bw_min', 'bw_max']:
+                    try:
+                        row[item] = s.spectrum[item]
+                    except:
+                        pass
+
+            if 'metrics' in s:
+                m = s.metrics
+                for item in ['peakamp', 'peaktime', 'energy', 'RSAM_high', 'RSAM_low', 'band_ratio',
+                             'sample_min', 'sample_max', 'sample_mean', 'sample_median', 
+                             'sample_lower_quartile', 'sample_upper_quartile', 'sample_rms', 
+                             'sample_stdev', 'percent_availability', 'num_gaps']:
+                             #'start_gap', 'num_gaps', 'end_gap', 'sum_gaps', 'max_gap', 
+                             #'num_overlaps', 'sum_overlaps', 'num_records', 'record_length', 
+                    try:
+                        row[item] = m[item]
+                    except:
+                        pass  
+
+            if 'scipy' in s:
+                row['skewness'] = s.scipy.skewness
+                row['kurtosis'] = s.scipy.kurtosis                        
+
+            list_of_rows.append(row)
+        tracedf = pd.DataFrame(list_of_rows)
+        tracedf = tracedf.round({'Fs': 2, 'secs': 2, 'quality':2, 'snr':2, 'min':2, 'max':2, 'rms':2})
+        print('Saving to CSV.')
+        tracedf.set_index('id')
+        tracedf.to_csv(traceCSVfile)
+
+        
+    # Summarize event
+    print('Create a summary row for whole event')
+    numOfRows = tracedf.shape[0]
+    if correct_data:
+        df = tracedf[tracedf["units"] == 'm/s']
+    else:
+        df = tracedf
+    df.sort_values(by=['quality'], inplace=True)
+    df = df.head(10) # get median of 10 best rows    
+    wavrow = df.median(axis = 0, skipna = True).to_dict()        
+    wavrow['WAV']=wavbase
+    wavrow['traces']=numOfRows
+    
+    if detect_event:
+        if not picklefile_loaded:
+            st = read(picklefile) 
+            picklefile_loaded = True
+        st.filter("highpass", freq=0.5)    
+        trig, ontimes, offtimes = detect_network_event(st, sta=0.4, lta=5.0, threshon=6.0, threshoff=0.24)
+        print('%s: %d events detected' % (picklefile, len(ontimes)))
+        durations = [t['duration'] for t in trig]
+        if len(durations)>0:
+            bestevent = np.argmax(durations)
+            thistrig=trig[int(np.argmax(durations))]
+            wavrow['ontime'] = thistrig['time']
+            wavrow['offtime']=thistrig['time']+thistrig['duration']            
+            for item in ['duration', 'coincidence_sum', 'cft_peak_wmean', 'cft_std_wmean']:
+                wavrow[item]=thistrig[item]
+            wavrow['detection_quality']=thistrig['coincidence_sum']*thistrig['cft_peak_wmean']*thistrig['cft_std_wmean']
+            
+        if make_png_files:
+            chosen = choose_best_traces(st, MAX_TRACES=1, include_seismic=True, 
+                                include_infrasound=False, include_uncorrected=False)
+            tr = st[chosen[0]] 
+            plt.figure()
+            plt.plot(tr.times(), tr.data)
+            plt.ylabel(tr.id)   
+            t0 = tr.stats.starttime
+            bottom, top = plt.ylim()
+            plt.vlines([wavrow['ontime']-t0, wavrow['offtime']-t0], bottom, top )
+            plt.savefig(detectionfile)            
+
+    return wavrow
 
 if __name__ == "__main__":
     pass
