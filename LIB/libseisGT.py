@@ -92,7 +92,27 @@ def smart_merge_traces(trace_pair):
         other_tr.data[indices] = this_tr.data[indices]
         return other_tr
         
+def pad_trace(tr, seconds):
+    if seconds>0.0:
+        y = tr.data
+        tr.stats['originalStartTime'] = tr.stats.starttime
+        tr.stats['originalEndTime'] = tr.stats.endtime
+        npts_pad = int(tr.stats.sampling_rate * seconds)
+        y_prepend = np.flip(y[0:npts_pad])
+        y_postpend = np.flip(y[-npts_pad:])
+        y = np.concatenate( [y_prepend, y, y_postpend ] )
+        padStartTime = tr.stats.starttime - npts_pad * tr.stats.delta
+        tr.data = y
+        add_to_trace_history(tr, 'padded')
+        tr.stats.starttime = padStartTime
 
+def unpad_trace(tr):
+    s = tr.stats
+    if 'originalStartTime' in s:
+        tr.trim(starttime=s.originalStartTime, endtime=s.originalEndTime, pad=False)
+        add_to_trace_history(tr, 'unpadded') 
+    
+        
 def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0], corners=2, zerophase=True, inv=None):
     """
     Clean Trace object in place.
@@ -111,12 +131,14 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
     #print(tr.id, startTime, endTime)
         
     # pad the Trace
-    y = tr.data
+    #y = tr.data
     npts = tr.stats.npts
     npts_pad = int(taperFraction * npts)
     npts_pad_seconds = npts_pad * tr.stats.delta
     if npts_pad_seconds < 10.0: # impose a minimum pad length of 10-seconds
-        npts_pad = int(10.0 / tr.stats.delta)
+        #npts_pad = int(10.0 / tr.stats.delta)
+        npts_pad_seconds = 10.0
+    """
     y_prepend = np.flip(y[0:npts_pad])
     y_postpend = np.flip(y[-npts_pad:])
     y = np.concatenate( [y_prepend, y, y_postpend ] )
@@ -124,6 +146,9 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
     tr.data = y
     add_to_trace_history(tr, 'padded')
     tr.stats.starttime = padStartTime
+    """
+    
+    pad_trace(tr, npts_pad_seconds)
     max_fraction = npts_pad / tr.stats.npts
     
     # clean
@@ -180,9 +205,9 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
                 tr.stats['units'] = 'Pa'  
             
     # remove the pad
-    #print(tr.id, startTime, endTime)
-    tr.trim(starttime=startTime, endtime=endTime, pad=False)
-    add_to_trace_history(tr, 'unpadded')        
+    #tr.trim(starttime=startTime, endtime=endTime, pad=False)
+    #add_to_trace_history(tr, 'unpadded')
+    unpad_trace(tr)
                         
    
     
@@ -343,7 +368,7 @@ def removeInstrumentResponse(st, preFilter = (1, 1.5, 30.0, 45.0), outputType = 
                 st.remove(tr)
     return
 
-def detect_network_event(st, minchans=None, threshon=3.5, threshoff=1.0, sta=0.5, lta=5.0):
+def detect_network_event(st, minchans=None, threshon=3.5, threshoff=1.0, sta=0.5, lta=5.0, pad=0.0):
     """
     Run a full network event detector/associator 
     
@@ -372,6 +397,10 @@ def detect_network_event(st, minchans=None, threshon=3.5, threshoff=1.0, sta=0.5
  
     """
     from obspy.signal.trigger import coincidence_trigger
+    if pad>0.0:
+        for tr in st:
+            pad_trace(tr, pad)
+            
     if not minchans:
         N = len(st)
         minchans = int(N/3)
@@ -381,6 +410,10 @@ def detect_network_event(st, minchans=None, threshon=3.5, threshoff=1.0, sta=0.5
     trig = coincidence_trigger("recstalta", threshon, threshoff, st, minchans, sta=sta, lta=lta, details=True) # 0.5s, 10s
     ontimes = [t['time'] for t in trig]
     offtimes = [t['time']+t['duration'] for t in trig]
+    
+    if pad>0.0:
+        for tr in st:
+            unpad_trace(tr)        
     return trig, ontimes, offtimes
     
 

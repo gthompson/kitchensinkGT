@@ -36,9 +36,7 @@ def process_trace(tr, inv=None):
     #     4. signal-to-noise ratio
     
     if not 'history' in tr.stats:
-        tr.stats['history'] = list()  
-        
-    tr.stats["duration"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending    
+        tr.stats['history'] = list()    
         
     """ RAW DATA QC METRICS """
     qcTrace(tr)
@@ -46,7 +44,8 @@ def process_trace(tr, inv=None):
     tr.stats.quality_factor -= tr.stats.metrics['num_gaps']
     tr.stats.quality_factor -= tr.stats.metrics['num_overlaps']
     tr.stats.quality_factor *= tr.stats.metrics['percent_availability']/100.0
-
+    tr.stats.metrics["duration"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending  
+    
     if tr.stats.quality_factor <= 0.0:
         return
 
@@ -55,11 +54,9 @@ def process_trace(tr, inv=None):
 
     """ CLEAN DATA WAVEFORM METRICS """ 
     # estimate signal-to-noise ratio (after detrending)
-    tr.stats["snr"] = signaltonoise(tr)
+    signaltonoise(tr)    
     add_to_trace_history(tr, 'Signal to noise measured.')
-    if tr.stats.snr[0]>1.0:
-        #tr.stats["quality_factor"] += np.log10(tr.stats.snr[0])
-        tr.stats["quality_factor"] * tr.stats.snr[0]
+    tr.stats["quality_factor"] = tr.stats["quality_factor"] * tr.stats.metrics.snr
     
     # SciPy stats
     #tr.stats["scipy"] = describe(tr.data, nan_policy = 'omit') # only do this after removing trend/high pass filtering
@@ -265,7 +262,9 @@ def signaltonoise(tr):
         highval = np.max(M)
         lowval = np.min(M)
         snr = highval / lowval
-    return (snr, highval, lowval)
+    tr.stats.metrics['snr'] = snr
+    tr.stats.metrics['signal_level'] = highval
+    tr.stats.metrics['noise_level'] = lowval
 
 
 def choose_best_traces(st, MAX_TRACES=8, include_seismic=True, include_infrasound=False, include_uncorrected=False):
