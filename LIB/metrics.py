@@ -44,24 +44,13 @@ def process_trace(tr, inv=None):
     tr.stats.quality_factor -= tr.stats.metrics['num_gaps']
     tr.stats.quality_factor -= tr.stats.metrics['num_overlaps']
     tr.stats.quality_factor *= tr.stats.metrics['percent_availability']/100.0
-    tr.stats.metrics["duration"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending  
+    tr.stats.metrics["twin"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending  
     
     if tr.stats.quality_factor <= 0.0:
         return
 
     """ CLEAN (DETREND, BANDPASS, CORRECT) TRACE """
-    clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 40.0], corners=2, zerophase=True, inv=inv)
-
-    """ CLEAN DATA WAVEFORM METRICS """ 
-    # estimate signal-to-noise ratio (after detrending)
-    signaltonoise(tr)    
-    add_to_trace_history(tr, 'Signal to noise measured.')
-    tr.stats["quality_factor"] = tr.stats["quality_factor"] * tr.stats.metrics.snr
-    
-    # SciPy stats
-    #tr.stats["scipy"] = describe(tr.data, nan_policy = 'omit') # only do this after removing trend/high pass filtering
-    tr.stats["scipy"] = describe(tr.data, nan_policy = 'omit')._asdict()
-    add_to_trace_history(tr, 'scipy.stats metrics added as tr.stats.scipy.')
+    clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.5, 30.0], corners=6, zerophase=False, inv=inv)
     
     # Update other stats
     qcTrace(tr)
@@ -220,7 +209,6 @@ def _check0andMinus1(liste):
         return True  
 
     
-        
 def signaltonoise(tr):
 # function snr, highval, lowval = signaltonoise(tr)
     # Here we just make an estimate of the signal-to-noise ratio
@@ -321,16 +309,27 @@ def _ssam(tr, f, S):
 def _band_ratio(tr, freqlims = [1, 6, 11]):    
     # compute band ratio as log2(amplitude > 6 Hz/amplitude < 6 Hz)
     # After Rodgers et al., 2015: https://doi.org/10.1016/j.jvolgeores.2014.11.012
+    A = None
     if 'ssam' in tr.stats:
         A = np.array(tr.stats.ssam.A)
         f = tr.stats.ssam.f
+    elif 'spectrum' in tr.stats:
+        f = tr.stats.spectrum['F']
+        A = tr.stats.spectrum['A']
+    if len(A)>0:
         f_indexes_low = np.intersect1d(np.where(f>freqlims[0]), np.where(f<freqlims[1]))
         f_indexes_high = np.intersect1d(np.where(f>freqlims[1]), np.where(f<freqlims[2]))       
         A_low = A[f_indexes_low]        
-        A_high = A[f_indexes_high]                 
-        tr.stats.metrics['band_ratio'] = np.log2(sum(A_high)/sum(A_low))
-        tr.stats.metrics['RSAM_high'] = sum(A_high)
-        tr.stats.metrics['RSAM_low'] = sum(A_low)
+        A_high = A[f_indexes_high] 
+        bandratio = {}
+        bandratio['freqlims'] = freqlims
+        bandratio['RSAM_high'] = sum(A_high)
+        bandratio['RSAM_low'] = sum(A_low)
+        bandratio['RSAM_ratio'] = np.log2(sum(A_high)/sum(A_low))
+        if not 'bandratio' in tr.stats:
+            tr.stats.bandratio = []
+        tr.stats.bandratio.append(bandratio)
+        
 
 def ampengfft(tr, outdir):
     """ 
@@ -343,10 +342,12 @@ def ampengfft(tr, outdir):
     
     """
     
+    
     # if we use absolute function, we don't need to check if maxy > -miny
     if not 'detrended' in tr.stats.history:
         tr.detrend(type='linear')
         add_to_trace_history(tr, 'detrended')
+        
     y = np.absolute(tr.data)
     maxy = y.max()
     maxy_i = y.argmax()
@@ -356,11 +357,22 @@ def ampengfft(tr, outdir):
     tr.stats.metrics['peakamp'] = maxy
     tr.stats.metrics['peaktime'] = maxy_t
     tr.stats.metrics['energy'] = np.sum(np.square(y)) / tr.stats.sampling_rate
+
+    # estimate signal-to-noise ratio (after detrending)
+    signaltonoise(tr)    
+    add_to_trace_history(tr, 'Signal to noise measured and added to tr.stats.metrics.')
     
+    # SciPy stats
+    scipystats = describe(tr.data, nan_policy = 'omit')._asdict()
+    for item in ['skewness', 'kurtosis']:
+        tr.stats.metrics[item]=scipystats[item]
+    add_to_trace_history(tr, 'scipy.stats metrics added to tr.stats.metrics.')
     
+    # add spectral data
     if 'spectrum' in tr.stats:
         _ssam(tr, tr.stats.spectrum['F'], tr.stats.spectrum['A'])
-        _band_ratio(tr) 
+        _band_ratio(tr, freqlims = [1.0, 6.0, 11.0])
+        _band_ratio(tr, freqlims = [0.8, 4.0, 16.0]) 
         _save_esam(tr, outdir)
         add_to_trace_history(tr, 'ampengfft')
     else:
@@ -369,6 +381,7 @@ def ampengfft(tr, outdir):
                         iwsobj = iwsobj.precompute()
                         iwsobj.compute_amplitude_spectrum(compute_bandwidth=True)""")
         add_to_trace_history(tr, 'ampeng')
+
 
     # To do:
     # an alternative version might be to plot the sum of spectral data by event type per day,
