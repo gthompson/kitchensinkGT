@@ -86,7 +86,7 @@ def WAV2picklefile(paths):
             this_inv = None            
             if bool_correct_data: # try to find corresponding station XML
                 this_inv = load_mvo_inventory(tr, paths['CALDIR'])
-            process_trace(tr, inv=None)
+            process_trace(tr, inv=this_inv)
         
         # remove bad traces
         for tr in st:    
@@ -408,6 +408,6 @@ bool_shortperiod=False
 bool_correct_data=True
 bool_make_png_files=False
 bool_detect_event=True
-bool_overwrite=True
-startdate =dt.datetime(2002,8,6, 18, 13, 00) # 05-1755-56L.S200208
+bool_overwrite=False
+startdate = dt.datetime(2005,11,23,5,52,51)
 main(SEISAN_DB, 999999, startdate)

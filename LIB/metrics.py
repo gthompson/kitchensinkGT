@@ -39,12 +39,17 @@ def process_trace(tr, inv=None):
         tr.stats['history'] = list()    
         
     """ RAW DATA QC METRICS """
-    qcTrace(tr)
-    tr.stats["quality_factor"] = trace_quality_factor(tr) #0 = blank trace, 1 = has some 0s and -1s, 3 = all looks good
-    tr.stats.quality_factor -= tr.stats.metrics['num_gaps']
-    tr.stats.quality_factor -= tr.stats.metrics['num_overlaps']
-    tr.stats.quality_factor *= tr.stats.metrics['percent_availability']/100.0
-    tr.stats.metrics["twin"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending  
+    try:
+        qcTrace(tr)
+    except:
+        tr.stats['quality_factor'] = -1
+        return
+    else:        
+    	tr.stats["quality_factor"] = trace_quality_factor(tr) #0 = blank trace, 1 = has some 0s and -1s, 3 = all looks good
+    	tr.stats.quality_factor -= tr.stats.metrics['num_gaps']
+    	tr.stats.quality_factor -= tr.stats.metrics['num_overlaps']
+    	tr.stats.quality_factor *= tr.stats.metrics['percent_availability']/100.0
+    	tr.stats.metrics["twin"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending  
     
     if tr.stats.quality_factor <= 0.0:
         return

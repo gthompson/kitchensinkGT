@@ -111,6 +111,8 @@ def inventory_fix_id_mvo(inv):
 def load_mvo_inventory(tr, CALDIR):
     this_inv = None
     matchcode = None
+    if len(tr.stats.channel)<3:
+        return this_inv
     if tr.stats.channel[0] in 'ES':
         matchcode = '[ES]'
     elif tr.stats.channel[0] in 'BH':
