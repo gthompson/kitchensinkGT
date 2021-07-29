@@ -113,7 +113,7 @@ class Sfile:
  
             if len(line) < 80:
                 if len(line.strip()) > 0:
-                     print("Processing %s: ignoring this line: %s" % (path, line, ) )
+                     print("Processing %s: ignoring this line: %s" % (self.path, line, ) )
                 continue
 
             if line[79] == '1':
