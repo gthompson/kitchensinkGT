@@ -409,5 +409,5 @@ bool_correct_data=True
 bool_make_png_files=False
 bool_detect_event=True
 bool_overwrite=False
-startdate = dt.datetime(2005,11,23,5,52,51)
+startdate = dt.datetime(1995,7,18,0,0,0)
 main(SEISAN_DB, 999999, startdate)
