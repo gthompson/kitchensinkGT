@@ -368,6 +368,18 @@ def read_volcano_def():
     subclass_df = pd.read_csv(filepath)
     subclass_df.columns = subclass_df.columns.str.lstrip()
     return subclass_df
+
+def build_master_trace_catalog(SEISAN_PATH, catalogdf, subclass=None):
+    frames = []
+    cat = catalogdf.copy()
+    if subclass:
+        cat = cat[cat.subclass == subclass]
+    for i,row in cat.iterrows():
+        traceCSV = row['path'].replace('./WAV', SEISAN_PATH + '/PICKLE').replace('.pickle','') + '.csv'
+        df = pd.read_csv(traceCSV)
+        frames.append(df)
+    traceDF = pd.concat(frames, sort=True)
+    return traceDF
     
 def build_master_event_catalog(csvdir, seisandbname, catalogfile, subclasses_for_ML, max_duration = 60):
     # load all the year/month CSV files
