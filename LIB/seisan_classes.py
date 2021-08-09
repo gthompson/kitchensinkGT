@@ -2,7 +2,7 @@ import os, sys
 import datetime as dt
 import pprint
 from obspy.io.nordic.core import readheader, readwavename, _is_sfile, blanksfile
-from obspy.core import read, Stream
+from obspy.core import read, Stream, UTCDateTime
 from obspy.core.event import QuantityError, Pick
 from libMVO import correct_nslc
 
@@ -72,7 +72,7 @@ class Sfile:
                 # Here we just parse using ObsPy
                 self.events = readheader(self.path)               
                 wavfiles = readwavename(self.path) # note this does not include the path
-                wavpath = self.path.replace('REA','WAV')
+                wavpath = os.path.dirname(self.path).replace('REA','WAV')
                 for wavfile in wavfiles:
                     self.wavfiles.append(os.path.join(wavpath, wavfile))
 
@@ -548,6 +548,41 @@ def spath2datetime(spath):
     fdt = dt.datetime(int(fbs[1][0:4]), int(fbs[1][4:6]), int(fbs[0][0:2]), int(fbs[0][3:5]), int(fbs[0][5:7]), int(fbs[0][8:10]) ) 
     return fdt
 
+def filetime2spath(filetime, mainclass='L', db=None, seisan_data=None, fullpath=True):
+    # REA/MVOE_/2001/11/19-1951-51L.S200111
+    spath = None
+    if isinstance(filetime, UTCDateTime) or isinstance(filetime, dt.datetime):
+        spath = '%02d-%02d%02d-%02d%s.S%4d%02d' % (filetime.day, filetime.hour, filetime.minute, filetime.second, mainclass, filetime.year, filetime.month)
+        if fullpath:
+            spath = os.path.join('%4d' % filetime.year, '%02d' % filetime.month, spath)
+            if db:
+                spath = os.path.join('REA', db, spath)
+                if seisan_data:
+                    spath = os.path.join(seisan_data, spath)
+    return spath
+
+def filetime2wavpath(filetime, mainclass='L', db=None, seisan_data=None, fullpath=True, y2kfix=False, numchans=0):
+    # WAV/MVOE_/2002/04/2002-04-27-0321-57S.MVO___014
+    wavpath = None
+    dbstring = "_____"
+    if db=='MVOE_':
+        dbstring = 'MVO__'
+    if db=='ASNE_':
+        dbstring = 'SPN__'
+    if isinstance(filetime, UTCDateTime) or isinstance(filetime, dt.datetime):
+        if not y2kfix and filetime.year < 2000:
+            wavpath = '2d%02d-%02d-%02d%02d-%02dS.%s_%03d' % (filetime.year-1900, filetime.month, filetime.day, filetime.hour, filetime.minute, filetime.second, dbstring, numchans)
+        else:
+            wavpath = '4d-%02d-%02d-%02d%02d-%02dS.%s_%03d' % (filetime.year, filetime.month, filetime.day, filetime.hour, filetime.minute, filetime.second, dbstring, numchans)
+        if fullpath:
+            wavpath = os.path.join('%4d' % filetime.year, '%02d' % filetime.month, wavpath)
+            if db:
+                wavpath = os.path.join('WAV', db, wavpath)
+                if seisan_data:
+                    wavpath = os.path.join(seisan_data, wavpath)
+    return wavpath
+            
+
 
 def parse_string(line, pos0, pos1, astype='float', stripstr=True):
     _s = line[pos0:pos1]
@@ -620,21 +655,27 @@ class Wavfile:
         sfilepath = blanksfile(wavfile, evtype, userid, overwrite=False, evtime=evtime)
         return sfilepath
     
-    def find_sfile(self):
+    def find_sfile(self, mainclass='L'):
         """ incomplete. idea is to find the sfile, which may not have the same time """
-        spath = os.path.dirname(wavfile)
-        spath = spath.replace('WAV','REA',1)
-        yyyy = self.evtime.year
-        mm = self.evtime.month
-        dd = self.evtime.day
-        HH = self.evtime.hour
-        MI = self.evtime.minute
-        SS = self.evtime.second
-        sbase = dd + "-" + HH + MI + "-" + SS + "L.S" + yyyy + mm
+        was_found = False
+        """
+        spath = os.path.dirname(self.path).replace('WAV','REA',1)
+        yyyy = self.filetime.year
+        mm = self.filetime.month
+        dd = self.filetime.day
+        HH = self.filetime.hour
+        MI = self.filetime.minute
+        SS = self.filetime.second
+        sbase = dd + "-" + HH + MI + "-" + SS + "%s.S" % mainclass + yyyy + mm
         sfile = os.path.join(spath, sbase)
-        if not os.path.exists(sfile):
-            pass        
-        return sfile
+        """
+        db = os.path.dirname(self.path).split('/')[-3]
+        seisan_data = self.path.split('/WAV')[0]
+        print(seisan_data, db)
+        sfile = filetime2spath(self.filetime, mainclass=mainclass, db=db, seisan_data=seisan_data, fullpath=True)
+        if os.path.exists(sfile):
+            was_found = True       
+        return sfile, was_found
                
     def read(self):
         if os.path.exists(self.path):
