@@ -1,4 +1,5 @@
 import os
+from glob import glob
 import numpy as np
 import pandas as pd
 from IPython.display import clear_output
@@ -180,7 +181,8 @@ def qc_event(dfall, subclasses_for_ML, seisan_subclasses, fingerprints, SEISAN_D
             # TEXT OUTPUT STARTS HERE
             print(' ')
             print('Checked events currently:')
-            print(dfall[dfall['checked']==True].groupby('new_subclass').size())
+            #print(dfall[dfall['checked']==True].groupby('new_subclass').size())
+            print(row)
             print(' ')
             print('Loaded %s' % picklepath)
             
@@ -381,7 +383,7 @@ def build_master_trace_catalog(SEISAN_PATH, catalogdf, subclass=None):
     traceDF = pd.concat(frames, sort=True)
     return traceDF
     
-def build_master_event_catalog(csvdir, seisandbname, catalogfile, subclasses_for_ML, max_duration = 60):
+def build_master_event_catalog(csvdir, seisandbname, catalogfile, subclasses_for_ML, max_duration = 300):
     # load all the year/month CSV files
     csvfiles = glob(os.path.join(csvdir, 'reawav_%s??????.csv' % seisandbname))
     frames = []
@@ -440,7 +442,9 @@ def build_master_event_catalog(csvdir, seisandbname, catalogfile, subclasses_for
     # Add column that records if event should be ignored
     # Ignore any events longer than 1-minute, as they are likely to contain multiple events 
     # or just be unhelpful for classifying short signals which are more common
-    dfall['ignore'] = dfall['twin']>max_duration
+    # SCAFFOLD - the twin column no longer seems to exist
+    #dfall['ignore'] = dfall['twin']>max_duration
+    dfall['ignore'] = False
     
     # Now we have a catalog dataframe we can work with. Let's save this.
     dfall.to_csv(catalogfile)
