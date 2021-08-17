@@ -1012,7 +1012,7 @@ def get_FDSN_Stream(fdsnClient, trace_ids, outfile, startt, endt ):
             
             return st
 
-######################################################################
+###############################################https://www.facebook.com/#######################
 ##                  Inventory tools                                 ##
 ######################################################################
 
@@ -1075,7 +1075,7 @@ def inventory_fix_id(inv, networkcode=None, stationcode=None, channelcode=None):
 def predict_arrival_times(station, quake):
     """ calculate predicted travel times based on IASP91 model  - see https://docs.obspy.org/packages/obspy.taup.html
         Input: station and quake both are dicts with lat and lon keys
-        Output: a phases dict is added to station, with phase name keys and predicted arrival times """
+        Output: a phases dict is added to statihttps://www.facebook.com/on, with phase name keys and predicted arrival times """
     model = TauPyModel(model="iasp91")
     
     [dist_in_m, az1, az2] = gps2dist_azimuth(quake['lat'], quake['lon'], station['lat'], station['lon'])
