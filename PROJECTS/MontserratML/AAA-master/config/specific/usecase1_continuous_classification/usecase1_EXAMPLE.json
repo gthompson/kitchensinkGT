@@ -1,0 +1,38 @@
+{	"data_to_analyze":{
+		"path_to_data":"/Users/thompsong/Dropbox/MVO_labelled_events/",
+		"data_files":"*.pickle",
+		"reading_function":"read_montserrat",
+		"reading_arguments":{
+		}
+	},
+
+	"analysis":{
+		 "n_window":1,
+		 "window_length":"15.0",
+		 "delta":100,
+		 "bandwidth":{"f_min":[0.5], "f_max":[25]},
+		 "butter_order":2,
+		 "spectro_window_size":256,
+		 "f_max":25
+	}, 
+	
+	"display":{
+		"display_for_checking":"False",
+		"spectro_window_size":228,
+		"window_type":"kaiser",
+		"decimate_factor":4,
+		"nperseg":"spectro_window_size",
+		"noverlap":"0.9*spectro_window_size", 
+		"nfft":"1.5*spectro_window_size",
+		"scaling":"density",
+		"dB":"True"			
+	}
+}
+
+
+
+
+
+
+
+	
