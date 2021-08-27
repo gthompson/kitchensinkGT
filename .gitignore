@@ -3,3 +3,10 @@
 *.pyc
 ~*
 
+*.csv
+PROJECTS/MVOcatalog/Untitled.ipynb
+PROJECTS/MontserratML/paris+t.xlsx
+LIB/Untitled.ipynb
+LIB/seisanDBtools/untitled
+LIB/list_of_functions.txt
+PROJECTS/MVOcatalog/quake.xml
