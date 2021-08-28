@@ -409,7 +409,6 @@ bool_correct_data=True
 bool_make_png_files=False
 bool_detect_event=True
 bool_overwrite=False
-startdate = dt.datetime(1995,7,18,0,0,0)
-startdate = dt.datetime(2000,3,1,0,0,0)
+startdate = dt.datetime(2007,1,29,0,0,0)
 # 2000-02-29-2338-36S.MVO___019
 main(SEISAN_DB, 999999, startdate)
