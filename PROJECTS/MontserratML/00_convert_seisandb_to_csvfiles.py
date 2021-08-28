@@ -87,6 +87,8 @@ def WAV2picklefile(paths):
             if bool_correct_data: # try to find corresponding station XML
                 this_inv = load_mvo_inventory(tr, paths['CALDIR'])
             process_trace(tr, inv=this_inv)
+            if len(tr.data)<1000:
+                tr.stats.quality_factor = -1.0
         
         # remove bad traces
         for tr in st:    
@@ -299,6 +301,9 @@ def processWAV(wavfile):
     wavrow={}
     
     st = WAV2picklefile(paths)
+    for tr in st:
+        if len(tr.data)<1000:
+            st.remove(tr) 
     st.select(component='[ENZ]') # subset to seismic components only
     if len(st)==0:
         return wavrow
@@ -410,5 +415,4 @@ bool_make_png_files=False
 bool_detect_event=True
 bool_overwrite=False
 startdate = dt.datetime(2007,1,29,0,0,0)
-# 2000-02-29-2338-36S.MVO___019
 main(SEISAN_DB, 999999, startdate)
