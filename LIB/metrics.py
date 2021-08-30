@@ -496,3 +496,37 @@ def peak_amplitudes(st):
     
     return (seismic3d, seismic1d, infrasound)
 
+
+def eventStatistics(st):
+    # create an empty list of dictionaries
+    list_of_dicts = []
+
+    # for each trace, add a new dictionary to the list
+    for tr in st:
+        thisrow = dict()  # each dictionary will become a row of a dataframe
+
+        # if we use absolute function, we don't need to check if maxy > -miny
+        tr.detrend()
+        y = np.absolute(tr.data)
+
+        # we did this before
+        maxy = y.max()
+        maxy_i = y.argmax()
+        maxy_t = tr.stats.starttime + maxy_i / tr.stats.sampling_rate
+
+        # add new elements to dictionary
+        thisrow['id'] = tr.id
+        thisrow['sample'] = maxy_i
+        thisrow['time'] = maxy_t
+        thisrow['peakamp'] = maxy
+
+        # add a new measurement: energy
+        thisrow['energy'] = np.sum(np.square(y)) / tr.stats.sampling_rate
+
+        # add row (dict) to list
+        list_of_dicts.append(thisrow)
+
+    # Convert list of dicts to dataframe
+    df = pd.DataFrame.from_dict(list_of_dicts)
+
+    return df
