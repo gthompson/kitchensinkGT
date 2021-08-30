@@ -75,11 +75,16 @@ def qcTrace(tr):
      'sample_stdev': 2175.2511682727431, 
      'percent_availability': 100.0}           
     """
-    tr.write('temp.mseed')
-    mseedqc = MSEEDMetadata(['temp.mseed']) 
-    tr.stats['metrics'] = mseedqc.meta
-    os.remove('temp.mseed')
-    add_to_trace_history(tr, 'MSEED metrics computed (similar to ISPAQ/MUSTANG).')
+    if len(tr.data)>0:
+        tr.write('temp.mseed')
+        try:
+            mseedqc = MSEEDMetadata(['temp.mseed']) 
+        except:
+            pass
+        else:
+            tr.stats['metrics'] = mseedqc.meta
+            os.remove('temp.mseed')
+            add_to_trace_history(tr, 'MSEED metrics computed (similar to ISPAQ/MUSTANG).')
 
 def _detectClipping(tr, countThresh = 10):
     upper_clipped = False

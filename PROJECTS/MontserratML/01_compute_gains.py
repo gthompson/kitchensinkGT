@@ -56,9 +56,12 @@ def get_sfile_list(SEISAN_DATA, DB, startdate, enddate):
 
 
 
-def WAV2picklefile(paths):
-    if os.path.exists(paths['picklefile']):
-        st = read(paths['picklefile'])
+def wav2stream(paths):
+    if os.path.exists(paths['picklefile_c']):
+        st = read(paths['picklefile_c'])
+        return st
+    if os.path.exists(paths['picklefile_u']):
+        st = read(paths['picklefile_u'])
     else:
         # We need to create the pickle file
         # Try to read the WAV file
@@ -77,31 +80,34 @@ def WAV2picklefile(paths):
         else: 
             print('Success.')
         
-        ######################### START OF CLEAN/CORRECT BLOCK ######################
-        print('Cleaning/correcting')
         fix_trace_id(st, shortperiod=bool_shortperiod) 
         #st=st.select(component='Z')
 
         for tr in st:
             this_inv = None            
-            if bool_correct_data: # try to find corresponding station XML
-                this_inv = load_mvo_inventory(tr, paths['CALDIR'])
             process_trace(tr, inv=this_inv)
-            if len(tr.data)<1000:
-                tr.stats.quality_factor = -1.0
         
         # remove bad traces
         for tr in st:    
             if tr.stats.quality_factor <= 0.0:
                 st.remove(tr)  
                 
-        ######################### END OF CLEAN/CORRECT BLOCK ######################
             
         # Write pickle file. This is now the best place to load stream data from in future, so replaces
         # seisan/WAV directory with seisan/PICKLE
         if len(st)>0:
-            print('Writing ',paths['picklefile'])
-            st.write(paths['picklefile'], format='PICKLE') 
+            print('Writing ',paths['picklefile_u'])
+            st.write(paths['picklefile_u'], format='PICKLE') 
+
+    for tr in st:
+        this_inv = None            
+        if bool_correct_data: # try to find corresponding station XML
+            this_inv = load_mvo_inventory(tr, paths['CALDIR'])
+        process_trace(tr, inv=this_inv)
+    if len(st)>0:
+        print('Writing ',paths['picklefile_c'])
+        st.write(paths['picklefile_c'], format='PICKLE') 
+        
     return st
 
 def Stream2logfile(st, paths):        
@@ -276,34 +282,33 @@ def wavfile2paths(wavfile):
     paths['PICKLEDIR'] = paths['WAVDIR'].replace('WAV', 'PICKLE')           
     paths['seismicpngfile'] = os.path.join(paths['HTMLDIR'], paths['wavbase'] + '_seismic.png')
     paths['infrasoundpngfile'] = os.path.join(paths['HTMLDIR'], paths['wavbase'] + '_infrasound.png')
-    paths['picklefile'] = os.path.join(paths['PICKLEDIR'], paths['wavbase'] + '.pickle')
+    paths['picklefile_u'] = os.path.join(paths['PICKLEDIR'], paths['wavbase'] + '_u.pickle')
+    paths['picklefile_c'] = os.path.join(paths['PICKLEDIR'], paths['wavbase'] + '_c.pickle')
     paths['logfile'] = paths['picklefile'].replace('.pickle', '.log')
     paths['sgramfile'] = os.path.join(paths['HTMLDIR'], paths['wavbase'] + '_sgram.png')
     paths['sgramfixed'] = paths['sgramfile'].replace('_sgram.png', '_sgram_fixed.png')  
-    paths['traceCSVfile'] = paths['picklefile'].replace('.pickle', '.csv')
+    paths['traceCSVfile_u'] = paths['picklefile_u'].replace('.pickle', '.csv')
+    paths['traceCSVfile_c'] = paths['picklefile_c'].replace('.pickle', '.csv')
     paths['detectionfile'] = os.path.join(paths['HTMLDIR'], paths['wavbase'] + '_detection.png')
 
     return paths
     
     
-def processWAV(wavfile):
+def examineWAV(wavfile):
     paths = wavfile2paths(wavfile)
     if not os.path.exists(paths['HTMLDIR']) and bool_make_png_files:
         os.makedirs(paths['HTMLDIR'])
     if not os.path.exists(paths['PICKLEDIR']):
         os.makedirs(paths['PICKLEDIR'])  
     if bool_overwrite:
-        products = ['picklefile', 'seismicpngfile', 'infrasoundpngfile', 'logfile', 'sgramfile', 
-                    'sgramfixed', 'traceCSVfile', 'detectionfile']
+        products = ['picklefile_u', 'picklefile_c', 'seismicpngfile', 'infrasoundpngfile', 'logfile', 'sgramfile', 
+                    'sgramfixed', 'traceCSVfile_u', 'traceCSVfile_c', 'detectionfile']
         for product in products:
             if os.path.exists(paths[product]):
                 os.remove(paths[product])
     wavrow={}
     
-    st = WAV2picklefile(paths)
-    for tr in st:
-        if len(tr.data)<1000:
-            st.remove(tr) 
+    st = wav2stream(paths)
     st.select(component='[ENZ]') # subset to seismic components only
     if len(st)==0:
         return wavrow
@@ -327,14 +332,7 @@ def processWAV(wavfile):
     return wavrow
 
 
-def processSeisanYearMonth(SEISAN_DATA, DB, YYYY, MM, filesdone, MAXFILES=999999, startdate=None):
-    failedWAVfiles=[]
-    LoD = []
-    
-    # We aim to add a couple of columns from the S-file, and save to this
-    reawavCSVfile=os.path.join(SEISAN_DATA, 'reawav_%s%s%s.csv' % (DB, YYYY, MM) )
-    if os.path.exists(reawavCSVfile):
-        return failedWAVfiles, filesdone
+def examineSeisanYearMonth(SEISAN_DATA, DB, YYYY, MM, filesdone, MAXFILES=999999, startdate=None):
     
     # Get s-file list
     if not startdate:
@@ -355,30 +353,16 @@ def processSeisanYearMonth(SEISAN_DATA, DB, YYYY, MM, filesdone, MAXFILES=999999
         #s.printEvents()
         d = s.to_dict()
         #pprint(d)
-        
+   	
+        # SCAFFOLD - Add code here to check wavfiles are consistent with S-file name. I have this in a later Jupyter Notebook.
+     
         for item in ['wavfile1', 'wavfile2']:
             if d[item]:
                 if os.path.exists(d[item]):
                     wavbase = os.path.basename(d[item])
                     if 'MVO' in wavbase:
                         print('Processing ',d[item])
-                        eventrow=[]
-                        eventrow = processWAV(d[item])
-                        if eventrow:
-                            eventrow['sfile']=os.path.basename(s.path)
-                            eventrow['mainclass']=s.mainclass
-                            eventrow['subclass']=s.subclass
-                            LoD.append(eventrow)
-                            filesdone += 1
-                            if filesdone >= MAXFILES:
-                                break
-    if LoD:
-        df = pd.DataFrame(LoD)
-        print('Writing ',reawavCSVfile)
-        df.drop(df.filter(regex="Unname"),axis=1, inplace=True)
-        df = df.set_index('filetime')       
-        df.to_csv(reawavCSVfile, index=True) 
-    return failedWAVfiles, filesdone
+                        examineWAV(d[item])
 
 def main(DB, MAXFILES=999999, startdate=None):
     filesdone = 0
@@ -391,20 +375,7 @@ def main(DB, MAXFILES=999999, startdate=None):
                 break
             MM = os.path.basename(monthdir)
             print('**** Processing %s ****' % monthdir)
-            """
-            if startdate:
-                yyyymmstartdate = dt.datetime(int(YYYY),int(MM),1)
-                print(yyyymmstartdate, startdate)
-                if yyyymmstartdate > startdate:
-                    continue
-            """
-            failedWAVfiles, filesdone = processSeisanYearMonth('.', DB, YYYY, MM, filesdone, MAXFILES=999999, startdate=startdate)
-            if len(failedWAVfiles)>0:
-                fptr=open('failedWAVfiles.txt','a')
-                for element in failedWAVfiles:
-                    fptr.write(element)
-                    fptr.write('\n')
-                fptr.close() 
+            examineSeisanYearMonth('.', DB, YYYY, MM, filesdone, MAXFILES=999999, startdate=startdate)
 
 SEISAN_DATA = os.path.join( os.getenv('HOME'),'DATA','MVO')
 os.chdir(SEISAN_DATA)
@@ -414,5 +385,7 @@ bool_correct_data=True
 bool_make_png_files=False
 bool_detect_event=True
 bool_overwrite=False
-startdate = dt.datetime(2007,1,29,0,0,0)
+startdate = dt.datetime(1995,7,18,0,0,0)
+startdate = dt.datetime(2000,3,1,0,0,0)
+# 2000-02-29-2338-36S.MVO___019
 main(SEISAN_DB, 999999, startdate)

@@ -1,5 +1,11 @@
 .DS_Store
 .ipynb_checkpoints
 *.pyc
-~*
-
+.vscode/settings.json
+*.csv
+PROJECTS/MVOcatalog/Untitled.ipynb
+PROJECTS/MontserratML/paris+t.xlsx
+LIB/Untitled.ipynb
+LIB/seisanDBtools/untitled
+LIB/list_of_functions.txt
+PROJECTS/MVOcatalog/quake.xml
