@@ -545,7 +545,16 @@ def spath2datetime(spath):
     return dt.datetime(yyyy,mm,dd,hh,mi,ss)
     """
     fbs = basename.split('.S')
-    fdt = dt.datetime(int(fbs[1][0:4]), int(fbs[1][4:6]), int(fbs[0][0:2]), int(fbs[0][3:5]), int(fbs[0][5:7]), int(fbs[0][8:10]) ) 
+    #print(fbs)
+    yyyy = int(fbs[1][0:4])
+    mm = int(fbs[1][4:6])
+    dd = int(fbs[0][0:2])
+    HH = int(fbs[0][3:5])
+    MM = int(fbs[0][5:7])
+    SS = float(fbs[0][8:10])
+    fdt = dt.datetime(yyyy, mm , dd, HH, MM, 0)
+    time_change = dt.timedelta(seconds=SS) 
+    fdt = fdt + time_change
     return fdt
 
 def filetime2spath(filetime, mainclass='L', db=None, seisan_data=None, fullpath=True):
@@ -564,16 +573,19 @@ def filetime2spath(filetime, mainclass='L', db=None, seisan_data=None, fullpath=
 def filetime2wavpath(filetime, mainclass='L', db=None, seisan_data=None, fullpath=True, y2kfix=False, numchans=0):
     # WAV/MVOE_/2002/04/2002-04-27-0321-57S.MVO___014
     wavpath = None
-    dbstring = "_____"
+    dbstring = db
     if db=='MVOE_':
         dbstring = 'MVO__'
     if db=='ASNE_':
         dbstring = 'SPN__'
+    if len(dbstring)<5:
+        dbstring += '_' * (5-len(dbstring))
+
     if isinstance(filetime, UTCDateTime) or isinstance(filetime, dt.datetime):
         if not y2kfix and filetime.year < 2000:
-            wavpath = '2d%02d-%02d-%02d%02d-%02dS.%s_%03d' % (filetime.year-1900, filetime.month, filetime.day, filetime.hour, filetime.minute, filetime.second, dbstring, numchans)
+            wavpath = '%2d%02d-%02d-%02d%02d-%02dS.%s_%03d' % (filetime.year-1900, filetime.month, filetime.day, filetime.hour, filetime.minute, filetime.second, dbstring, numchans)
         else:
-            wavpath = '4d-%02d-%02d-%02d%02d-%02dS.%s_%03d' % (filetime.year, filetime.month, filetime.day, filetime.hour, filetime.minute, filetime.second, dbstring, numchans)
+            wavpath = '%4d-%02d-%02d-%02d%02d-%02dS.%s_%03d' % (filetime.year, filetime.month, filetime.day, filetime.hour, filetime.minute, filetime.second, dbstring, numchans)
         if fullpath:
             wavpath = os.path.join('%4d' % filetime.year, '%02d' % filetime.month, wavpath)
             if db:
