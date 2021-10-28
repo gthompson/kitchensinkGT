@@ -343,6 +343,8 @@ def processSeisanYearMonth(SEISAN_DATA, DB, YYYY, MM, filesdone, MAXFILES=999999
         enddate = dt.datetime(int(YYYY), int(MM)+1, 1)
     else:
         enddate = dt.datetime(int(YYYY)+1, 1, 1)
+    print(startdate, enddate)
+    return
     slist = sorted(get_sfile_list(SEISAN_DATA, DB, startdate, enddate))
     
     for i,sfile in enumerate(slist):
@@ -390,14 +392,14 @@ def main(DB, MAXFILES=999999, startdate=None):
             if filesdone>=MAXFILES:
                 break
             MM = os.path.basename(monthdir)
-            print('**** Processing %s ****' % monthdir)
-            """
             if startdate:
-                yyyymmstartdate = dt.datetime(int(YYYY),int(MM),1)
-                print(yyyymmstartdate, startdate)
-                if yyyymmstartdate > startdate:
+                SYYYY = startdate.year
+                SMM = startdate.month                
+                if SYYYY>int(YYYY):
                     continue
-            """
+                elif SMM > int(MM):
+                    continue
+            print('\n**** Processing %s ****' % monthdir)
             failedWAVfiles, filesdone = processSeisanYearMonth('.', DB, YYYY, MM, filesdone, MAXFILES=999999, startdate=startdate)
             if len(failedWAVfiles)>0:
                 fptr=open('failedWAVfiles.txt','a')
@@ -415,4 +417,5 @@ bool_make_png_files=False
 bool_detect_event=True
 bool_overwrite=False
 startdate = dt.datetime(2007,1,29,0,0,0)
-main(SEISAN_DB, 999999, startdate)
+startdate = dt.datetime(1996,10,20,0,0)
+main(SEISAN_DB, MAXFILES=999999, startdate=startdate)
