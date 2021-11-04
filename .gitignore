@@ -2,7 +2,7 @@
 .ipynb_checkpoints
 *.pyc
 .vscode/settings.json
-*.csv
+#*.csv
 PROJECTS/MVOcatalog/Untitled.ipynb
 PROJECTS/MontserratML/paris+t.xlsx
 LIB/Untitled.ipynb
