@@ -934,8 +934,8 @@ def get_FDSN_inventory(fdsnClient, eventTime, stationXmlFile, network, latitude,
     Load inventory of stations/channels available around this event time. It will attempt to load from file, then from the client
     Written for Miami Lakes project
     """
-    
-    if os.path.exists(stationXmlFile):
+    reload = True
+    if os.path.exists(stationXmlFile) and not reload:
         # load inv from file
         inv = obspy.core.inventory.read_inventory(stationXmlFile)
     else:
@@ -953,7 +953,30 @@ def get_FDSN_inventory(fdsnClient, eventTime, stationXmlFile, network, latitude,
                 endtime = endt,
                 level = 'response'
             )
-            
+            '''
+                startbefore (UTCDateTime)
+                startafter (UTCDateTime)
+                endbefore (UTCDateTime)
+                endafter (UTCDateTime)
+                latitude (float)
+                longitude (float)
+                minradius (float)
+                maxradius (float)
+                includerestricted (bool)
+                includeavailability (bool)
+                format (str), Default value: xml, Choices: xml, text, fdsnxml, stationxml, sc3ml
+            '''
+            '''
+            inv = fdsnClient.get_stations(
+                network = network,
+                latitude = latitude,
+                longitude = longitude,
+                maxradius = searchRadiusDeg,
+                startbefore = startt,
+                endafter = endt,
+                level = 'response'
+            )      
+            '''
         except Exception as e: 
             print(e)
             print('-  no inventory available')
@@ -980,6 +1003,7 @@ def get_FDSN_Stream(fdsnClient, trace_ids, outfile, startt, endt ):
         # load raw data from FDSN client
         st = obspy.core.Stream()
         for trace_id in trace_ids:
+            print(trace_id)
             netw, station, chancode = trace_id.split('.')
             print("net=%s, station=%s, chancode=%s" % (netw, station, chancode))
             try:
@@ -995,6 +1019,7 @@ def get_FDSN_Stream(fdsnClient, trace_ids, outfile, startt, endt ):
 
             except:
                 print("- No waveform data available for %s for this event %s" % (trace_id, outfile))
+                this_st = obspy.core.Stream()
                 
             else:
                 if this_st:
@@ -1003,14 +1028,13 @@ def get_FDSN_Stream(fdsnClient, trace_ids, outfile, startt, endt ):
     
         if not st:
             print("- No waveform data available for this event %s" % outfile)
-            return
         else:
             st.merge(fill_value=0)
     
             # Save raw waveform data to miniseed
             st.write(outfile, format="MSEED")
             
-            return st
+        return st
 
 ###############################################https://www.facebook.com/#######################
 ##                  Inventory tools                                 ##
