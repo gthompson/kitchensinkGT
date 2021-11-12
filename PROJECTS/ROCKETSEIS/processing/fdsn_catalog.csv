@@ -1,0 +1,2 @@
+time,description,launch_complex,bool_lander,url,fdsnclient,network,seisandb,lat,lon,pretrigsecs,posttrigsecs,searchRadiusKm
+2021-11-11T02:03:31,SpaceX Crew 3,39A,False,https://youtu.be/KsDM59EniUA,RASPISHAKE,AM,KSC__,28.608389,-80.604333,60.0,180.0,20.0
