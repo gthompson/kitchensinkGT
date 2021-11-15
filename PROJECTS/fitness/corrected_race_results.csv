@@ -1,203 +1,209 @@
-Date, Age, Miles, Mins, Pace, Mins25, Pace25, Description
-1983-09-04, 12,  6.000,  42.75,  7.12,  42.75,  7.12, Leicester
-1984-05-01, 12,  0.250,   1.27,  5.08,   1.27,  5.07, Humphries Sports Day
-1984-05-01, 12,  0.500,   3.17,  6.33,   3.17,  6.33, Humphries athletics class
-1984-06-02, 12,  9.200,  92.50, 10.05,  92.50, 10.05, Barrow
-1984-09-01, 13,  5.000,  37.50,  7.50,  37.50,  7.50, Leicester
-1984-09-01, 13,  9.000,  93.33, 10.37,  93.33, 10.37, sileby
-1985-05-01, 13,  0.500,   3.03,  6.07,   3.03,  6.07, Humphries athletics class
-1985-05-01, 13,  0.932,   6.50,  6.97,   6.50,  6.97, Humphries athletics class 1500m
-1985-06-01, 13,  4.000,  26.45,  6.61,  26.45,  6.61, barrow
-1985-09-01, 14,  9.000,  67.17,  7.46,  67.17,  7.46, sileby
-1986-06-01, 14,  4.000,  32.50,  8.12,  32.50,  8.12, barrow
-1986-07-01, 14,  0.932,   6.05,  6.49,   6.05,  6.49, Humphries with Stub 1500m
-1986-09-07, 15,  9.000,  66.50,  7.39,  66.50,  7.39, sileby
-1986-10-04, 15,  6.215,  42.50,  6.84,  42.50,  6.84, shepshed
-1987-06-06, 15,  4.000,  28.00,  7.00,  28.00,  7.00, Barrow
-1987-07-04, 15,  3.108,  21.33,  6.87,  21.33,  6.87, loughborough
-1987-08-01, 16,  3.850,  25.42,  6.60,  25.42,  6.60, thringstone
-1987-09-06, 16,  5.000,  31.50,  6.30,  31.50,  6.30, Leicester
-1987-10-04, 16,  3.000,  21.50,  7.17,  21.50,  7.17, melton
-1987-11-01, 16,  6.215,  48.50,  7.80,  48.50,  7.80, shepshed
-1988-06-04, 16,  4.000,  27.50,  6.88,  27.50,  6.88, barrow
-1988-07-02, 16,  3.108,  21.00,  6.76,  21.00,  6.76, loughborough
-1988-08-07, 17,  4.500,  27.67,  6.15,  27.67,  6.15, thringstone
-1988-09-03, 17,  6.215,  51.50,  8.29,  51.50,  8.29, Leicester (Run the World)
-1988-09-11, 17,  9.000,  59.50,  6.61,  59.50,  6.61, sileby
-1988-10-18, 17, 13.112,  97.08,  7.40,  97.08,  7.40, Bellshire Half M in Melton
-1989-06-03, 17,  4.000,  27.67,  6.92,  27.67,  6.92, barrow
-1989-09-02, 18,  6.215,  45.28,  7.29,  45.28,  7.29, walton
-1989-09-10, 18,  9.000,  62.50,  6.94,  62.50,  6.94, sileby
-1991-04-01, 19,  0.932,   4.58,  4.92,   4.58,  4.92, St Andrews 1500m
-1991-05-01, 19,  0.037,   0.14,  3.84,   0.13,  3.58, Track meet 60m  Glasgow
-1991-05-01, 19,  0.250,   0.97,  3.88,   0.97,  3.87, St Andrews or Glasgow
-1991-05-01, 19,  1.000,   4.87,  4.87,   4.87,  4.87, Track meet mile  Glasgow
-1991-05-01, 19,  3.108,  16.92,  5.44,  16.92,  5.44, Track meet 5k  Glasgow
-1991-05-15, 19, 13.112,  90.33,  6.89,  90.33,  6.89, St Andrews Half
-1994-05-01, 22,  0.250,   0.97,  3.90,   0.97,  3.87, Durham Track with Andy
-1995-07-01, 23, 13.112, 119.20,  9.09, 119.20,  9.09, Leeds Half M
-1998-04-04, 26,  3.108,  20.50,  6.60,  20.50,  6.60, Beat Beethoven
-1998-04-25, 26,  6.215,  41.67,  6.70,  41.67,  6.70, Law Days Judicata
-1998-06-10, 26,  0.125,   0.46,  3.65,   0.45,  3.60, Track meet 200m
-1998-06-10, 26,  0.250,   0.97,  3.89,   0.97,  3.87, Track meet 400m
-1998-06-10, 26,  0.500,   2.35,  4.70,   2.35,  4.70, Track meet 800m
-1998-06-10, 26,  1.000,   5.20,  5.20,   5.20,  5.20, Track meet mile
-1998-06-13, 26,  3.108,  19.33,  6.22,  19.33,  6.22, Mosquito Meander
-1998-06-20, 26,  6.215,  39.33,  6.33,  39.33,  6.33, Midnight Sun Run
-1998-06-24, 26,  0.125,   0.45,  3.63,   0.45,  3.60, Track meet 200m
-1998-06-24, 26,  0.500,   2.27,  4.53,   2.27,  4.53, Track meet 800m
-1998-07-08, 26,  0.250,   0.98,  3.94,   0.98,  3.93, Track meet 400m
-1998-07-08, 26,  1.000,   5.05,  5.05,   5.05,  5.05, Track meet mile
-1998-07-22, 27,  1.000,   5.02,  5.02,   5.00,  5.00, Mapco Mile
-1998-07-23, 27,  9.000,  61.25,  6.81,  61.12,  6.79, Grandmas over the hill
-1998-07-26, 27, 16.200, 115.00,  7.10, 114.73,  7.08, Gold Discovery Run
-1998-08-08, 27, 13.112,  89.25,  6.81,  89.05,  6.79, Santa Claus Half M
-1998-08-15, 27,  3.108,  18.13,  5.84,  18.10,  5.82, GCI 5k
-1998-08-27, 27, 11.500,  81.33,  7.07,  81.15,  7.06, Musk Ox Run
-1998-09-19, 27, 26.224, 245.20,  9.35, 244.43,  9.32, Equinox Marathon
-1998-10-10, 27,  6.500,  40.20,  6.18,  40.12,  6.17, Miller Hill / Yankovich Cookie Challenge
-1999-04-03, 27,  3.108,  19.82,  6.38,  19.77,  6.36, Beat Beethoven
-1999-04-24, 27,  3.108,  18.00,  5.79,  17.97,  5.78, Alaskaland Run for Youth
-1999-04-25, 27,  3.108,  18.73,  6.03,  18.70,  6.02, Alaskaland Couch Potato Challenge
-1999-05-01, 27,  6.215,  39.80,  6.40,  39.72,  6.39, Law Days 10k
-1999-05-22, 27,  3.108,  16.67,  5.36,  16.63,  5.35, Presbyterian 5k
-1999-06-09, 27,  0.250,   0.97,  3.88,   0.97,  3.87, Track meet 400m
-1999-06-09, 27,  0.500,   2.45,  4.90,   2.45,  4.90, Track meet 800m
-1999-06-09, 27,  1.000,   5.15,  5.15,   5.13,  5.13, Track meet mile
-1999-06-19, 27,  6.215,  43.72,  7.03,  43.62,  7.02, Midnight Sun Run
-1999-06-24, 27,  6.215,  45.00,  7.24,  44.88,  7.22, Hugh Heacock at Birch Hill
-1999-07-04, 27,  3.108,  19.23,  6.19,  19.20,  6.18, 1st Salmon Run in Nenana
-1999-07-07, 27,  0.062,   0.22,  3.55,   0.22,  3.47, Track meet 100m
-1999-07-07, 27,  0.125,   0.46,  3.64,   0.45,  3.60, Track meet 200m
-1999-07-07, 27,  1.000,   5.32,  5.32,   5.30,  5.30, Track meet mile
-1999-07-10, 27, 13.112,  89.02,  6.79,  88.82,  6.77, Santa Claus Half M
-1999-07-21, 28,  1.000,   4.88,  4.88,   4.87,  4.87, Mapco Mile
-2000-03-01, 28,  4.000,  28.00,  7.00,  27.90,  6.97, Cudjoehead - Salem Park
-2000-07-01, 28, 13.112, 102.68,  7.83, 102.28,  7.80, Santa Claus Half M
-2000-07-23, 29, 16.200, 111.50,  6.88, 110.87,  6.84, Gold Discovery Run
-2000-07-29, 29,  6.215,  47.52,  7.65,  47.22,  7.60, Beaver Sports Triathlon
-2001-03-01, 29,  4.000,  26.50,  6.62,  26.35,  6.59, Cudjoehead - Salem Park
-2001-06-01, 29, 13.112, 140.00, 10.68, 138.77, 10.58, Leeds Half M with Tanya
-2003-07-26, 32,  5.000,  32.62,  6.52,  32.20,  6.44, Trent Toll Bridge (Notts AC)
-2004-03-28, 32,  6.215,  40.40,  6.50,  39.88,  6.42, Desford 10k
-2004-04-11, 32,  3.000,  17.93,  5.98,  17.72,  5.91, Livingstone Relays
-2004-05-01, 32,  4.000,  30.10,  7.53,  29.65,  7.41, Barrow Bruiser
-2004-09-05, 33,  6.215,  40.27,  6.48,  39.58,  6.37, Crossdale 10k
-2004-09-12, 33, 13.112,  92.95,  7.09,  91.23,  6.96, Robin Hood Half Marathon
-2004-12-12, 33, 12.600,  90.00,  7.14,  88.32,  7.01, Turkey Trot - Keyworth
-2005-01-23, 33,  6.215,  38.75,  6.23,  38.12,  6.13, LRRL Beaumont Markfield
-2005-01-30, 33,  6.000,  37.58,  6.26,  36.97,  6.16, LRRL Barrow 
-2005-07-28, 34,  6.215,  41.13,  6.62,  40.25,  6.48, Holme Pierrepont
-2005-07-30, 34,  3.108,  19.35,  6.23,  18.95,  6.10, Wollaton Park
-2005-08-05, 34,  4.000,  24.50,  6.12,  24.02,  6.00, Rushcliffe Country Park
-2005-12-11, 34, 13.112, 105.00,  8.01, 102.27,  7.80, Turkey Trot - Keyworth
-2005-12-26, 34,  6.000,  42.50,  7.08,  41.52,  6.92, Barrow Boxing Day Handicap
-2006-09-30, 35,  6.400,  47.83,  7.47,  46.38,  7.25, Two way street station cookie challenge
-2007-04-07, 35,  6.215,  43.18,  6.95,  41.97,  6.75, Spring Fling 10k
-2007-04-14, 35,  3.108,  19.48,  6.27,  18.98,  6.11, Beet Beethoven
-2007-05-01, 35,  1.865,  10.77,  5.77,  10.52,  5.64, Track time trial
-2007-05-05, 35,  3.108,  18.48,  5.95,  18.03,  5.80, Chena River Run
-2007-06-23, 35,  6.215,  38.40,  6.18,  37.43,  6.02, Midnight Sun Run
-2007-06-28, 35,  1.000,   5.16,  5.16,   5.05,  5.05, Flint Hills Mile
-2007-06-30, 35,  7.500,  54.28,  7.24,  52.70,  7.03, Spruce Tree Classic
-2007-07-07, 35, 13.112,  86.59,  6.60,  84.27,  6.43, Santa Claus Half
-2007-07-07, 35, 13.112,  85.98,  6.56,  83.70,  6.38, strava half m
-2007-07-07, 35, 12.430,  81.25,  6.54,  79.10,  6.36, strava 20k
-2007-07-07, 35, 10.000,  64.17,  6.42,  62.50,  6.25, strava 10 m
-2007-07-07, 35,  9.323,  59.62,  6.39,  58.07,  6.23, strava 15k
-2007-07-10, 35,  0.750,   4.03,  5.38,   3.95,  5.27, Training for Flint Hills mile?
-2007-07-30, 36,  7.100,  52.48,  7.39,  50.55,  7.12, UAF campus and trail run
-2007-08-04, 36,  4.972,  30.77,  6.19,  29.82,  6.00, GCI 8k
-2007-08-05, 36,  5.000,  30.58,  6.12,  29.65,  5.93, Morning run near Pioneer Park
-2007-08-26, 36,  5.250,  31.92,  6.08,  30.95,  5.90, Yankovitch loop run SUPER FAST  HILLY
-2007-09-15, 36,  8.700,  74.11,  8.52,  70.98,  8.16, Equinox Leg 2
-2007-10-20, 36,  6.500,  49.98,  7.69,  48.07,  7.39, Two Way Street Cookie Challenge
-2008-04-05, 36,  3.108,  19.92,  6.41,  19.28,  6.21, Spring Fling 5k
-2008-06-28, 36,  7.200,  50.65,  7.03,  48.87,  6.79, Spruce Tree Classic
-2008-08-17, 37,  6.215,  39.63,  6.38,  38.13,  6.14, Run Lu Lu Run
-2008-09-18, 37, 26.224, 243.47,  9.28, 230.28,  8.78, Equinox Marathon
-2009-03-15, 37,  7.200,  53.32,  7.41,  50.98,  7.08, St Patricks
-2009-04-11, 37,  3.108,  20.16,  6.49,  19.38,  6.24, Beat Beethoven
-2009-06-09, 37,  4.000,  37.73,  9.43,  35.67,  8.92, Masochism on Moose Mtn
-2009-06-19, 37,  6.215,  37.78,  6.08,  36.40,  5.86, Midnight Sun Run
-2009-06-27, 37,  7.200,  52.60,  7.31,  50.33,  6.99, Spruce Tree Classic
-2009-07-02, 37,  1.000,   5.25,  5.25,   5.08,  5.08, Flint Hills Mile
-2009-09-19, 38,  1.000,   5.27,  5.27,   5.07,  5.07, Fast mile during run around Patty center
-2009-07-25, 38,  1.000,   5.17,  5.17,   4.98,  4.98, Golden Mile
-2009-08-08, 38, 13.112,  90.13,  6.87,  85.80,  6.54, Santa Claus Half
-2009-08-15, 38,  6.837,  45.30,  6.63,  43.20,  6.32, Run Lu Lu Run
-2009-08-16, 38,  6.215,  45.87,  7.38,  43.52,  7.00, Run for the Refuge
-2009-09-12, 38, 12.100,  80.93,  6.69,  77.15,  6.38, Final leg of Skagway-Whitehorse Klondike Relay
-2009-09-18, 38, 26.224, 229.19,  8.74, 215.38,  8.21, Equinox Marathon
-2009-10-24, 38,  6.800,  46.05,  6.77,  43.87,  6.45, Cache Creek Warm-up
-2010-03-16, 38,  3.000,  20.00,  6.67,  19.07,  6.36, UAF campus lunch run
-2010-03-18, 38,  3.000,  18.50,  6.17,  17.70,  5.90, UAF campus afternoon run
-2010-03-24, 38,  4.310,  32.05,  7.44,  30.40,  7.05, West Ridge Lunch Run
-2010-04-01, 38,  3.000,  19.12,  6.37,  18.27,  6.09, UAF campus run
-2010-04-03, 38,  6.215,  39.43,  6.34,  37.68,  6.06, Spring Fling
-2010-04-10, 38,  3.108,  18.47,  5.94,  17.70,  5.70, Beet Beethoven
-2010-05-09, 38, 11.000,  83.88,  7.63,  79.43,  7.22, Murphy Dome Roam
-2010-06-19, 38,  6.215,  41.27,  6.64,  39.33,  6.33, Midnight Sun Run
-2010-07-01, 38,  1.000,   5.23,  5.23,   5.03,  5.03, Flint Hills Mile
-2010-07-17, 38,  4.972,  29.50,  5.93,  28.27,  5.69, Valkyeries
-2010-07-24, 39,  1.000,   5.25,  5.25,   5.00,  5.00, Golden Mile
-2010-07-25, 39, 16.203, 117.04,  7.22, 110.13,  6.80, Gold Discovery.
-2010-08-07, 39, 13.112,  89.02,  6.79,  84.07,  6.41, Santa Claus Half
-2010-08-28, 39,  3.108,  21.12,  6.80,  19.95,  6.42, Birch Hill 5k
-2010-09-18, 39, 26.224, 239.78,  9.14, 222.17,  8.47, Equinox Marathon
-2011-05-15, 39, 11.000,  76.80,  6.98,  72.42,  6.58, Murphy Dome Roam
-2011-05-28, 39,  6.700,  59.90,  8.94,  55.60,  8.30, Annihilator
-2011-07-23, 40,  1.000,   5.57,  5.57,   5.27,  5.27, Golden Mile
-2012-05-09, 40,  3.108,  21.95,  7.06,  20.47,  6.59, Chena River Run
-2012-06-23, 40,  6.215,  41.29,  6.64,  38.67,  6.22, Midnight Sun Run
-2012-06-28, 40,  1.000,   5.62,  5.62,   5.32,  5.32, Flint Hills Mile
-2012-07-14, 40,  5.370,  34.30,  6.39,  32.22,  6.00, Valkyries
-2012-07-21, 41,  1.000,   5.50,  5.50,   5.17,  5.17, Golden Mile
-2012-07-22, 41, 16.283, 143.36,  8.80, 130.17,  7.99, Gold Discovery Run
-2012-08-04, 41, 13.112, 107.82,  8.22,  98.50,  7.51, Santa Claus Half
-2012-08-25, 41,  3.108,  20.40,  6.57,  18.97,  6.10, Birch Hill 5k
-2012-09-15, 41, 26.224, 261.70,  9.98, 234.77,  8.95, Equinox Marathon
-2012-09-22, 41,  3.108,  19.92,  6.41,  18.55,  5.97, Troth Yeddha 5k at UAF
-2012-10-27, 41, 10.000,  68.85,  6.88,  63.80,  6.38, Halloween Run
-2013-04-13, 41,  3.108,  19.86,  6.39,  18.48,  5.95, Beat Beethoven
-2013-06-22, 41,  6.215,  41.17,  6.62,  38.25,  6.15, Midnight Sun Run
-2013-06-27, 41,  1.000,   5.46,  5.46,   5.13,  5.13, Flint Hills Mile
-2013-07-20, 42,  1.000,   5.35,  5.35,   4.98,  4.98, Golden Mile
-2014-04-06, 42,  3.108,  19.83,  6.38,  18.32,  5.89, Donate Life USF 5k
-2014-05-18, 42, 11.000,  88.05,  8.00,  79.75,  7.25, Murphy Dome Roam
-2014-05-26, 42,  1.000,   5.43,  5.43,   5.07,  5.07, Flint Hills Mile
-2014-06-21, 42,  6.215,  40.81,  6.57,  37.60,  6.05, Midnight Sun Run
-2014-09-06, 43,  4.000,  41.00, 10.25,  35.65,  8.91, Mud Titan  Plant City
-2014-12-18, 43,  3.108,  18.93,  6.09,  17.38,  5.59, AGU Run
-2015-11-29, 44, 26.224, 267.83, 10.21, 229.88,  8.77, Spacecoast Marathon
-2016-05-07, 44,  3.108,  19.88,  6.40,  18.02,  5.80, Chena River Run
-2016-06-18, 44,  6.215,  41.13,  6.62,  37.15,  5.98, Midnight Sun Run
-2016-05-13, 44,  3.108,  22.00,  7.08,  19.73,  6.35, West Ridge Lunch Run 5k
-2016-06-26, 44,  6.215,  42.80,  6.89,  38.52,  6.20, Prestwold Air Ambulance 10k
-2016-08-09, 45,  5.000,  34.15,  6.83,  30.45,  6.09, 3 club challenge
-2016-08-23, 45,  3.108,  23.58,  7.59,  20.77,  6.68, Morning track run USF
-2016-08-27, 45,  3.108,  29.85,  9.61,  25.48,  8.20, 5k on Clearwater Beach
-2016-09-22, 45,  3.470,  23.65,  6.82,  21.08,  6.08, Tempo run
-2016-11-24, 45,  3.108,  22.20,  7.14,  19.68,  6.33, Thanksgiving Turkey Trot
-2016-11-24, 45,  1.000,   5.57,  5.57,   5.07,  5.07, Thanksgiving Turkey Trot
-2016-11-24, 45,  6.215,  42.87,  6.90,  38.17,  6.14, Thanksgiving Turkey Trot
-2016-12-26, 45,  6.000,  42.15,  7.02,  37.45,  6.24, Barrow Boxing Day Handicap
-2017-02-26, 45,  3.200,  23.08,  7.21,  20.45,  6.39, Flatwoods levee tempo run
-2017-07-04, 45,  3.108,  20.20,  6.50,  18.10,  5.82, Independence Day 5k  Fairbanks  AK
-2017-10-01, 46,  3.108,  20.53,  6.61,  18.18,  5.85, fort de soto 5k & 15k
-2017-11-11, 46,  6.215,  44.35,  7.14,  38.93,  6.26, Trot thru the terrace
-2018-03-13, 46,  6.000,  41.98,  7.00,  36.95,  6.16, Run on the shutle landing facility 
-2018-06-09, 46,  6.215,  60.70,  9.77,  50.98,  8.20, Santa Rosa Olympic Triathlon 1500m swim  25 mile ride  10k run
-2018-07-07, 46,  6.215,  48.32,  7.77,  41.95,  6.75, Multirace Fort de Soto Tri #1
-2018-08-18, 47,  6.215,  48.43,  7.79,  41.58,  6.69, Multirace Fort de Soto Tri #2
-2018-09-15, 47,  6.215,  48.30,  7.77,  41.48,  6.67, Multirace Fort de Soto Tri #3
-2019-02-10, 47,  9.323,  79.40,  8.52,  67.27,  7.22, Trout Creek 15km trail race
-2019-06-06, 47,  1.000,   5.72,  5.72,   5.10,  5.10, Jim Loftus Mile
-2019-07-13, 47,  3.108,  21.65,  6.97,  18.87,  6.07, Multirace Fort de Soto Tri #1
-2019-08-03, 48,  3.108,  24.03,  7.73,  20.43,  6.58, Multirace Fort de Soto Tri #2
-2019-09-14, 48,  3.108,  22.97,  7.39,  19.65,  6.32, Multirace Fort de Soto Tri #3
-2020-07-07, 48,  3.108,  22.18,  7.14,  19.07,  6.14, Fast tempo run  Babe Zaharias golf course
-2021-04-24, 49,  3.108,  20.75,  6.68,  17.83,  5.74, Clearwater running festival 5k
-2021-07-18, 50,  1.000,   5.98,  5.98,   5.17,  5.17, 50th birthday foot race
-2021-10-23, 50,  6.215,  43.97,  7.07,  37.07,  5.96, Fast tempo run  Lake Carrollwood
-2021-11-06, 50,  6.215,  43.00,  6.92,  36.37,  5.85, Trot thru the terrace
+Date,Age,Miles,Mins,Pace,Mins25,Pace25,Description,Age,comments
+1983-09-04, 12,  6.000,  42.75,  7.12,  31.57,  5.26, Leicester, 12.13, James Longstaff 43m40s
+1984-05-01, 12,  0.249,   1.27,  5.11,   1.03,  4.16, Humphries Sports Day, 12.79, 
+1984-05-01, 12,  0.497,   3.17,  6.37,   2.47,  4.96, Humphries athletics class, 12.79, 
+1984-06-02, 12,  9.200,  92.50, 10.05,  64.43,  7.00, Barrow, 12.87, James Longstaff 91m30s
+1984-09-01, 13,  5.000,  37.50,  7.50,  28.68,  5.74, Leicester, 13.12, 
+1984-09-01, 13,  9.000,  93.33, 10.37,  65.48,  7.28, sileby, 13.12, Neil D 93m45s
+1985-05-01, 13,  0.497,   3.03,  6.10,   2.50,  5.03, Humphries athletics class, 13.79, 
+1985-05-01, 13,  0.932,   6.50,  6.97,   5.23,  5.61, Humphries athletics class 1500m, 13.79, 
+1985-06-01, 13,  4.000,  26.45,  6.61,  21.62,  5.40, barrow, 13.87, Adam Mayes 22m30s; Steve Warriner 27m00s; Mick Greaves 27m30s; Chris Harrison 32m00s
+1985-09-01, 14,  9.000,  67.17,  7.46,  54.40,  6.04, sileby, 14.12, Neil D 102m
+1986-06-01, 14,  4.000,  32.50,  8.12,  27.08,  6.77, barrow, 14.87, Steve Warriner 28m30s; Jason Cramphorn 29m00s; Wayne Morley 32m15s
+1986-07-01, 14,  0.932,   6.05,  6.49,   5.23,  5.61, Humphries with Stub 1500m, 14.95, 
+1986-09-07, 15,  9.000,  66.50,  7.39,  57.08,  6.34, sileby, 15.14, Neil D 85m
+1986-10-04, 15,  6.215,  42.50,  6.84,  37.00,  5.95, shepshed, 15.21, 
+1987-06-06, 15,  4.000,  28.00,  7.00,  25.08,  6.27, Barrow, 15.89, Steve Warriner 27m30s; John Warriner 29m00s
+1987-07-04, 15,  3.108,  21.33,  6.87,  19.22,  6.18, loughborough, 15.96, Steve Warriner 21m30s; John Warriner 22m10s
+1987-08-01, 16,  3.850,  25.42,  6.60,  23.05,  5.99, thringstone, 16.04, Steve Warriner 25m36s; John Warriner 26m30s
+1987-09-06, 16,  5.000,  31.50,  6.30,  28.78,  5.76, Leicester, 16.14, John Warriner 34m30s
+1987-10-04, 16,  3.000,  21.50,  7.17,  19.48,  6.49, melton, 16.21, John Warriner 21m45s
+1987-11-01, 16,  6.215,  48.50,  7.80,  43.72,  7.03, shepshed, 16.29, 
+1988-06-04, 16,  4.000,  27.50,  6.88,  25.58,  6.40, barrow, 16.88, Philip Bacon 26m30s; Steve Warriner 26m45s; John Warriner 27m15s; James Longstaff 28m00s; Andy Neal 28m00s; Jason Tuckwood 32m30s
+1988-07-02, 16,  3.108,  21.00,  6.76,  19.60,  6.31, loughborough, 16.96, Steve Warriner 21m03s; John Warriner 21m07s
+1988-08-07, 17,  4.500,  27.67,  6.15,  26.03,  5.79, thringstone, 17.05, John Warriner 29m10s
+1988-09-03, 17,  6.215,  51.50,  8.29,  47.60,  7.66, Leicester (Run the World), 17.13, 
+1988-09-11, 17,  9.000,  59.50,  6.61,  55.87,  6.21, sileby, 17.15, John Warriner 67m20s
+1988-10-18, 17, 13.112,  97.08,  7.40,  90.73,  6.92, Bellshire Half M in Melton, 17.25, 
+1989-06-03, 17,  4.000,  27.67,  6.92,  26.23,  6.56, barrow, 17.88, Jason Tuckwood 38m
+1989-09-02, 18,  6.215,  45.28,  7.29,  42.92,  6.91, walton, 18.12, John Warriner 46m17s; Steve Warriner 46m20s
+1989-09-10, 18,  9.000,  62.50,  6.94,  59.38,  6.60, sileby, 18.15, 
+1991-04-01, 19,  0.932,   4.58,  4.92,   4.37,  4.68, St Andrews 1500m, 19.71, 
+1991-05-01, 19,  0.037,   0.14,  3.84,   0.13,  3.58, Track meet 60m  Glasgow, 19.79, 
+1991-05-01, 19,  0.249,   0.97,  3.90,   0.93,  3.75, St Andrews or Glasgow, 19.79, 
+1991-05-01, 19,  1.000,   4.87,  4.87,   4.63,  4.63, Track meet mile  Glasgow, 19.79, 3rd place
+1991-05-01, 19,  3.108,  16.92,  5.44,  16.03,  5.16, Track meet 5k  Glasgow, 19.79, Might have been 17m55s
+1991-05-15, 19, 13.112,  90.33,  6.89,  84.40,  6.44, St Andrews Half, 19.82, 
+1994-05-01, 22,  0.249,   0.97,  3.92,   0.97,  3.89, Durham Track with Andy, 22.79, 
+1995-07-01, 23, 13.112, 119.20,  9.09, 119.20,  9.09, Leeds Half M, 23.95, Andy 119m19s; Julia 119m44s 
+1998-04-04, 26,  3.108,  20.50,  6.60,  20.48,  6.59, Beat Beethoven, 26.71, Art 23m; SteveMc 21m45s
+1998-04-25, 26,  6.215,  41.67,  6.70,  41.62,  6.70, Law Days Judicata, 26.77, 
+1998-06-10, 26,  0.124,   0.46,  3.67,   0.45,  3.62, Track meet 200m, 26.90, 1st
+1998-06-10, 26,  0.249,   0.97,  3.92,   0.97,  3.89, Track meet 400m, 26.90, 3rd
+1998-06-10, 26,  0.497,   2.35,  4.73,   2.35,  4.73, Track meet 800m, 26.90, 3rd
+1998-06-10, 26,  1.000,   5.20,  5.20,   5.20,  5.20, Track meet mile, 26.90, 3rd place
+1998-06-13, 26,  3.108,  19.33,  6.22,  19.32,  6.22, Mosquito Meander, 26.90, Michelle Mitchell 19m45s (my beautiful rabbit)
+1998-06-20, 26,  6.215,  39.33,  6.33,  39.30,  6.32, Midnight Sun Run, 26.92, Michelle Mitchell 39m28s
+1998-06-24, 26,  0.124,   0.45,  3.65,   0.45,  3.62, Track meet 200m, 26.93, 
+1998-06-24, 26,  0.497,   2.27,  4.56,   2.27,  4.56, Track meet 800m, 26.93, 
+1998-07-08, 26,  0.249,   0.98,  3.96,   0.98,  3.96, Track meet 400m, 26.97, 
+1998-07-08, 26,  1.000,   5.05,  5.05,   5.05,  5.05, Track meet mile, 26.97, 
+1998-07-22, 27,  1.000,   5.02,  5.02,   5.02,  5.02, Mapco Mile, 27.01, Me 9th; Mark Dammeyer 4th in 4m54s
+1998-07-23, 27,  9.000,  61.25,  6.81,  61.20,  6.80, Grandmas over the hill, 27.01, Me 5th; Art 69m50s; Kevin Brinegar 54m40s; Scott McCrea 55m10s
+1998-07-26, 27, 16.300, 115.00,  7.06, 114.90,  7.05, Gold Discovery Run, 27.02, Heather Hunt 1h51m; Kevin 1h33m; Art 2h08m
+1998-08-08, 27, 13.112,  89.25,  6.81,  89.18,  6.80, Santa Claus Half M, 27.06, First 5 miles = 35m06s; Second 5 miles = 33m41s; Last 5k = 20m28s
+1998-08-15, 27,  3.108,  18.13,  5.84,  18.12,  5.83, GCI 5k, 27.08, 
+1998-08-27, 27, 11.500,  81.33,  7.07,  81.27,  7.07, Musk Ox Run, 27.11, Out in 44m40s; back in 36m30s; 6th; just ahead of Jim Brader and Dave Covey - 5minutes ahead of Michelle
+1998-09-19, 27, 26.224, 245.20,  9.35, 244.97,  9.34, Equinox Marathon, 27.17, Beat Art by about 9 seconds. Matias Saari did 3:49:17.
+1998-10-10, 27,  6.500,  40.20,  6.18,  40.18,  6.18, Miller Hill / Yankovich Cookie Challenge, 27.23, WON THE RACE BY 1 MINUTE FROM ROCKY REIFENSTAHL: I practised it a couple of times in the week before
+1999-04-03, 27,  3.108,  19.82,  6.38,  19.80,  6.37, Beat Beethoven, 27.71, Beat Beethoven 5k around campus. 19m49s. 6m40s for first 2 miles; then 5m50s for the third; passing Michelle who finished in 20m11s. Art beat his time of last year by almost 2 minutes to finish in 21:23. 5 miles total.
+1999-04-24, 27,  3.108,  18.00,  5.79,  18.00,  5.79, Alaskaland Run for Youth, 27.77, 4th; just behind Stuart Grant; Art smashed PB too in 19m50s
+1999-04-25, 27,  3.108,  18.73,  6.03,  18.73,  6.03, Alaskaland Couch Potato Challenge, 27.77, 
+1999-05-01, 27,  6.215,  39.80,  6.40,  39.78,  6.40, Law Days 10k, 27.79, Law Days 10k. Around freezing; windy & snowing. Legs felt sore. Got to the turn around in 20m30s. At the 4 mile point I was 35s behind Michelle Mitchell; who was ~10 s behind Tina Devine. I did the second-half in 19m18s; passing Michelle around the 6 mile mark.
+1999-05-22, 27,  3.108,  16.67,  5.36,  16.67,  5.36, Presbyterian 5k, 27.84, Presbyterian 5k from Patty Center. I won it in 16m40s from Stuart Grant. Michelle 4th in 18m20s. But was it really 5k? It might have been more like a 17m20s 5k performance.
+1999-06-09, 27,  0.249,   0.97,  3.90,   0.97,  3.89, Track meet 400m, 27.89, 
+1999-06-09, 27,  0.497,   2.45,  4.93,   2.45,  4.93, Track meet 800m, 27.89, 
+1999-06-09, 27,  1.000,   5.15,  5.15,   5.15,  5.15, Track meet mile, 27.89, 
+1999-06-19, 27,  6.215,  43.72,  7.03,  43.70,  7.03, Midnight Sun Run, 27.92, Injured
+1999-06-24, 27,  6.215,  45.00,  7.24,  44.97,  7.24, Hugh Heacock at Birch Hill, 27.93, 
+1999-07-04, 27,  3.108,  19.23,  6.19,  19.22,  6.18, 1st Salmon Run in Nenana, 27.96, Came in first - someone ahead went wrong way
+1999-07-07, 27,  0.062,   0.22,  3.57,   0.22,  3.49, Track meet 100m, 27.97, 
+1999-07-07, 27,  0.124,   0.46,  3.66,   0.45,  3.62, Track meet 200m, 27.97, 
+1999-07-07, 27,  1.000,   5.32,  5.32,   5.32,  5.32, Track meet mile, 27.97, 
+1999-07-10, 27, 13.112,  89.02,  6.79,  88.97,  6.79, Santa Claus Half M, 27.98, First 5 miles = 34m38s; Second 5 miles = 33m59s; Last 5k = 20m34s
+1999-07-21, 28,  1.000,   4.88,  4.88,   4.88,  4.88, Mapco Mile, 28.01, 2nd; behind Kevin Brinegar in 4m43s
+2000-03-01, 28,  4.000,  28.00,  7.00,  27.97,  6.99, Cudjoehead - Salem Park, 28.62, Came 8th; 1 minute behind Simon Carn; 4th
+2000-07-01, 28, 13.112, 102.68,  7.83, 102.50,  7.82, Santa Claus Half M, 28.95, 
+2000-07-23, 29, 16.300, 111.50,  6.84, 111.32,  6.83, Gold Discovery Run, 29.01, Not far behind Jane LeBlond 109m32s - paced her to 13 miles
+2000-07-29, 29,  6.215,  47.52,  7.65,  47.43,  7.63, Beaver Sports Triathlon, 29.03, With Amber Bethe. 800m swim; 30 mile bike ride; 10k run. Me 3:04:48 (19:58; 1:57:19; 47:31); Amber 3:07:10 (24:07; 1:44:53; 58:10)
+2001-03-01, 29,  4.000,  26.50,  6.62,  26.43,  6.61, Cudjoehead - Salem Park, 29.61, Came 3rd
+2001-06-01, 29, 13.112, 140.00, 10.68, 139.25, 10.62, Leeds Half M with Tanya, 29.87, 
+2003-07-26, 32,  5.000,  32.62,  6.52,  32.27,  6.45, Trent Toll Bridge (Notts AC), 32.02, Vicky Hards did it in 31m21s (5th woman)
+2004-03-28, 32,  6.215,  40.40,  6.50,  39.83,  6.41, Desford 10k, 32.69, 
+2004-04-11, 32,  3.000,  17.93,  5.98,  17.70,  5.90, Livingstone Relays, 32.73, 
+2004-05-01, 32,  4.000,  30.10,  7.53,  29.60,  7.40, Barrow Bruiser, 32.79, 
+2004-09-05, 33,  6.215,  40.27,  6.48,  39.62,  6.37, Crossdale 10k, 33.13, Around 4 min/km pace throughout; finished 10th (beat all women)
+2004-09-12, 33, 13.112,  92.95,  7.09,  91.30,  6.96, Robin Hood Half Marathon, 33.15, First 5 miles = 37m40s; Second 5 miles = 35m10s; Last 5k = 20m07s
+2004-12-12, 33, 12.600,  90.00,  7.14,  88.27,  7.01, Turkey Trot - Keyworth, 33.40, Unofficial entry. Started 10 minutes late; and missed half a mile off course. 
+2005-01-23, 33,  6.215,  38.75,  6.23,  38.07,  6.12, LRRL Beaumont Markfield, 33.51, 
+2005-01-30, 33,  6.000,  37.58,  6.26,  36.92,  6.15, LRRL Barrow , 33.53, 
+2005-07-28, 34,  6.215,  41.13,  6.62,  40.25,  6.48, Holme Pierrepont, 34.03, behind Vicky
+2005-07-30, 34,  3.108,  19.35,  6.23,  18.95,  6.10, Wollaton Park, 34.03, beat David & Vicky
+2005-08-05, 34,  4.000,  24.50,  6.12,  24.02,  6.00, Rushcliffe Country Park, 34.05, beat David & Vicky
+2005-12-11, 34, 13.112, 105.00,  8.01, 102.00,  7.78, Turkey Trot - Keyworth, 34.40, first 9 miles in about 63 minutes; then had to walk - hardest run since Equinox in 1998!
+2005-12-26, 34,  6.000,  42.50,  7.08,  41.42,  6.90, Barrow Boxing Day Handicap, 34.44, Ellen ran about 52 minutes
+2006-09-30, 35,  6.400,  47.83,  7.47,  46.28,  7.23, Two way street station cookie challenge, 35.20, First run back in Alaska (and since doing in ankle twice in previous few months)
+2007-04-07, 35,  6.215,  43.18,  6.95,  41.72,  6.71, Spring Fling 10k, 35.72, Patty Center to Goldhill out and back (Ellen did 47.33). We did first mile in 7.36; I was at 2 mile in 14.50; 5k in 22.55; then 4m in 27.55; 5m in 34.55. Just beat Steve Bainbridge.
+2007-04-14, 35,  3.108,  19.48,  6.27,  18.88,  6.08, Beet Beethoven, 35.74, 9th out of about 500 runners
+2007-05-01, 35,  1.865,  10.77,  5.77,  10.45,  5.60, Track time trial 3000m, 35.79, 1st having taken on the lead after 3.5 laps
+2007-05-05, 35,  3.108,  18.48,  5.95,  17.93,  5.77, Chena River Run, 35.80, 9th out of 980 runners
+2007-06-23, 35,  6.215,  38.40,  6.18,  37.18,  5.98, Midnight Sun Run, 35.93, 
+2007-06-28, 35,  1.000,   5.16,  5.16,   5.02,  5.02, Flint Hills Mile, 35.94, 6th ?
+2007-06-30, 35,  7.500,  54.28,  7.24,  52.27,  6.97, Spruce Tree Classic, 35.95, Through the first mile in over 10 minutes due to blistering. Gradually sped up thereafter. Over the bicycle bumps both ways (officially 52:17).
+2007-07-07, 35, 13.112,  86.59,  6.60,  83.63,  6.38, Santa Claus Half, 35.97, 
+2007-07-10, 35,  0.746,   4.03,  5.41,   3.92,  5.25, Training for Flint Hills mile?, 35.98, 
+2007-07-30, 36,  7.100,  52.48,  7.39,  50.47,  7.11, UAF campus and trail run, 36.03, 
+2007-08-04, 36,  4.972,  30.77,  6.19,  29.77,  5.99, GCI 8k, 36.05, 
+2007-08-05, 36,  5.000,  30.58,  6.12,  29.60,  5.92, Morning run near Pioneer Park, 36.05, 
+2007-08-26, 36,  5.250,  31.92,  6.08,  30.88,  5.88, Yankovitch loop run SUPER FAST  HILLY, 36.11, 
+2007-09-15, 36,  8.700,  74.11,  8.52,  70.75,  8.13, Equinox Leg 2, 36.16, 
+2007-10-20, 36,  6.500,  49.98,  7.69,  47.90,  7.37, Two Way Street Cookie Challenge, 36.26, 4th. Had to run through snow that was deep and slippy
+2008-04-05, 36,  3.108,  19.92,  6.41,  19.15,  6.16, Spring Fling 5k, 36.72, 
+2008-06-01, 36,  5.000,  32.15,  6.43,  30.88,  6.18, Fairbanks run for women, 36.87, Ran with Ellen; who finished 3rd
+2008-06-28, 36,  7.200,  50.65,  7.03,  48.45,  6.73, Spruce Tree Classic, 36.94, 
+2008-08-17, 37,  6.215,  39.63,  6.38,  38.02,  6.12, Run Lu Lu Run, 37.08, 3rd place; behind Simon McLaughlin (2nd) by 19 secs
+2008-09-18, 37, 26.224, 243.47,  9.28, 229.12,  8.74, Equinox Marathon, 37.17, 
+2009-03-15, 37,  7.200,  53.32,  7.41,  50.57,  7.02, St Patricks, 37.65, 2nd; 7 secs behind Ed Debevec
+2009-04-11, 37,  3.108,  20.16,  6.49,  19.22,  6.18, Beat Beethoven, 37.73, 
+2009-06-09, 37,  4.000,  37.73,  9.43,  35.20,  8.80, Masochism on Moose Mtn, 37.89, Steep 1.25 miles; 2.75 miles down. I descended in 16:12; a pace of 5:53
+2009-06-19, 37,  6.215,  37.78,  6.08,  36.08,  5.81, Midnight Sun Run, 37.92, 22nd; right behind women's winner Crystal Pitney
+2009-06-27, 37,  7.200,  52.60,  7.31,  49.80,  6.92, Spruce Tree Classic, 37.94, 5th;
+2009-07-02, 37,  1.000,   5.25,  5.25,   5.05,  5.05, Flint Hills Mile, 37.96, 8th; just behind Brando
+2009-07-12, 37,  6.750,  63.58,  9.42,  59.25,  8.78, Ester Dome Ass Kicker, 37.98, Passed Kristen Rozzell and Sam Herreid on the road back
+2009-07-18, 38,  8.500,  88.72, 10.44,  82.05,  9.65, Chena Hot Springs Run & Soak, 38.00, Right behind Kristen
+2009-09-19, 38,  1.000,   5.27,  5.27,   5.05,  5.05, Fast mile during run around Patty center, 38.17, 
+2009-07-25, 38,  1.000,   5.17,  5.17,   4.97,  4.97, Golden Mile, 38.02, 4th; half a second ahead of Maggie Callahan; first woman
+2009-08-08, 38, 13.112,  90.13,  6.87,  85.50,  6.52, Santa Claus Half, 38.06, 
+2009-08-15, 38,  6.837,  45.30,  6.63,  43.05,  6.30, Run Lu Lu Run, 38.08, 2nd; after I had moved from 4th to 1st on the ascent. The flat road at the bottom was just too long.
+2009-08-16, 38,  6.215,  45.87,  7.38,  43.33,  6.97, Run for the Refuge, 38.08, Caught up to Heather Best and Kristen Rozell; who were running together; about half way
+2009-09-12, 38, 12.100,  80.93,  6.69,  76.83,  6.35, Final leg of Skagway-Whitehorse Klondike Relay, 38.15, 
+2009-09-18, 38, 26.224, 229.19,  8.74, 214.20,  8.17, Equinox Marathon, 38.17, BEST EVER TIME; 39th
+2009-10-24, 38,  6.800,  46.05,  6.77,  43.65,  6.42, Cache Creek Warm-up, 38.27, 2nd; having been 5th at the half way. 4 minutes behind Stian Stensland though.
+2009-12-05, 38,  4.351,  47.70, 10.96,  43.73, 10.05, Heart of Darkness Snowshoe, 38.38, 7th;
+2010-03-16, 38,  3.000,  20.00,  6.67,  18.92,  6.31, UAF campus lunch run, 38.65, 
+2010-03-18, 38,  3.000,  18.50,  6.17,  17.57,  5.86, UAF campus afternoon run, 38.67, 
+2010-03-24, 38,  4.310,  32.05,  7.44,  30.10,  6.98, West Ridge Lunch Run, 38.68, 
+2010-04-01, 38,  3.000,  19.12,  6.37,  18.12,  6.04, UAF campus run, 38.71, 
+2010-04-03, 38,  6.215,  39.43,  6.34,  37.37,  6.01, Spring Fling, 38.71, 5th
+2010-04-10, 38,  3.108,  18.47,  5.94,  17.55,  5.65, Beet Beethoven, 38.73, 
+2010-05-09, 38, 11.000,  83.88,  7.63,  78.58,  7.14, Murphy Dome Roam, 38.81, 
+2010-06-19, 38,  6.215,  41.27,  6.64,  38.92,  6.26, Midnight Sun Run, 38.92, Started with a crooked left ankle; sort of hobbling. Kept up with lead women for 2-3 miles; then slowed.
+2010-07-01, 38,  1.000,   5.23,  5.23,   5.00,  5.00, Flint Hills Mile, 38.95, A distant 5th; with a pack behind me
+2010-07-17, 38,  4.972,  29.50,  5.93,  27.98,  5.63, Valkyeries, 39.00, 7th.
+2010-07-24, 39,  1.000,   5.25,  5.25,   5.00,  5.00, Golden Mile, 39.02, 1st place 
+2010-07-25, 39, 16.300, 117.04,  7.18, 109.83,  6.74, Gold Discovery., 39.02, 5th. Met Sarah Palin after the race at Governor's Picnic. She served me a burger.
+2010-08-07, 39, 13.112,  89.02,  6.79,  83.78,  6.39, Santa Claus Half, 39.05, 9th.
+2010-08-28, 39,  3.108,  21.12,  6.80,  19.87,  6.39, Birch Hill 5k, 39.11, 9th. Slipping ans sliding in the mud. Needed spikes.
+2010-09-18, 39, 26.224, 239.78,  9.14, 220.90,  8.42, Equinox Marathon, 39.17, 
+2011-05-15, 39, 11.000,  76.80,  6.98,  71.67,  6.52, Murphy Dome Roam, 39.82, 
+2011-05-28, 39,  6.700,  59.90,  8.94,  54.85,  8.19, Annihilator, 39.86, MAJOR RIGHT ANKLE SPRAIN Less than 1 mile from finish (I had caught David Fee who finished 4 minutes ahead of me)
+2011-07-23, 40,  1.000,   5.57,  5.57,   5.27,  5.27, Golden Mile, 40.01, 1st place again; Defended my title
+2012-05-09, 40,  3.108,  21.95,  7.06,  20.27,  6.52, Chena River Run, 40.81, Ran with Steve McNutt to about the half-way point; then things loosened up and  I sped up. Steve finished in 26:08
+2012-06-23, 40,  6.215,  41.29,  6.64,  38.28,  6.16, Midnight Sun Run, 40.93, 
+2012-06-28, 40,  1.000,   5.62,  5.62,   5.27,  5.27, Flint Hills Mile, 40.94, 
+2012-07-14, 40,  5.370,  34.30,  6.39,  31.87,  5.93, Valkyries, 40.99, Did an extra 0.37 miles
+2012-07-21, 41,  1.000,   5.50,  5.50,   5.17,  5.17, Golden Mile, 41.01, Christi Smitz was first woman for 2nd year in a row in around 5:43. I was 4th; after winning the two years before.
+2012-07-22, 41, 16.300, 143.36,  8.80, 129.72,  7.96, Gold Discovery Run, 41.01, Had to walk the last mile
+2012-08-04, 41, 13.112, 107.82,  8.22,  98.13,  7.48, Santa Claus Half, 41.05, Had to walk/jog/stretch first 6 miles due to pulled right calf
+2012-08-25, 41,  3.108,  20.40,  6.57,  18.90,  6.08, Birch Hill 5k, 41.10, 
+2012-09-15, 41, 26.224, 261.70,  9.98, 233.37,  8.90, Equinox Marathon, 41.16, My slowest but funnest Equinox so far. 
+2012-09-22, 41,  3.108,  19.92,  6.41,  18.47,  5.94, Troth Yeddha 5k at UAF, 41.18, 2nd. Anna Worden was 4th (1st woman). Bruce Sackinger; Dave ? And Dave Leonard also in top 10.
+2012-10-27, 41, 10.000,  68.85,  6.88,  63.47,  6.35, Halloween Run, 41.27, 3rd behind Ted Alder and Patrik Sartz
+2013-04-13, 41,  3.108,  19.86,  6.39,  18.33,  5.90, Beat Beethoven, 41.74, 
+2013-06-22, 41,  6.215,  41.17,  6.62,  37.83,  6.09, Midnight Sun Run, 41.93, 
+2013-06-27, 41,  1.000,   5.46,  5.46,   5.08,  5.08, Flint Hills Mile, 41.94, 
+2013-07-20, 42,  1.000,   5.35,  5.35,   4.98,  4.98, Golden Mile, 42.01, 
+2013-07-27, 42,  3.108,  21.00,  6.76,  19.25,  6.19, Chena Lakes Triathlon Sprint Triathlon, 42.02, From memory. Do not have exact results. I do remember that Elena; Serge and their kids were there.
+2013-07-14, 41, 13.112, 138.95, 10.60, 121.68,  9.28, Sourdough Triathlon, 41.99, 
+2014-04-06, 42,  3.108,  19.83,  6.38,  18.15,  5.84, Donate Life USF 5k, 42.72, 
+2014-05-18, 42, 11.000,  88.05,  8.00,  78.80,  7.16, Murphy Dome Roam, 42.83, 
+2014-05-26, 42,  1.000,   5.43,  5.43,   5.03,  5.03, Flint Hills Mile, 42.86, 
+2014-06-21, 42,  6.215,  40.81,  6.57,  37.18,  5.98, Midnight Sun Run, 42.92, 
+2014-07-12, 42,  6.215,  44.98,  7.24,  40.60,  6.53, North Pole Triathlon, 42.98, 
+2014-09-06, 43,  4.000,  41.00, 10.25,  35.50,  8.88, Mud Titan  Plant City, 43.14, 
+2014-12-18, 43,  3.108,  18.93,  6.09,  17.30,  5.57, AGU Run, 43.42, 
+2015-11-29, 44, 26.224, 267.83, 10.21, 228.12,  8.70, Spacecoast Marathon, 44.36, Signed up less than 24 hours before; without training. Took first 10k very slow.
+2016-04-16, 44,  3.107,  26.38,  8.49,  22.95,  7.39, Escape from Fort de Soto, 44.75, 
+2016-05-07, 44,  3.108,  19.88,  6.40,  17.85,  5.74, Chena River Run, 44.80, Max 19:08; Dave L 20:08; Greg Finstad 20:54; Manx Quayle 20:42; Becca Rolph 20:56
+2016-05-31, 44,  4.530,  48.52, 10.71,  40.73,  8.99, Masochism on Moose Mtn, 44.87, Drew 36:36; Simon M 36:50; Joel H 39:53; Ted 41:57; Tom M 43:38; Mike Hayes 44:19; Melissa 39:53; Ellen 50:14; Erin 51:48
+2016-06-18, 44,  6.215,  41.13,  6.62,  36.77,  5.92, Midnight Sun Run, 44.92, Dave L 41:57; Dave Maxwell 42:24; Krista Herringa 42:36; Beth Zirbes 44:29; Ed D 45:28
+2016-05-13, 44,  3.108,  22.00,  7.08,  19.55,  6.29, West Ridge Lunch Run 5k, 44.82, Max 20:18; Dave Fee 20:46; Tom Moran 21:28; Dave L 21:59; Krista Herringa 22:58; Taryn 23:17; Ned 25:46
+2016-06-26, 44,  6.215,  42.80,  6.89,  38.08,  6.13, Prestwold Air Ambulance 10k, 44.94, Emily Ault 39:52; Dave Goddard 40:17; Lloyd Bowler 43:15; Monique 46:16; Dawn Storer 46:34
+2016-08-09, 45,  5.000,  34.15,  6.83,  30.38,  6.08, 3 club challenge, 45.06, 
+2016-08-23, 45,  3.108,  23.58,  7.59,  20.72,  6.67, Morning track run USF, 45.10, 
+2016-08-27, 45,  3.108,  29.85,  9.61,  25.40,  8.17, 5k on Clearwater Beach, 45.11, 
+2016-09-22, 45,  3.470,  23.65,  6.82,  21.02,  6.06, Tempo run, 45.18, 
+2016-11-24, 45,  3.108,  22.20,  7.14,  19.60,  6.31, Thanksgiving Turkey Trot, 45.35, 
+2016-11-24, 45,  1.000,   5.57,  5.57,   5.05,  5.05, Thanksgiving Turkey Trot, 45.35, 
+2016-11-24, 45,  6.215,  42.87,  6.90,  37.98,  6.11, Thanksgiving Turkey Trot, 45.35, 
+2016-12-26, 45,  6.000,  42.15,  7.02,  37.25,  6.21, Barrow Boxing Day Handicap, 45.44, 
+2017-02-26, 45,  3.200,  23.08,  7.21,  20.30,  6.34, Flatwoods levee tempo run, 45.61, 
+2017-07-04, 45,  3.108,  20.20,  6.50,  17.92,  5.77, Independence Day 5k  Fairbanks  AK, 45.96, 
+2017-10-01, 46,  3.108,  20.53,  6.61,  18.13,  5.84, fort de soto 5k & 15k, 46.20, Emily Cerrito 23:55; Michelle Saunders 28:21; Faye Ricker 39:00
+2017-11-11, 46,  6.215,  44.35,  7.14,  38.77,  6.24, Trot thru the terrace, 46.32, Emily Cerrito 51:38; Charlie Breithaupt 49:55
+2018-03-13, 46,  6.000,  41.98,  7.00,  36.67,  6.11, Run on the shutle landing facility , 46.65, 
+2018-06-09, 46,  6.215,  60.70,  9.77,  50.33,  8.10, Santa Rosa Olympic Triathlon 1500m swim  25 mile ride  10k run, 46.89, 
+2018-07-07, 46,  6.215,  48.32,  7.77,  41.48,  6.67, Multirace Fort de Soto Tri #1, 46.97, 
+2018-08-18, 47,  6.215,  48.43,  7.79,  41.52,  6.68, Multirace Fort de Soto Tri #2, 47.08, 
+2018-09-15, 47,  6.215,  48.30,  7.77,  41.38,  6.66, Multirace Fort de Soto Tri #3, 47.16, 
+2019-02-10, 47,  9.323,  79.40,  8.52,  66.78,  7.16, Trout Creek 15km trail race, 47.56, 
+2019-06-06, 47,  1.000,   5.72,  5.72,   5.07,  5.07, Jim Loftus Mile, 47.89, 1:28 1:31 1:27 1:18
+2019-07-13, 47,  3.108,  21.65,  6.97,  18.67,  6.01, Multirace Fort de Soto Tri #1, 47.99, 
+2019-08-03, 48,  3.108,  24.03,  7.73,  20.42,  6.57, Multirace Fort de Soto Tri #2, 48.04, 
+2019-09-14, 48,  3.108,  22.97,  7.39,  19.62,  6.31, Multirace Fort de Soto Tri #3, 48.16, 
+2020-07-07, 48,  3.108,  22.18,  7.14,  18.88,  6.08, Fast tempo run  Babe Zaharias golf course, 48.97, 
+2021-04-24, 49,  3.108,  20.75,  6.68,  17.70,  5.70, Clearwater running festival 5k, 49.77, 
+2021-07-18, 50,  1.000,   5.98,  5.98,   5.17,  5.17, 50th birthday foot race, 50.00, Mitch 6:10; charlie maybe 6:30
+2021-10-23, 50,  6.215,  43.97,  7.07,  37.00,  5.95, Fast tempo run  Lake Carrollwood, 50.26, 
+2021-11-06, 50,  6.215,  43.00,  6.92,  36.30,  5.84, Trot thru the terrace, 50.30, 2nd overall after chasing down a 57-year-old geologist called Matt; and only 10-seconds behind the winner. negative splits; when adjusted for hills. First woman was a USF chemistry freshman in 49 minutes.
+2021-11-13, 50,  6.215,  42.05,  6.77,  35.62,  5.73, St Pete Run Festival, 50.32, Mitch 43:50; Emily 51:30
