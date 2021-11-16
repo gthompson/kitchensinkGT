@@ -8,7 +8,8 @@ all_sfiles = []
 all_DSN_wavfiles = []
 all_ASN_wavfiles = []
 all_subclasses = []
-os.chdir('/Users/thompsong/DATA/MVO/')
+HOME = os.getenv('HOME')
+os.chdir(os.path.join(HOME, 'DATA', 'MVO'))
 print('Directory, cum_N_sfiles, cum_N_DSN_wavfiles, cum_N_DSN_traces, cum_N_ASN_wavfiles, cum_N_ASN_traces')
 for ydir in glob.glob('REA/MVOE_/????'):
     YYYY = ydir[-4:]
