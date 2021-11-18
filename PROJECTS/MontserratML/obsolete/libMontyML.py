@@ -3,7 +3,7 @@ from glob import glob
 import numpy as np
 import pandas as pd
 from IPython.display import clear_output
-from statsmodels.stats.weightstats import DescrStatsW
+#from statsmodels.stats.weightstats import DescrStatsW
 from obspy.core import read
 import matplotlib.pyplot as plt
 
