@@ -22,8 +22,8 @@ from libMVO import fix_trace_id, inventory_fix_id_mvo, load_mvo_inventory
 #from statsmodels.stats.weightstats import DescrStatsW
 #from obspy.core import read
 #import matplotlib.pyplot as plt
-cwd = os.getcwd()
-sys.path.append(cwd)
+CWD = os.getcwd() # might need to pass explicitly to qc_event()
+sys.path.append(CWD)
 
 # IMPORTS END ############################################
 ##########################################################
@@ -198,8 +198,8 @@ def _select_best_events(df, allowed_subclasses, N=100, exclude_checked=True):
                 df_subclass.sort_values(by=['sortcol'], ascending=False, inplace=True)
                 df_subclass.drop(columns=['sortcol'], inplace=True)
                 df_subclass = df_subclass.head(H)
-                if 'bandratio_[1.0_6.0_11.0]' in df_subclass.columns:
-                    df_subclass.rename(columns = {'bandratio_[1.0_6.0_11.0]':'band_ratio'}, inplace = True)
+                #if 'bandratio_[1.0_6.0_11.0]' in df_subclass.columns:
+                #    df_subclass.rename(columns = {'bandratio_[1.0_6.0_11.0]':'band_ratio'}, inplace = True)
                 best_events_dict[subclass]=df_subclass
 
     return best_events_dict
@@ -219,10 +219,11 @@ def get_fingerprints(dfall, allowed_subclasses, N=100, exclude_checked=False):
             #df_subclass = df.get_group(subclass)
             df_subclass = best_events_dict[subclass]     
             fingerprints[subclass] = df_subclass[[ 'peaktime', 
-                'kurtosis', 'medianF', 'peakF', 'bw_min', 'bw_max', 'band_ratio']].describe()
+                'kurtosis', 'medianF', 'peakF', 'bw_min', 'bw_max', 'bandratio_[1.0_6.0_11.0]']].describe()
             #print(fingerprints[subclass])
         else:
-            fingerprints[subclass]=pd.read_csv('fingerprint_%s.csv' % subclass)
+            if os.path.exists('fingerprint_%s.csv' % subclass):
+                fingerprints[subclass]=pd.read_csv('fingerprint_%s.csv' % subclass)
     return fingerprints
 
 """    
@@ -260,11 +261,11 @@ def get_weighted_fingerprints(dfall, subclasses_for_ML, N=300, exclude_checked=F
 def save_fingerprints(fingerprints, allowed_subclasses):
     for subclass in allowed_subclasses:
         if subclass in fingerprints.keys(): 
-            fingerprints[subclass].to_csv('fingerprint_%s.csv' % subclass)
+            _df2csv_without_index(fingerprints[subclass], 'fingerprint_%s.csv' % subclass)
             
 #
 
-def _select_next_event(dfall, subclasses_for_ML):
+def select_next_event(dfall, subclasses_for_ML):
     """ The goal here is just to pick the next event of a particular subclass from the unchecked events """
     checked = dfall[dfall['checked']==True]
     unchecked = dfall[dfall['checked']==False]
@@ -304,10 +305,10 @@ def _select_next_event(dfall, subclasses_for_ML):
             #df.drop(columns=['include'], inplace=True)
             df.sort_values(by=['sortcol'], ascending=False, inplace=True)
             df.drop(columns=['sortcol'], inplace=True)
-            df = df.head(1)
-            if 'bandratio_[1.0_6.0_11.0]' in df.columns:
-                df.rename(columns = {'bandratio_[1.0_6.0_11.0]':'band_ratio'}, inplace = True)
-            return df
+            #df = df.head(1)
+            #if 'bandratio_[1.0_6.0_11.0]' in df.columns:
+            #    df.rename(columns = {'bandratio_[1.0_6.0_11.0]':'band_ratio'}, inplace = True)
+            return df.index[0] # a WAVfile path
         else:
             subclasses.remove(nextclass)
     return None
@@ -378,17 +379,23 @@ def plot_amplitude_locations(st):
 
 #
 
+"""
 def _guess_subclass(row, fingerprints, subclasses_for_ML):
     chance_of = {}
     for item in subclasses_for_ML:
         chance_of[item]=0.0
-    
-    params = ['peaktime', 'kurtosis', 'medianF', 'peakF', 'bw_min', 'bw_max', 'band_ratio']
+    print(row)
+    #params = ['peaktime', 'kurtosis', 'medianF', 'peakF', 'bw_min', 'bw_max', 'band_ratio']
     for subclass in fingerprints.keys():
         fingerprint = fingerprints[subclass]
         #fingerprint.reset_index(inplace=True)
         #print(fingerprint.columns)
-        for param in params:
+        print(fingerprint)
+        print(fingerprint.columns)
+        print(fingerprint.index)
+        #for param in params:
+        for param in fingerprint.columns:
+            print(param)
             thisval = row[param]
             
             # test against mean+/-std
@@ -419,145 +426,193 @@ def _guess_subclass(row, fingerprints, subclasses_for_ML):
     for subclass in chance_of.keys():
         if total>0:
             print('%s: %.0f' % (subclass, 100*chance_of[subclass]/total), end=', ')
+"""
+
+def _guess_subclass(row, fingerprints, subclasses_for_ML):
+    chance_of = {}
+    #print(row)
+    for item in subclasses_for_ML:
+        chance_of[item]=0.0
+    for subclass in fingerprints.keys():
+        fingerprint = fingerprints[subclass]
+        for param in fingerprint.columns:
+            thisval = row[param] # the value of this parameter for the event
             
+            # test against mean+/-std
+            meanval = fingerprint.loc['mean', param]
+            stdval = fingerprint.loc['std', param]
+            minus1sigma = meanval - stdval
+            plus1sigma = meanval + stdval
+            
+            if thisval > minus1sigma and thisval < plus1sigma:
+                weight = 1.0 - abs(thisval-meanval)/stdval
+                chance_of[subclass] += weight
+                
+            # test against 25-75% percentile
+            medianval = fingerprint.loc['50%',param]
+            val25 = fingerprint.loc['25%',param]
+            val75 = fingerprint.loc['75%',param]
+            if thisval > val25 and thisval < val75:
+                if thisval < medianval:
+                    weight = 1.0 - (medianval-thisval)/(medianval-val25)
+                else:
+                    weight = 1.0 - (thisval-medianval)/(val75-medianval)
+                chance_of[subclass] += weight
+    
+    print('The event is classified as %s, but here are our guesses:' % row['subclass'])
+    total = 0
+    for subclass in chance_of.keys():
+        total += chance_of[subclass]
+    for subclass in chance_of.keys():
+        if total>0:
+            print('%s: %.0f' % (subclass, 100*chance_of[subclass]/total), end=', ')
+
+
 #
+from pathlib import Path
+def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station_locationsDF):
+    
+    subclass = df.loc[thiswav, 'new_subclass']
+    empty_df = pd.DataFrame()
+    p = Path(thiswav)
+    picklepath = os.path.join(pandaSeisDBDir, p.parts[-3], p.parts[-2], p.parts[-1] + '.pickle')
 
-def qc_event(dfall, subclasses_for_ML, seisan_subclasses, fingerprints, SEISAN_DATA, station_locationsDF):
-    df = _select_next_event(dfall, subclasses_for_ML)
-    df['path'] = df.index
-    subclass = df.iloc[0]['new_subclass']
+    if os.path.exists(picklepath):
 
-    for index, row in df.iterrows():
-        #clear_output(wait=True)
-        
-        picklepath = os.path.join(SEISAN_DATA, row.path.replace('./WAV','PICKLE') + '.pickle')
-        
-        if os.path.exists(picklepath):
-            
-            # plot whole event file
-            st = read(picklepath) #.select(station='MBWH')
-            st.filter('bandpass', freqmin=0.5, freqmax=25.0, corners=4)
-            _deconvolve_instrument_response(st)
+        # plot whole event file
+        st = read(picklepath) #.select(station='MBWH')
+        st.filter('bandpass', freqmin=0.5, freqmax=25.0, corners=4)
+        _deconvolve_instrument_response(st)
 
-            # compute ampeng to show later
-            traceids = []
-            energies = []
-            amplitudes = []
-            for tr in st:
-                amp = np.max(np.absolute(tr.data))
-                energy = np.sum(np.square(tr.data))/tr.stats.sampling_rate
-                traceids.append(tr.id)
-                amplitudes.append(amp)
-                energies.append(energy)
-            dfenergy = pd.DataFrame()
-            dfenergy['traceID']=traceids
-            dfenergy['amplitude']=amplitudes
-            dfenergy['energy']=energies
-            dfenergy.sort_values(by=['amplitude'],ascending=False,inplace=True)
-            suggested_weight = None
-            if st[0].stats.units == 'Counts':
-                suggested_weight = int(np.log10(dfenergy.iloc[0]['energy']/2)) # works with uncorrected data in Counts only
-            
-            # plot all
-            st.plot(equal_scale=False, outfile='current_event.png');
+        # compute ampeng to show later
+        traceids = []
+        energies = []
+        amplitudes = []
+        for tr in st:
+            amp = np.max(np.absolute(tr.data))
+            energy = np.sum(np.square(tr.data))/tr.stats.sampling_rate
+            traceids.append(tr.id)
+            amplitudes.append(amp)
+            energies.append(energy)
+        dfenergy = pd.DataFrame()
+        dfenergy['traceID']=traceids
+        dfenergy['amplitude']=amplitudes
+        dfenergy['energy']=energies
+        dfenergy.sort_values(by=['amplitude'],ascending=False,inplace=True)
+        suggested_weight = None
+        if st[0].stats.units == 'Counts':
+            suggested_weight = int(np.log10(dfenergy.iloc[0]['energy']/2)) # works with uncorrected data in Counts only
 
-            # also plot a fixed 30-seconds around the peaktime
-            starttime = st[0].stats.starttime + row['peaktime']-10
-            endtime = starttime + 20
-            st.trim(starttime=starttime, endtime=endtime, pad=True, fill_value=None)
-            st.plot(equal_scale=False, outfile='current_event_zoomed.png')                  
+        # plot all
+        st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event.png'));
 
-            # Show a map of amplitude distribution
-            try:
-                add_station_locations(st, station_locationsDF)
-                plot_amplitude_locations(st)
-            except:
-                pass
+        # also plot a fixed 30-seconds around the peaktime
+        #starttime = st[0].stats.starttime + df.iloc[0,'peaktime']-10
+        starttime = st[0].stats.starttime + df.loc[thiswav,'peaktime']-10
+        endtime = starttime + 20
+        st.trim(starttime=starttime, endtime=endtime, pad=True, fill_value=None)
+        st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event_zoomed.png'))                  
 
-            # show webpage
-            if sys.platform=='linux':
-                os.system("xdg-open current_event.html")
-            elif sys.platform=='darwin':
-                os.system("open current_event.html")
+        # Show a map of amplitude distribution
+        try:
+            add_station_locations(st, station_locationsDF)
+            plot_amplitude_locations(st)
+        except:
+            pass
 
-            # TEXT OUTPUT STARTS HERE
-            print(' ')
-            #print('Checked events currently:')
-            #print(dfall[dfall['checked']==True].groupby('new_subclass').size())
-            #print(row)
-            #print(' ')
-            print('Loaded %s' % picklepath)
-            
-            # station amplitudes and energies
-            #print(dfenergy)
+        # show webpage
+        if sys.platform=='linux':
+            os.system("xdg-open current_event.html")
+        #elif sys.platform=='darwin': # does not work, so just manually open current_event.html instead
+        #    os.system("open current_event.html")
 
-            # trace df metrics
-            csvpath = picklepath.replace('.pickle', '.csv')
-            tracedf = pd.read_csv(csvpath)
-            if 'bandratio_[1.0_6.0_11.0]' in tracedf.columns:
-                tracedf.rename(columns = {'bandratio_[1.0_6.0_11.0]':'band_ratio'}, inplace = True)
-            tracedf.sort_values(by=['peakamp'], ascending=False, inplace=True)
-            print(' ')
-            print(tracedf[['id', 'medianF', 'bw_min', 'peakF', 'bw_max', 'band_ratio', 'kurtosis']])
+        # TEXT OUTPUT STARTS HERE
+        print(' ')
+        #print('Checked events currently:')
+        #print(dfall[dfall['checked']==True].groupby('new_subclass').size())
+        #print(row)
+        #print(' ')
+        print('Loaded %s' % picklepath)
 
-            # fingerprint guesses
-            print(' ')
-            _guess_subclass(row, fingerprints, subclasses_for_ML)
-            print(suggested_weight)
+        # station amplitudes and energies
+        #print(dfenergy)
 
-            # Input
-            checked = False
-            print(' ')
-            print('RECLASSIFY')
-            print('Valid subclasses according to VOLCANO.DEF are: ', seisan_subclasses, end = ' ' )
-            print('e.g. l, 75, h, 25, 6')
-            #print('To enter percentage probabilities, e.g. 75% l, 25%h, enter l, 75, h, 25')
-            #print('Optionally add a weight [0-9] too with a trailing integer, e.g. l, 75,  h, 25, 5')
-            #print('Or:\n\ts = mark event for splitting')
-            #print('\td = mark event for deletion')
-            #print('\ti = ignore event')
-            #print('\tq = quit')
-            print('Or s=split, d=delete, i=ignore, q=quit')
+        # trace df metrics
+        csvpath = picklepath.replace('.pickle', '.csv')
+        tracedf = pd.read_csv(csvpath)
+        #if 'bandratio_[1.0_6.0_11.0]' in tracedf.columns:
+        #    tracedf.rename(columns = {'bandratio_[1.0_6.0_11.0]':'band_ratio'}, inplace = True)
+        tracedf.sort_values(by=['peakamp'], ascending=False, inplace=True)
+        print(' ')
+        #print(tracedf[['id', 'medianF', 'bw_min', 'peakF', 'bw_max', 'band_ratio', 'kurtosis']])
+        print(tracedf[['id', 'medianF', 'bw_min', 'peakF', 'bw_max', 'bandratio_[1.0_6.0_11.0]', 'kurtosis']])
 
-            try:                       
-                new_subclass = input('\t ?') 
-                if not new_subclass:
-                    new_subclass = subclass
-                if new_subclass == 'q': 
-                    return df, True
-                if new_subclass == 's':
-                      df.loc[index, 'split'] = True
-                      checked = True
-                if new_subclass == 'i':
-                      df.loc[index, 'ignore'] = True 
-                      checked = True
-                if new_subclass == 'd':
-                      df.loc[index, 'delete'] = True 
-                      checked = True
-                if not checked:                         
-                    if not ',' in new_subclass: # convert to a subclass, percentage string
-                        new_subclass = new_subclass + ', 100'
-                    spl = new_subclass.split(',') # split string to subclass probability list 
-                    if len(spl) % 2 == 1:
-                        df.loc[index, 'weight'] = int(spl.pop())
-                    spd = {spl[a].strip():spl[a + 1] for a in range(0, len(spl), 2)} # subclass probability dict
-                    for key in subclasses_for_ML:
-                        if key in spd.keys():
-                            df.loc[index, key] = int(spd[key])
-                            print(key, int(spd[key]) )
-                        else:
-                            df.loc[index, key] = 0
-                    keymax = max(spd, key=spd.get)
-                    print('new_subclass = ',keymax)
-                    df.loc[index, 'new_subclass']=keymax  
-                    checked = True
-                if checked:
-                    df.loc[index, 'checked']=True
-            except:
-                print('Input may have been faulty. Skipping event')
-                return False
-    df.drop(columns=['path'])                
-    return df, False   
+        # fingerprint guesses
+        print(' ')
+        _guess_subclass(df.loc[thiswav], fingerprints, subclasses_for_ML)
+        print(suggested_weight)
+
+        # Input
+        checked = False
+        print(' ')
+        print('RECLASSIFY')
+        print('Valid subclasses according to VOLCANO.DEF are: ', seisan_subclasses, end = ' ' )
+        print('e.g. l, 75, h, 25, 6')
+        #print('To enter percentage probabilities, e.g. 75% l, 25%h, enter l, 75, h, 25')
+        #print('Optionally add a weight [0-9] too with a trailing integer, e.g. l, 75,  h, 25, 5')
+        #print('Or:\n\ts = mark event for splitting')
+        #print('\td = mark event for deletion')
+        #print('\ti = ignore event')
+        #print('\tq = quit')
+        print('Or s=split, d=delete, i=ignore, q=quit')
+
+        try:                       
+            new_subclass = input('\t ?') 
+            if not new_subclass:
+                new_subclass = subclass
+            if new_subclass == 'q': # GOOD, QUITTING
+                #return empty_df, True
+                return True
+            if new_subclass == 's':
+                  df.loc[thiswav, 'split'] = True
+                  checked = True
+            if new_subclass == 'i':
+                  df.loc[thiswav, 'ignore'] = True
+                  checked = True
+            if new_subclass == 'd':
+                  df.loc[thiswav, 'delete'] = True
+                  checked = True
+            if not checked:                         
+                if not ',' in new_subclass: # convert to a subclass, percentage string
+                    new_subclass = new_subclass + ', 100'
+                spl = new_subclass.split(',') # split string to subclass probability list 
+                if len(spl) % 2 == 1:
+                    df.loc[thiswav, 'weight'] = int(spl.pop())
+                spd = {spl[a].strip():spl[a + 1] for a in range(0, len(spl), 2)} # subclass probability dict
+                for key in subclasses_for_ML:
+                    if key in spd.keys():
+                        df.loc[thiswav, key] = int(spd[key])
+                        print(key, int(spd[key]) )
+                    else:
+                        df.loc[thiswav, key] = 0
+                keymax = max(spd, key=spd.get)
+                print('new_subclass = ',keymax)
+                df.loc[thiswav, 'new_subclass']=keymax 
+                checked = True
+            if checked:
+                df.loc[thiswav, 'checked']=True
+        except: # BAD
+            print('Input may have been faulty. Skipping event')
+            #return empty_df, False
+            return False
+        else: # GOOD - RECLASSIFIED
+            #df.drop(columns=['path'])                
+            #return df, False     
+            return False
+    else: # BAD
+        print("%s not found" % picklepath)
+        #return empty_df, False
+        return False
 
 #
 
@@ -711,7 +766,7 @@ def to_AAA(df, subclasses_for_ML, outfile, ignore_extra_columns=True):
     
     if os.path.exists(outfile):
         outfile_old = outfile + '.old'
-        os.system(outfile, outfile_old)
+        os.system("cp %s %s" % (outfile, outfile_old))
     _df2csv_without_index(dfAAA, outfile)
     print('Catalog CSV saved to ',outfile)
     
@@ -816,6 +871,7 @@ else: # create one
         exit()
     
 # ensure we always have the same index and columns
+'''
 correct_columns = ['filetime', 'Fs', 'bandratio_[0.8_4.0_16.0]',
        'bandratio_[1.0_6.0_11.0]', 'bw_max', 'bw_min', 'calib',
        'cft_peak_wmean', 'cft_std_wmean', 'coincidence_sum', 'day',
@@ -828,6 +884,24 @@ correct_columns = ['filetime', 'Fs', 'bandratio_[0.8_4.0_16.0]',
        'snr', 'subclass', 'trigger_duration', 'year', 'D', 'R',
        'r', 'e', 'l', 'h', 't', 'new_subclass', 'weight', 'checked', 'split',
        'delete', 'ignore'] # removed starttime
+       '''
+correct_columns = ['filetime', 'path', 'sfile', 'num_traces', 'Fs', 'calib', 
+                   'subclass', 'new_subclass', 'quality', 'weight',
+                   'checked', 'split', 'delete', 'ignore',
+                   'D', 'R', 'r', 'e', 'l', 'h', 't',
+                   'year', 'month', 'day', 'hour', 'minute', 'second',
+                   'peaktime', 'peakA', 'peakamp', 'energy',
+                   'signal_level', 'noise_level', 'snr',
+                   'peakF', 'medianF', 'bandratio_[0.8_4.0_16.0]', 'bandratio_[1.0_6.0_11.0]', 'bw_max', 'bw_min',
+                   'sample_min', 'sample_max', 'sample_mean',
+                   'sample_rms', 'sample_stdev',
+                   'sample_lower_quartile', 'sample_median', 'sample_upper_quartile',
+                   'kurtosis', 'skewness',
+                   'num_gaps', 'percent_availability',                   
+                   'trigger_duration', 'ontime', 'offtime', 
+                   'cft_peak_wmean', 'cft_std_wmean', 'coincidence_sum',
+                   'detection_quality'] # removed starttime
+
 dfall = dfall[correct_columns] # subset to correct columns
 dfall.set_index('path', inplace=True) # try this
 dfall.sort_index(inplace=True)   
@@ -843,19 +917,31 @@ while iterate_again:
     fingerprints = get_fingerprints(dfall, subclasses_for_ML, N=100, exclude_checked=False)
     save_fingerprints(fingerprints, subclasses_for_ML)
     
+    # get index (path) of next event
+    nextwav = select_next_event(dfall, subclasses_for_ML)
+    
     # manually QC the next event. each time we choose the class with least checked examples
-    one_event_df, quit = qc_event(dfall, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station_locationsDF)
-    if isinstance(one_event_df, pd.DataFrame):
+    #one_event_df, bool_quit = qc_event(dfall, nextwav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station_locationsDF)
+    bool_quit = qc_event(dfall, nextwav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station_locationsDF)
+    """
+    #if isinstance(one_event_df, pd.DataFrame):
+    if len(one_event_df)>0:
         # now we must merge this back into dfall
         #dfall.sort_index(inplace=True)
         dfall.update(one_event_df)  
     
         # save the modified dataframe catalog  
-        _df2csv_without_index(dfall, master_event_catalog)
+        #_df2csv_without_index(dfall, master_event_catalog)
+        tempcat = os.path.basename(master_event_catalog).replace('.csv','.pkl')
+        dfall.to_pickle(tempcat)
     else:
         iterate_again=False
-    if quit:
-        iterate_again=False 
+    """
+    if bool_quit:
+        iterate_again=False
+    else:
+        tempcat = os.path.basename(master_event_catalog).replace('.csv','.pkl')
+        dfall.to_pickle(tempcat)        
 
 # LOOPING ENDS HERE ######################################        
         
