@@ -14,11 +14,11 @@ import numpy as np
 import sys
 LIBpath = os.path.join( os.getenv('HOME'),'src','kitchensinkGT', 'LIB')
 sys.path.append(LIBpath)
-from libseisGT import add_to_trace_history #, mulplt
+from libseisGT import add_to_trace_history, plot_seismograms 
 from modutils import yn_choice
 #from IPython.display import clear_output
 from obspy import read_inventory #, remove_response
-from libMVO import fix_trace_id, inventory_fix_id_mvo, load_mvo_inventory
+from libMVO import fix_trace_id, inventory_fix_id_mvo, load_mvo_inventory, plot_station_amplitude_map
 #from statsmodels.stats.weightstats import DescrStatsW
 #from obspy.core import read
 #import matplotlib.pyplot as plt
@@ -109,59 +109,10 @@ def build_master_event_catalog(pandaSeisDBDir, SEISAN_DB, catalogfile, subclasse
     # Now we have a catalog dataframe we can work with. Let's save this.
     #dfall2 = dfall.reset_index()    
     #dfall2.to_csv(catalogfile)
-    _df2csv_without_index(dfall, catalogfile)
+    _df2file_without_index(dfall.copy(), catalogfile)
     
     return dfall
 
-#
-
-def parse_STATION0HYP(station0hypfile):
-    """ file sample
-    012345678901234567890123456 
-      MWNH1644.53N 6211.45W 407
-      MWNL1644.53N 6211.45W 407
-      MWZH1644.53N 6211.45W 407
-      MWZL1644.53N 6211.45W 407
-      0123456789012345678901234 
-    """
-    station_locations = []
-    if os.path.exists(station0hypfile):
-        fptr = open(station0hypfile,'r')
-        for line in fptr:
-            line = line.strip()
-            if len(line)==25:
-                station = line[0:4]
-                latdeg = line[4:6]
-                if latdeg != '16':
-                    print(line)
-                    continue
-                latmin = line[6:8]
-                latsec = line[9:11]
-                hemisphere = line[11]
-                if hemisphere == 'N':
-                    latsign = 1
-                elif hemisphere == 'S':
-                    latsign = -1 
-                else:
-                    print(line)
-                    continue
-                londeg = line[13:15]
-                lonmin = line[15:17]
-                lonsec = line[18:20]
-                lonsign = 1
-                if line[20]=='W':
-                    lonsign = -1
-                elev = line[21:25].strip()
-                station_dict = {}
-                station_dict['name'] = station
-                station_dict['lat'] = (float(latdeg) + float(latmin)/60 + float(latsec)/3600) * latsign
-                station_dict['lon'] = (float(londeg) + float(lonmin)/60 + float(lonsec)/3600) * lonsign
-                station_dict['elev'] = float(elev)
-                
-                station_locations.append(station_dict)
-        fptr.close()
-        return pd.DataFrame(station_locations)
-    
 #    
     
 def _select_best_events(df, allowed_subclasses, N=100, exclude_checked=True):
@@ -261,7 +212,7 @@ def get_weighted_fingerprints(dfall, subclasses_for_ML, N=300, exclude_checked=F
 def save_fingerprints(fingerprints, allowed_subclasses):
     for subclass in allowed_subclasses:
         if subclass in fingerprints.keys(): 
-            _df2csv_without_index(fingerprints[subclass], 'fingerprint_%s.csv' % subclass)
+            _df2file_without_index(fingerprints[subclass], 'fingerprint_%s.csv' % subclass)
             
 #
 
@@ -327,106 +278,16 @@ def _deconvolve_instrument_response(st):
             need_to_correct = True
         if need_to_correct:           
             if bool_correct_data: # try to find corresponding station XML
-                this_inv = load_mvo_inventory(tr, '/Users/thompsong/DATA/MVO/CAL')
+                this_inv = load_mvo_inventory(tr, os.path.join(SEISAN_DATA, 'CAL'))
         if this_inv and tr.stats['units'] == 'Counts':
             tr.remove_response(inventory=this_inv, output="VEL")
             tr.stats['units'] = 'm/s'
             add_to_trace_history(tr, 'deconvolved')
-        #else:
+        else:
+            print(tr.stats.units)
         #    st.remove(tr)
 
 #
-
-def add_station_locations(st, station_locationsDF):
-    for tr in st:
-        df = station_locationsDF[station_locationsDF['name'] == tr.stats.station]
-        df = df.reset_index()
-        if len(df.index)==1:
-            row = df.iloc[0]
-            tr.stats['lat'] = row['lat']
-            tr.stats['lon'] = row['lon']
-            tr.stats['elev'] = row['elev']
-        else:
-            print('Found %d matching stations' % len(index))
-
-#
-
-def plot_amplitude_locations(st):
-    plt.figure()
-    x = []
-    y = []
-    s = []
-    for tr in st:
-        if 'lon' in tr.stats:
-            x.append(tr.stats.lon)
-            y.append(tr.stats.lat)
-            s.append(np.max(np.absolute(tr.data)))
-    if len(s)>0:
-        maxs = np.max(s)
-        s = s/maxs * 50
-        plt.scatter(x, y, s, facecolors='none', edgecolors='r');
-        for i, label in enumerate(tr.stats.station):
-            #if tr.stats.channel[-1]=='Z':
-            plt.text(x[i]*1.01, y[i]*1.01, label)
-
-        volcano_dict = {}
-        volcano_dict['name']='VOLC'
-        volcano_dict['lat']=16.7166638
-        volcano_dict['lon']=-62.1833326
-        volcano_dict['elev']=1000
-        plt.scatter(volcano_dict['lon'], volcano_dict['lat'], 300, marker='*')
-        plt.show();
-
-#
-
-"""
-def _guess_subclass(row, fingerprints, subclasses_for_ML):
-    chance_of = {}
-    for item in subclasses_for_ML:
-        chance_of[item]=0.0
-    print(row)
-    #params = ['peaktime', 'kurtosis', 'medianF', 'peakF', 'bw_min', 'bw_max', 'band_ratio']
-    for subclass in fingerprints.keys():
-        fingerprint = fingerprints[subclass]
-        #fingerprint.reset_index(inplace=True)
-        #print(fingerprint.columns)
-        print(fingerprint)
-        print(fingerprint.columns)
-        print(fingerprint.index)
-        #for param in params:
-        for param in fingerprint.columns:
-            print(param)
-            thisval = row[param]
-            
-            # test against mean+/-std
-            meanval = fingerprint[param]['mean']
-            stdval = fingerprint[param]['std']
-            minus1sigma = meanval - stdval
-            plus1sigma = meanval + stdval
-            
-            if thisval > minus1sigma and thisval < plus1sigma:
-                weight = 1.0 - abs(thisval-meanval)/stdval
-                chance_of[subclass] += weight
-                
-            # test against 25-75% percentile
-            medianval = fingerprint[param]['50%']
-            val25 = fingerprint[param]['25%']
-            val75 = fingerprint[param]['75%']
-            if thisval > val25 and thisval < val75:
-                if thisval < medianval:
-                    weight = 1.0 - (medianval-thisval)/(medianval-val25)
-                else:
-                    weight = 1.0 - (thisval-medianval)/(val75-medianval)
-                chance_of[subclass] += weight
-    
-    print('The event is classified as %s, but here are our guesses:' % row['subclass'])
-    total = 0
-    for subclass in chance_of.keys():
-        total += chance_of[subclass]
-    for subclass in chance_of.keys():
-        if total>0:
-            print('%s: %.0f' % (subclass, 100*chance_of[subclass]/total), end=', ')
-"""
 
 def _guess_subclass(row, fingerprints, subclasses_for_ML):
     chance_of = {}
@@ -468,7 +329,6 @@ def _guess_subclass(row, fingerprints, subclasses_for_ML):
             print('%s: %.0f' % (subclass, 100*chance_of[subclass]/total), end=', ')
 
 
-#
 from pathlib import Path
 def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station_locationsDF):
     
@@ -504,21 +364,21 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
             suggested_weight = int(np.log10(dfenergy.iloc[0]['energy']/2)) # works with uncorrected data in Counts only
 
         # plot all
-        st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event.png'));
-
+        #st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event.png'), size=(600,100), method='full');
+        #st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event.png'), method='full');
+        plot_seismograms(st, outfile=os.path.join(CWD, 'current_event.png'))
         # also plot a fixed 30-seconds around the peaktime
         #starttime = st[0].stats.starttime + df.iloc[0,'peaktime']-10
         starttime = st[0].stats.starttime + df.loc[thiswav,'peaktime']-10
         endtime = starttime + 20
         st.trim(starttime=starttime, endtime=endtime, pad=True, fill_value=None)
-        st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event_zoomed.png'))                  
+        #st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event_zoomed.png'), size=(600,100), method='full')
+        #st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event_zoomed.png'), method='full');
+        plot_seismograms(st, outfile=os.path.join(CWD, 'current_event_zoomed.png'))
 
         # Show a map of amplitude distribution
-        try:
-            add_station_locations(st, station_locationsDF)
-            plot_amplitude_locations(st)
-        except:
-            pass
+        station0hypfile = os.path.join(SEISAN_DATA, 'DAT', 'STATION0_MVO.HYP')
+        plot_station_amplitude_map(st, station0hypfile=station0hypfile, outfile='current_map.png')
 
         # show webpage
         if sys.platform=='linux':
@@ -819,10 +679,16 @@ def _make_parent_dir(somefile):
         print('Cannot create directory for %s' % somefile)
         exit()        
 
-def _df2csv_without_index(df, csvfile):
+def _df2file_without_index(df, catfile, indexcol=None):
     df = df.reset_index()  
+    if indexcol:
+        if not indexcol in df.columns:
+            df.rename(columns = {'index':indexcol})
     df.drop(df.filter(regex="Unname"),axis=1, inplace=True)
-    df.to_csv(csvfile, index=False)
+    if catfile[-3:]=='csv':
+        df.to_csv(catfile, index=False)
+    if catfile[-3:]=='pkl':
+        df.to_pickle(catalog_pickle_file) 
 
 # FUNCTIONS END ##########################################
 ##########################################################
@@ -839,7 +705,8 @@ master_event_catalog_original = os.path.join(AAA_DATA_DIR, 'original', '%scatalo
 aaa_input_file = os.path.join(AAA_DATA_DIR, 'runAAA', '%slabelled_events.csv' % SEISAN_DB) 
 _make_parent_dir(master_event_catalog)
 _make_parent_dir(master_event_catalog_original)
-_make_parent_dir(aaa_input_file)    
+_make_parent_dir(aaa_input_file)
+catalog_pickle_file = os.path.basename(master_event_catalog).replace('.csv','.pkl') 
 
 # read items from Seisan software setup
 volcanodefcsv = 'CSVfiles/volcano_def.csv'
@@ -857,7 +724,9 @@ if not os.path.exists(station0hypfile):
 station_locationsDF = parse_STATION0HYP(station0hypfile)
 
 # Load a previously created master event catalog from AAA_DATA_DIR - or create a new one from pandaSeisDBDir
-if os.path.exists(master_event_catalog): # load the one that exists from AAA_DATA_DIR, and trim the columns
+if os.path.exists(catalog_pickle_file):
+    dfall = pd.read_pickle(catalog_pickle_file)    
+elif os.path.exists(master_event_catalog): # load the one that exists from AAA_DATA_DIR, and trim the columns
     dfall = pd.read_csv(master_event_catalog) # how do i ignore the index?
 else: # create one 
     print('%s does not exist, will try to create a new master event catalog from pandaSeisDBDir' % master_event_catalog)
@@ -901,7 +770,8 @@ correct_columns = ['filetime', 'path', 'sfile', 'num_traces', 'Fs', 'calib',
                    'trigger_duration', 'ontime', 'offtime', 
                    'cft_peak_wmean', 'cft_std_wmean', 'coincidence_sum',
                    'detection_quality'] # removed starttime
-
+print(dfall.columns)
+print(dfall.head)
 dfall = dfall[correct_columns] # subset to correct columns
 dfall.set_index('path', inplace=True) # try this
 dfall.sort_index(inplace=True)   
@@ -910,6 +780,7 @@ dfall.sort_index(inplace=True)
 # LOOPING BEGINS HERE ####################################
 
 iterate_again = True # changed this back to do the loop
+changes_made = False
 while iterate_again:
 
     # get/update the fingerprints of each event class
@@ -932,25 +803,35 @@ while iterate_again:
     
         # save the modified dataframe catalog  
         #_df2csv_without_index(dfall, master_event_catalog)
-        tempcat = os.path.basename(master_event_catalog).replace('.csv','.pkl')
-        dfall.to_pickle(tempcat)
+        catalog_pickle_file = os.path.basename(master_event_catalog).replace('.csv','.pkl')
+        dfall.to_pickle(catalog_pickle_file)
     else:
         iterate_again=False
     """
     if bool_quit:
         iterate_again=False
-    else:
-        tempcat = os.path.basename(master_event_catalog).replace('.csv','.pkl')
-        dfall.to_pickle(tempcat)        
+    else: # changes made
+        changes_made = True
+        _df2file_without_index(dfall.copy(), catalog_pickle_file, 'path')     
 
 # LOOPING ENDS HERE ######################################        
-        
-# remove events we marked for deletion, splitting or to ignore
-dfsubset = remove_marked_events(dfall)
 
-#to_AAA(dfsubset, subclasses_for_ML, aaa_infile, SEISAN_DATA, ignore_extra_columns=False)
-to_AAA(dfsubset, subclasses_for_ML, aaa_input_file, ignore_extra_columns=False)
 
-report_checked_events(dfall, subclasses_for_ML)
+# Save
+if changes_made:
+    print('Updating %s' % master_event_catalog)
+    _df2file_without_index(dfall, master_event_catalog, 'path')
+
+    # remove events we marked for deletion, splitting or to ignore
+    dfsubset = remove_marked_events(dfall)
+
+    #to_AAA(dfsubset, subclasses_for_ML, aaa_infile, SEISAN_DATA, ignore_extra_columns=False)
+    print('Updating %s' % aaa_input_file)
+    to_AAA(dfsubset, subclasses_for_ML, aaa_input_file, ignore_extra_columns=False)
+
+    report_checked_events(dfall, subclasses_for_ML)
+else:
+    print('No changes made')
+print('The end')
 
 

@@ -129,6 +129,10 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
     startTime = tr.stats.starttime
     endTime = tr.stats.endtime
     #print(tr.id, startTime, endTime)
+    
+    # get trace max and min
+    #amp_before = (max(tr.data)-min(tr.data))/2
+    #stdev_before = np.std(tr.data)
         
     # pad the Trace
     #y = tr.data
@@ -195,12 +199,17 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
                 print('No matching response info found')
             else:
                 add_to_trace_history(tr, 'calibrated')
+                # update the calib value
+                tr.stats.calib = _get_calib(tr, inv)
+                
         elif not tr.stats.calib==1.0:
             tr.data = tr.data * tr.stats.calib
             add_to_trace_history(tr, 'calibrated') 
         if 'calibrated' in tr.stats.history:           
             if tr.stats.channel[1]=='H':
                 tr.stats['units'] = 'm/s'
+            if tr.stats.channel[1]=='N':
+                tr.stats['units'] = 'm/s2'                
             if tr.stats.channel[1]=='D':
                 tr.stats['units'] = 'Pa'  
             
@@ -208,8 +217,24 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
     #tr.trim(starttime=startTime, endtime=endTime, pad=False)
     #add_to_trace_history(tr, 'unpadded')
     unpad_trace(tr)
+    
+    #amp_after = (max(tr.data)-min(tr.data))/2
+    #stdev_after = np.std(tr.data)
+    #tr.stats.calib = amp_after / amp_before
+    #tr.stats.calib = stdev_before / stdev_after
+    #if 'calibrated' in tr.stats.history:
+    #    tr.stats.calib = amp_after / amp_before
                         
-   
+def _get_calib(tr, this_inv):
+    calib = 1.0
+    for station in this_inv.networks[0].stations:
+        if station.code == tr.stats.station:
+            for channel in station.channels:
+                if channel.code == tr.stats.channel:
+                    calib_freq, calib_value = channel.response._get_overall_sensitivity_and_gain()
+    return calib_value
+        
+        
     
 #######################################################################
 ##                Stream tools                                       ##
@@ -466,6 +491,85 @@ def get_event_window(st, pretrig=30, posttrig=30):
 def trim_to_event(st, mintime, maxtime, pretrig=10, posttrig=10):
     """ Trims a Stream based on mintime and maxtime which could come from detect_network_event or get_event_window """
     st.trim(starttime=mintime-pretrig, endtime=maxtime+posttrig)
+    
+def plot_seismograms(st, outfile=None, bottomlabel=None, ylabels=None):
+    """ Create a plot of a Stream object similar to Seisan's mulplt """
+    fh = plt.figure(figsize=(8,12))
+    
+    # get number of stations
+    stations = []
+    for tr in st:
+        stations.append(tr.stats.station)
+    stations = list(set(stations))
+    n = len(stations)
+    
+    # start time as a Unix epoch
+    startepoch = st[0].stats.starttime.timestamp
+    
+    # create empty set of subplot handles - without this any change to one affects all
+    axh = []
+    
+    # loop over all stream objects
+    colors = 'kgrb'
+    channels = 'ZNEF'
+    linewidths = [0.25, 0.1, 0.1]
+    for i in range(n):
+        # add new axes handle for new subplot
+        #axh.append(plt.subplot(n, 1, i+1, sharex=ax))
+        if i>0:
+            #axh.append(plt.subplot(n, 1, i+1, sharex=axh[0]))
+            axh.append(fh.add_subplot(n, 1, i+1, sharex=axh[0]))
+        else:
+            axh.append(fh.add_subplot(n, 1, i+1))
+        
+        # find all the traces for this station
+        this_station = stations[i]
+        these_traces = st.copy().select(station=this_station)
+        for this_trace in these_traces:
+            this_component = this_trace.stats.channel[2]
+            line_index = channels.find(this_component)
+            #print(this_trace.id, line_index, colors[line_index], linewidths[line_index])
+        
+            # time vector, t, in seconds since start of record section
+            t = np.linspace(this_trace.stats.starttime.timestamp - startepoch,
+                this_trace.stats.endtime.timestamp - startepoch,
+                this_trace.stats.npts)
+            #y = this_trace.data - offset
+            y = this_trace.data
+            
+            # PLOT THE DATA
+            axh[i].plot(t, y, linewidth=linewidths[line_index], color=colors[line_index])
+            axh[i].autoscale(enable=True, axis='x', tight=True)
+   
+        # remove yticks because we will add text showing max and offset values
+        #axh[i].yaxis.set_ticks([])
+
+        # remove xticklabels for all but the bottom subplot
+        if i < n-1:
+            axh[i].xaxis.set_ticklabels([])
+        else:
+            # for the bottom subplot, also add an xlabel with start time
+            if bottomlabel:
+                plt.xlabel(bottomlabel)
+            else:
+                plt.xlabel("Starting at %s" % (st[0].stats.starttime) )
+
+        # default ylabel is station.channel
+        if ylabels:
+            plt.ylabel(ylabels[i])
+        else:
+            plt.ylabel(this_station, rotation=90)
+            
+    # change all font sizes
+    plt.rcParams.update({'font.size': 8})
+    
+    plt.subplots_adjust(wspace=0.1)
+    
+    # show the figure
+    if outfile:
+        plt.savefig(outfile, bbox_inches='tight')    
+    else:
+        plt.show()
     
     
 def mulplt(st, bottomlabel='', ylabels=[], MAXPANELS=6):

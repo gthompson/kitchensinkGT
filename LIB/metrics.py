@@ -25,7 +25,7 @@ In terms of order of application:
 
 """
 
-def process_trace(tr, inv=None):
+def process_trace(tr, inv=None, quality_threshold=0.0):
 # function tr, quality_factor, snr = compute_metrics(tr)
 # This function wraps all others
     # Here we compute simple metrics on each trace (and used to write them to NET.STA.CHAN files). 
@@ -43,7 +43,6 @@ def process_trace(tr, inv=None):
         qcTrace(tr)
     except:
         tr.stats['quality_factor'] = -1
-        return
     else:        
     	tr.stats["quality_factor"] = trace_quality_factor(tr) #0 = blank trace, 1 = has some 0s and -1s, 3 = all looks good
     	tr.stats.quality_factor -= tr.stats.metrics['num_gaps']
@@ -51,14 +50,13 @@ def process_trace(tr, inv=None):
     	tr.stats.quality_factor *= tr.stats.metrics['percent_availability']/100.0
     	tr.stats.metrics["twin"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending  
     
-    if tr.stats.quality_factor <= 0.0:
-        return
+    if tr.stats.quality_factor > quality_threshold: # only clean traces better than the threshold
 
-    """ CLEAN (DETREND, BANDPASS, CORRECT) TRACE """
-    clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.5, 30.0], corners=6, zerophase=False, inv=inv)
+        """ CLEAN (DETREND, BANDPASS, CORRECT) TRACE """
+        clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.5, 30.0], corners=6, zerophase=False, inv=inv)
     
-    # Update other stats
-    qcTrace(tr)
+        # Update other stats
+        qcTrace(tr)
     
     
 def qcTrace(tr):
@@ -85,6 +83,8 @@ def qcTrace(tr):
             tr.stats['metrics'] = mseedqc.meta
             os.remove('temp.mseed')
             add_to_trace_history(tr, 'MSEED metrics computed (similar to ISPAQ/MUSTANG).')
+    else:
+        tr.stats['quality_factor'] = -100
 
 def _detectClipping(tr, countThresh = 10):
     upper_clipped = False
@@ -341,7 +341,7 @@ def _band_ratio(tr, freqlims = [1, 6, 11]):
         tr.stats.bandratio.append(bandratio)
         
 
-def ampengfft(tr, outdir):
+def ampengfft(tr, outdir=None):
     """ 
     Measure peakamp and energy on a Trace and add to tr.stats.metrics
     Call ssam to add ssam dict to tr.stats
@@ -383,7 +383,8 @@ def ampengfft(tr, outdir):
         _ssam(tr, tr.stats.spectrum['F'], tr.stats.spectrum['A'])
         _band_ratio(tr, freqlims = [1.0, 6.0, 11.0])
         _band_ratio(tr, freqlims = [0.8, 4.0, 16.0]) 
-        _save_esam(tr, outdir)
+        if outdir:
+            _save_esam(tr, outdir)
         add_to_trace_history(tr, 'ampengfft')
     else:
         print("""No tr.stats.spectrum. Cannot compute SSAM data. You need to use:
