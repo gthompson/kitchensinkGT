@@ -166,7 +166,7 @@ def get_fingerprints(dfall, allowed_subclasses, N=100, exclude_checked=False):
     best_events_dict = _select_best_events(dfall, allowed_subclasses, N=N, exclude_checked=exclude_checked)
     for subclass in allowed_subclasses:
         if subclass in best_events_dict.keys(): 
-            print('Computing fingerprint for subclass ',subclass)
+            #print('Computing fingerprint for subclass ',subclass)
             #df_subclass = df.get_group(subclass)
             df_subclass = best_events_dict[subclass]     
             fingerprints[subclass] = df_subclass[[ 'peaktime', 
@@ -236,7 +236,7 @@ def select_next_event(dfall, subclasses_for_ML):
             if counts<mincounts:
                 mincounts=counts
                 nextclass=subclass
-        print('next event is of subclass = %s' % nextclass)
+        #print('next event is of subclass = %s' % nextclass)
 
         is_subclass = unchecked['subclass']==nextclass
         df = unchecked[is_subclass]
@@ -283,9 +283,6 @@ def _deconvolve_instrument_response(st):
             tr.remove_response(inventory=this_inv, output="VEL")
             tr.stats['units'] = 'm/s'
             add_to_trace_history(tr, 'deconvolved')
-        else:
-            print(tr.stats.units)
-        #    st.remove(tr)
 
 #
 
@@ -330,9 +327,10 @@ def _guess_subclass(row, fingerprints, subclasses_for_ML):
 
 
 from pathlib import Path
-def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station_locationsDF):
+def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station0hypfile):
     
     subclass = df.loc[thiswav, 'new_subclass']
+    orig_subclass = df.loc[thiswav, 'subclass']
     empty_df = pd.DataFrame()
     p = Path(thiswav)
     picklepath = os.path.join(pandaSeisDBDir, p.parts[-3], p.parts[-2], p.parts[-1] + '.pickle')
@@ -345,6 +343,7 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
         _deconvolve_instrument_response(st)
 
         # compute ampeng to show later
+        """
         traceids = []
         energies = []
         amplitudes = []
@@ -361,7 +360,8 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
         dfenergy.sort_values(by=['amplitude'],ascending=False,inplace=True)
         suggested_weight = None
         if st[0].stats.units == 'Counts':
-            suggested_weight = int(np.log10(dfenergy.iloc[0]['energy']/2)) # works with uncorrected data in Counts only
+            suggested_weight = int(np.log10(dfenergy.iloc[0]['energy']/2)) # works with uncorrected data in Counts only 
+        """
 
         # plot all
         #st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event.png'), size=(600,100), method='full');
@@ -377,7 +377,6 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
         plot_seismograms(st, outfile=os.path.join(CWD, 'current_event_zoomed.png'))
 
         # Show a map of amplitude distribution
-        station0hypfile = os.path.join(SEISAN_DATA, 'DAT', 'STATION0_MVO.HYP')
         plot_station_amplitude_map(st, station0hypfile=station0hypfile, outfile='current_map.png')
 
         # show webpage
@@ -392,7 +391,7 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
         #print(dfall[dfall['checked']==True].groupby('new_subclass').size())
         #print(row)
         #print(' ')
-        print('Loaded %s' % picklepath)
+        print('Loaded %s, original class: %s, current class: %s' % (picklepath, orig_subclass, subclass))
 
         # station amplitudes and energies
         #print(dfenergy)
@@ -410,7 +409,7 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
         # fingerprint guesses
         print(' ')
         _guess_subclass(df.loc[thiswav], fingerprints, subclasses_for_ML)
-        print(suggested_weight)
+        #print(suggested_weight)
 
         # Input
         checked = False
@@ -627,7 +626,7 @@ def to_AAA(df, subclasses_for_ML, outfile, ignore_extra_columns=True):
     if os.path.exists(outfile):
         outfile_old = outfile + '.old'
         os.system("cp %s %s" % (outfile, outfile_old))
-    _df2csv_without_index(dfAAA, outfile)
+    _df2file_without_index(dfAAA, outfile)
     print('Catalog CSV saved to ',outfile)
     
 #    
@@ -718,10 +717,6 @@ seisan_subclasses = subclass_mapping['subclass'].values.tolist() # append('g') a
 #seisan_etypes = subclass_mapping['etype'].values.tolist()
 subclasses_for_ML = ['D', 'R', 'r', 'e', 'l', 'h', 't'] # subclasses allowed for Machine Learning
 station0hypfile = os.path.join(SEISAN_DATA, 'DAT', 'STATION0_MVO.HYP')
-if not os.path.exists(station0hypfile):
-    print('%s not found. exiting' % station0hypfile)
-    exit()                
-station_locationsDF = parse_STATION0HYP(station0hypfile)
 
 # Load a previously created master event catalog from AAA_DATA_DIR - or create a new one from pandaSeisDBDir
 if os.path.exists(catalog_pickle_file):
@@ -740,20 +735,6 @@ else: # create one
         exit()
     
 # ensure we always have the same index and columns
-'''
-correct_columns = ['filetime', 'Fs', 'bandratio_[0.8_4.0_16.0]',
-       'bandratio_[1.0_6.0_11.0]', 'bw_max', 'bw_min', 'calib',
-       'cft_peak_wmean', 'cft_std_wmean', 'coincidence_sum', 'day',
-       'detection_quality', 'energy', 'hour', 'kurtosis', 'medianF', 'minute',
-       'month', 'noise_level', 'num_gaps', 'num_traces', 'offtime', 'ontime',
-       'path', 'peakA', 'peakF', 'peakamp', 'peaktime', 'percent_availability',
-       'quality', 'sample_lower_quartile', 'sample_max', 'sample_mean',
-       'sample_median', 'sample_min', 'sample_rms', 'sample_stdev',
-       'sample_upper_quartile', 'second', 'sfile', 'signal_level', 'skewness',
-       'snr', 'subclass', 'trigger_duration', 'year', 'D', 'R',
-       'r', 'e', 'l', 'h', 't', 'new_subclass', 'weight', 'checked', 'split',
-       'delete', 'ignore'] # removed starttime
-       '''
 correct_columns = ['filetime', 'path', 'sfile', 'num_traces', 'Fs', 'calib', 
                    'subclass', 'new_subclass', 'quality', 'weight',
                    'checked', 'split', 'delete', 'ignore',
@@ -770,8 +751,6 @@ correct_columns = ['filetime', 'path', 'sfile', 'num_traces', 'Fs', 'calib',
                    'trigger_duration', 'ontime', 'offtime', 
                    'cft_peak_wmean', 'cft_std_wmean', 'coincidence_sum',
                    'detection_quality'] # removed starttime
-print(dfall.columns)
-print(dfall.head)
 dfall = dfall[correct_columns] # subset to correct columns
 dfall.set_index('path', inplace=True) # try this
 dfall.sort_index(inplace=True)   
@@ -792,22 +771,7 @@ while iterate_again:
     nextwav = select_next_event(dfall, subclasses_for_ML)
     
     # manually QC the next event. each time we choose the class with least checked examples
-    #one_event_df, bool_quit = qc_event(dfall, nextwav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station_locationsDF)
-    bool_quit = qc_event(dfall, nextwav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station_locationsDF)
-    """
-    #if isinstance(one_event_df, pd.DataFrame):
-    if len(one_event_df)>0:
-        # now we must merge this back into dfall
-        #dfall.sort_index(inplace=True)
-        dfall.update(one_event_df)  
-    
-        # save the modified dataframe catalog  
-        #_df2csv_without_index(dfall, master_event_catalog)
-        catalog_pickle_file = os.path.basename(master_event_catalog).replace('.csv','.pkl')
-        dfall.to_pickle(catalog_pickle_file)
-    else:
-        iterate_again=False
-    """
+    bool_quit = qc_event(dfall, nextwav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station0hypfile)
     if bool_quit:
         iterate_again=False
     else: # changes made
@@ -819,6 +783,9 @@ while iterate_again:
 
 # Save
 if changes_made:
+    
+    print('Quitting. Saving changes.')
+    
     print('Updating %s' % master_event_catalog)
     _df2file_without_index(dfall, master_event_catalog, 'path')
 
@@ -831,7 +798,7 @@ if changes_made:
 
     report_checked_events(dfall, subclasses_for_ML)
 else:
-    print('No changes made')
+    print('Quitting. No changes made.')
 print('The end')
 
 

@@ -5,11 +5,12 @@ import os
 import numpy as np
 from scipy.stats import describe
 from scipy.interpolate import interp1d
-from obspy import Stream
+from obspy import Stream, Trace
 from obspy.signal.quality_control import MSEEDMetadata 
 #import libseisGT
 from libseisGT import add_to_trace_history, clean_trace
 import pandas as pd
+from math import pi
 
 """
 Functions for computing data quality metrics and statistical metrics (such as amplitude, energy and frequency) 
@@ -341,6 +342,18 @@ def _band_ratio(tr, freqlims = [1, 6, 11]):
         tr.stats.bandratio.append(bandratio)
         
 
+        
+def ampeng(tr):
+    if not 'detrended' in tr.stats.history:
+        tr.detrend(type='linear')
+        add_to_trace_history(tr, 'detrended')    
+    y = np.absolute(tr.data)
+    maxy = y.max()
+    maxy_i = y.argmax()
+    maxy_t = maxy_i / tr.stats.sampling_rate
+    stationEng = np.sum(np.square(y)) / tr.stats.sampling_rate
+    return maxy_t, maxy, stationEng
+    
 def ampengfft(tr, outdir=None):
     """ 
     Measure peakamp and energy on a Trace and add to tr.stats.metrics
@@ -352,21 +365,18 @@ def ampengfft(tr, outdir=None):
     
     """
     
-    
     # if we use absolute function, we don't need to check if maxy > -miny
     if not 'detrended' in tr.stats.history:
         tr.detrend(type='linear')
         add_to_trace_history(tr, 'detrended')
         
-    y = np.absolute(tr.data)
-    maxy = y.max()
-    maxy_i = y.argmax()
-    maxy_t = maxy_i / tr.stats.sampling_rate
     if not 'metrics' in tr.stats:
         tr.stats.metrics = {}
+        
+    maxy_t, maxy, stationEng = ampeng(tr)    
     tr.stats.metrics['peakamp'] = maxy
     tr.stats.metrics['peaktime'] = maxy_t
-    tr.stats.metrics['energy'] = np.sum(np.square(y)) / tr.stats.sampling_rate
+    tr.stats.metrics['energy'] = stationEng
 
     # estimate signal-to-noise ratio (after detrending)
     signaltonoise(tr)    
@@ -429,7 +439,9 @@ def _save_esam(tr, outdir):
     fptr.write('\n')
     fptr.close()
     
-        
+
+
+#### METRICS BELOW ARE NOT ADDED TO TRACE OBJECTS        
 
 def max_3c(st):
     """ max of a 3-component seismogram """
@@ -503,6 +515,7 @@ def peak_amplitudes(st):
     return (seismic3d, seismic1d, infrasound)
 
 
+
 def eventStatistics(st):
     # create an empty list of dictionaries
     list_of_dicts = []
@@ -536,3 +549,134 @@ def eventStatistics(st):
     df = pd.DataFrame.from_dict(list_of_dicts)
 
     return df
+
+def Eseismic2magnitude(Eseismic, correction=3.7):
+    # after equation 7 in Hanks and Kanamori 1979, where moment is substitute with energy
+    # energy in Joules rather than ergs, so correction is 3.7 rather than 10.7
+    if isinstance(Eseismic, list): # list of stationEnergy
+        mag = [] 
+        for thisE in Eseismic:
+            mag.append(Eseismic2magnitude(thisE, correction=correction))
+    else:
+        mag = np.log10(Eseismic)/1.5 - correction
+    return mag
+
+def magnitude2Eseismic(mag, correction=3.7):
+    # after equation 7 in Hanks and Kanamori 1979, where moment is substitute with energy
+    # energy in Joules rather than ergs, so correction is 3.7 rather than 10.7   
+    if isinstance(mag, list): # list of stationEnergy
+        Eseismic = [] 
+        for thismag in mag:
+            Eseismic.append(magnitude2Eseismic(thismag, correction=correction))
+    else:
+        Eseismic = np.power(10, 1.5 * mag + correction)
+    return Eseismic
+
+def Mlrichter(val, R, a=1.6, b=0.15, g=0):
+    """
+    MLRICHTER Compute a Richter local magnitude
+      ml=Mlrichter(peakamp, R, a, b, g)
+
+       peakamp = maximum amplitude measured from seismic trace
+       R = distance from earthquake to station (in km)
+       this Ml formula only for stations 0.1-200 km from quake
+   
+       equation is:
+           ml = log10(peakamp) + a * log10(R) + b;
+
+       from Lahr hypoellipse manual Chapter 4.2, defaults are a=1.6 & b=-0.15
+       this also agrees with Wikipedia for distances less than 200 km
+   
+       g is station correction
+    """
+    if isinstance(val,Stream): # Stream
+        ml = []
+        for tr in val:
+            ml.append(Mlrichter(tr, R, a=a, b=b, g=g))
+    elif isinstance(val,Trace): # Trace
+        peaktime, peakamp, stationEnergy = ampeng(tr)
+        ml = Mlrichter(peakamp, R, a=a, b=b, g=g)
+    elif isinstance(val, list): # list of stationEnergy
+        ml = []
+        for thisval in val:
+            ml.append(Mlrichter(tr, R, a=a, b=b, g=g))
+    else: 
+        peakamp = val
+        ml = np.log10(peakamp) + a * np.log10(R) + b + g; 
+        
+    return ml
+
+def Eseismic_Boatwright(val, R, rho_earth=2000, c_earth=2500, S=1.0, A=1.0):
+    # val can be a Stream, Trace, a stationEnergy or a list of stationEnergy
+    # R in m
+    # Following values assumed by Johnson and Aster, 2005:
+    # rho_earth 2000 kg/m^3
+    # c_earth 2500 m/s
+    # A is attenuation = 1
+    # S is site response = 1
+    if isinstance(val,Stream): # Stream
+        Eseismic = []
+        for tr in val:
+            Eseismic.append(Eseismic_Boatwright(tr, R, rho_earth, c_earth, S, A))
+    elif isinstance(val,Trace): # Trace
+        stationEnergy = compute_stationEnergy(val) 
+        Eseismic = Eseismic_Boatwright(stationEnergy, R, rho_earth, c_earth, S, A)
+    elif isinstance(val, list): # list of stationEnergy
+        Eseismic = []
+        for thisval in val:
+            Eseismic.append(Eseismic_Boatwright(thisval, R, rho_earth, c_earth, S, A))
+    else: # stationEnergy
+        Eseismic = 2 * pi * (R ** 2) * rho_earth * c_earth * (S ** 2) * val / A 
+    return Eseismic
+
+def Eacoustic_Boatwright(val, R, rho_atmos=1.2, c_atmos=340):
+    # val can be a Stream, Trace, a stationEnergy or a list of stationEnergy
+    # R in m
+    # Following values assumed by Johnson and Aster, 2005:
+    # rho_atmos 1.2 kg/m^3
+    # c_atmos 340 m/s   
+    if isinstance(val,Stream): # Stream
+        Eacoustic = []
+        for tr in val:
+            Eacoustic.append(Eacoustic_Boatwright(tr, R, rho_atmos, c_atmos))
+    elif isinstance(val, Trace): # Trace
+        stationEnergy = compute_stationEnergy(val) 
+        Eacoustic = Eacoustic_Boatwright(stationEnergy, R, rho_atmos, c_atmos)
+    elif isinstance(val, list): # list of stationEnergy
+        for thisval in val:
+            Eacoustic.append(Eacoustic_Boatwright(thisval, R, rho_atmos, c_atmos, S, A))
+    else:
+        Eacoustic = 2 * pi * (R ** 2) / (rho_atmos * c_atmos) * val
+    return Eacoustic
+    
+def VASR(Eacoustic, Eseismic):
+    # From Johnson and Aster 2005
+    eta = Eacoustic / Eseismic
+    return eta
+
+def compute_stationEnergy(val):
+    # seismic: eng is sum of velocity trace (in m/s) squared, divided by samples per second
+    # infrasound: eng is sum of pressure trace (in Pa) squared, divided by samples per second
+    if isinstance(val, Stream):
+        stationEnergy =[]
+        for tr in val:
+            stationEnergy.append(compute_stationEnergy(tr))
+    if isinstance(val, Trace):
+        tr2 = val.copy()
+        tr2.detrend()
+        y = tr2.data
+        stationEnergy = np.sum(y ** 2)*tr2.stats.delta
+    return stationEnergy
+
+def attenuation(tr, R, Q=50, c_earth=2500):
+    s = tr.stats
+    if 'spectrum' in s: 
+        peakF = s['spectrum']['peakF']
+        exponent = - ((pi) * peakF * R) / (c_earth * Q)
+        A = np.exp(exponent)
+        return A
+    else:
+        return None
+
+
+       
