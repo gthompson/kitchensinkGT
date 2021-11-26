@@ -58,53 +58,52 @@ def get_sfile_list(SEISAN_DATA, DB, startdate, enddate):
 
 
 
-def tracedf2eventdf(tracedf, st, paths):
+def eventdf2catalogdf(eventdf, st, paths):
     # Summarize event
     print('Create a summary row for whole event')
-    numOfRows = tracedf.shape[0]
+    numOfRows = eventdf.shape[0]
     if bool_correct_data:
-        df = tracedf[tracedf["units"] == 'm/s']
+        df = eventdf[eventdf["units"] == 'm/s']
         if len(df.index)==0:
-            df = tracedf
+            df = eventdf
     else:
-        df = tracedf
+        df = eventdf
     df.sort_values(by=['quality'], inplace=True)
-    df = df.head(10) # get median of 10 best rows    
-    wavrow = df.median(axis = 0, skipna = True).to_dict()        
-    wavrow['path']=paths['wavfile']
-    wavrow['num_traces']=numOfRows
+    df = df.head(10) # get 10 best rows    
+    catalogrow = df.median(axis = 0, skipna = True).to_dict()        
+    catalogrow['path']=paths['wavfile']
+    catalogrow['num_traces']=numOfRows
     filetime=df.iloc[0]['starttime']
-    wavrow['filetime']=filetime
-    try:
-        wavrow['year']=filetime[0:4]
-        wavrow['month']=filetime[5:7]
-        wavrow['day']=filetime[8:10]
-        wavrow['hour']=filetime[11:13]
-        wavrow['minute']=filetime[14:16]
-        wavrow['second']=filetime[17:23]
+    catalogrow['filetime']=filetime
+    try: # is filetime a string or a datetime object?
+        catalogrow['year']=filetime[0:4]
+        catalogrow['month']=filetime[5:7]
+        catalogrow['day']=filetime[8:10]
+        catalogrow['hour']=filetime[11:13]
+        catalogrow['minute']=filetime[14:16]
+        catalogrow['second']=filetime[17:23]
     except:
-        wavrow['year']=filetime.year
-        wavrow['month']=filetime.month
-        wavrow['day']=filetime.day
-        wavrow['hour']=filetime.hour
-        wavrow['minute']=filetime.minute
-        wavrow['second']=filetime.second
+        catalogrow['year']=filetime.year
+        catalogrow['month']=filetime.month
+        catalogrow['day']=filetime.day
+        catalogrow['hour']=filetime.hour
+        catalogrow['minute']=filetime.minute
+        catalogrow['second']=filetime.second
     
     if bool_detect_event:   
         trig, ontimes, offtimes = detect_network_event(st, sta=0.4, lta=5.0, threshon=4.0, threshoff=0.24, pad=5.0)
         print('%s: %d events detected' % (paths['picklefile'], len(ontimes)))
         durations = [t['duration'] for t in trig]
         if len(durations)>0:
-            bestevent = np.argmax(durations)
+            bestevent = np.argmax(durations) # choose longest detection
             thistrig=trig[int(np.argmax(durations))]
-            wavrow['ontime'] = thistrig['time']
-            wavrow['offtime']=thistrig['time']+thistrig['duration']  
-            wavrow['trigger_duration']=thistrig['duration']
+            catalogrow['ontime'] = thistrig['time']
+            catalogrow['offtime']=thistrig['time']+thistrig['duration']  
+            catalogrow['trigger_duration']=thistrig['duration']
             for item in ['coincidence_sum', 'cft_peak_wmean', 'cft_std_wmean']:
-                wavrow[item]=thistrig[item]
-            wavrow['detection_quality']=thistrig['coincidence_sum']*thistrig['cft_peak_wmean']*thistrig['cft_std_wmean']
+                catalogrow[item]=thistrig[item]
+            catalogrow['detection_quality']=thistrig['coincidence_sum']*thistrig['cft_peak_wmean']*thistrig['cft_std_wmean']
             
-        if bool_make_png_files:
             chosen = choose_best_traces(st, MAX_TRACES=1, include_seismic=True, 
                                 include_infrasound=False, include_uncorrected=False)
             tr = st[chosen[0]] 
@@ -113,10 +112,10 @@ def tracedf2eventdf(tracedf, st, paths):
             plt.ylabel(tr.id)   
             t0 = tr.stats.starttime
             bottom, top = plt.ylim()
-            plt.vlines([wavrow['ontime']-t0, wavrow['offtime']-t0], bottom, top )
+            plt.vlines([catalogrow['ontime']-t0, catalogrow['offtime']-t0], bottom, top )
             plt.savefig(paths['detectionfile'])            
 
-    return wavrow
+    return catalogrow
 
 def wavfile2paths(wavfile):
     paths={}
@@ -133,7 +132,7 @@ def wavfile2paths(wavfile):
     paths['miniseedfile_c'] = os.path.join(paths['miniseeddir_c'], paths['wavbase'] + '.mseed') 
     paths['traceCSVfile_u'] = paths['miniseedfile_u'].replace('.mseed', '.csv')
     paths['traceCSVfile_c'] = paths['miniseedfile_c'].replace('.mseed', '.csv')
-    paths['detectionfile'] = os.path.join(paths['HTMLDIR'], paths['wavbase'] + '_detection.png')
+    paths['detectionfile'] = os.path.join(paths['miniseeddir_c'], paths['wavbase'] + '_detection.png')
     return paths
     
 
@@ -142,8 +141,6 @@ def enhanceWAV(wavfile):
     for item in ['miniseeddir_r', 'miniseeddir_u', 'miniseeddir_r']:
         if not os.path.exists(paths[item]):
             os.makedirs(paths[item])  
-
-    wavrow={}
     
     ### Part I added
     wavbase = os.path.basename(wavfile)
@@ -184,15 +181,13 @@ def enhanceWAV(wavfile):
     
     ### End of part added
 
-    ### Need to refactor parts below still
-
-    st.select(component='[ENZ]') # subset to seismic components only
-    if len(st)==0:
-        return wavrow
-   
-
-    wavrow = tracedf2eventdf(tracedf, st, paths)        
-    return wavrow    
+    corrected_st.select(component='[ENZ]') # subset to seismic components only
+    if len(corrected_st)==0:
+        eventrow = {}
+        return eventrow
+    else:
+        eventrow = eventdf2catalogdf(mag_df, corrected_st, paths)        
+        return eventrow    
     
 
 
