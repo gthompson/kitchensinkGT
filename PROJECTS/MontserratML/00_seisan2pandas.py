@@ -13,11 +13,11 @@ from obspy import read, read_inventory, Stream
 
 LIBpath = os.path.join( os.getenv('HOME'),'src','kitchensinkGT', 'LIB')
 sys.path.append(LIBpath)
-from libMVO import fix_trace_id, inventory_fix_id_mvo, load_mvo_inventory \
+from libMVO import fix_trace_id, inventory_fix_id_mvo, load_mvo_inventory, \
     read_monty_wavfile_and_correct_traceIDs, enhance_stream, save_enhanced_stream, \
     metrics2df, read_enhanced_stream, plot_station_amplitude_map, parse_STATION0HYP, \
     add_station_locations, load_mvo_master_inventory
-from metrics import process_trace, choose_best_traces, select_by_index_list, ampengfft \
+from metrics import process_trace, choose_best_traces, select_by_index_list, ampengfft, \
     Mlrichter, Eseismic_Boatwright, Eseismic2magnitude, compute_stationEnergy
 from libseisGT import Stream_min_starttime, detect_network_event #, plot_seismograms 
 from seisan_classes import spath2datetime, Sfile #, printEvents
@@ -93,7 +93,7 @@ def eventdf2catalogdf(eventdf, st, paths):
     
     if bool_detect_event:   
         trig, ontimes, offtimes = detect_network_event(st, sta=0.4, lta=5.0, threshon=4.0, threshoff=0.24, pad=5.0)
-        print('%s: %d events detected' % (paths['picklefile'], len(ontimes)))
+        print('%d events detected' % (len(ontimes)))
         durations = [t['duration'] for t in trig]
         if len(durations)>0:
             bestevent = np.argmax(durations) # choose longest detection
@@ -153,7 +153,7 @@ def enhanceWAV(wavfile):
     uncorrected_df = metrics2df(uncorrected_st)
     save_enhanced_stream(uncorrected_st, uncorrected_df, paths['miniseedfile_u'], save_pickle=False) # SCAFFOLD
 
-    corrected_st = enhance_stream(raw_st, paths['CALDIR'])
+    corrected_st = enhance_stream(raw_st, paths['CALDIR'], master_inv=MASTER_INV)
     corrected_df = metrics2df(corrected_st)
     save_enhanced_stream(corrected_st, corrected_df, paths['miniseedfile_c'], save_pickle=False)
     #plot_station_amplitude_map(corrected_st, station0hypfile=station0hypfile)
@@ -195,9 +195,9 @@ def enhanceWAV(wavfile):
 def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES=999999, startdate=None):
     failedWAVfiles=[]
     LoD = []
-    
+
     # We aim to add a couple of columns from the S-file, and save to this
-    reawavCSVfile=os.path.join(SEISAN_DATA, 'reawav_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
+    reawavCSVfile=os.path.join(SEISAN_DATA, 'miniseed_c', SEISAN_DB, 'CATALOG_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
     if os.path.exists(reawavCSVfile):
         return failedWAVfiles, filesdone
     
@@ -209,9 +209,9 @@ def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES
     else:
         enddate = dt.datetime(int(YYYY)+1, 1, 1)
     print(startdate, enddate)
-    return
-    slist = sorted(get_sfile_list(SEISAN_DATA, SEISAN_DB, startdate, enddate))
-    
+    slist = get_sfile_list(SEISAN_DATA, SEISAN_DB, startdate, enddate)
+    slist = sorted(slist)
+
     for i,sfile in enumerate(slist):
         print('Processing %d of %d: %s' % (i, len(slist), sfile) )
         if i==MAXFILES:
@@ -250,36 +250,37 @@ def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES
 #######################################################################
 
 SEISAN_DATA = os.path.join( os.getenv('HOME'),'DATA','MVO')
+master_station_xml = './MontserratDigitalSeismicNetwork.xml'
+os.system("cp %s %s/CAL/" % (master_station_xml, SEISAN_DATA) )
+master_station_xml = 'CAL/MontserratDigitalSeismicNetwork.xml'
 os.chdir(SEISAN_DATA)
 SEISAN_DB = 'MVOE_'
 station0hypfile = os.path.join(SEISAN_DATA, 'DAT', 'STATION0_MVO.HYP')
-station_locationsDF = parse_STATION0HYP(station0hypfile) 
+if os.path.exists(station0hypfile):
+    station_locationsDF = parse_STATION0HYP(station0hypfile) 
+else:
+    print(station0hypfile,' not found')
+    exit()
+print(station_locationsDF)
+MASTER_INV = read_inventory(master_station_xml)
 bool_shortperiod=False
 bool_correct_data=True
 bool_make_png_files=False
 bool_detect_event=True
 bool_overwrite=False
-#startdate = dt.datetime(2007,1,29,0,0,0)
-startdate = dt.datetime(1996,10,20,0,0)
-
+MAXFILES = 999999
 filesdone = 0
-yeardirs = sorted(glob(os.path.join('REA',SEISAN_DB,'[12]???')))
+yeardirs = sorted(glob(os.path.join(SEISAN_DATA, 'REA',SEISAN_DB,'[12]???')))
 for yeardir in yeardirs:
+    print(yeardir)
     YYYY = os.path.basename(yeardir)
     monthsdirs = sorted(glob(os.path.join(yeardir,'[01]?')))
     for monthdir in monthsdirs:
         if filesdone>=MAXFILES:
             break
         MM = os.path.basename(monthdir)
-        if startdate:
-            SYYYY = startdate.year
-            SMM = startdate.month                
-            if SYYYY>int(YYYY):
-                continue
-            elif SMM > int(MM):
-                continue
         print('\n**** Processing %s ****' % monthdir)
-        failedWAVfiles, filesdone = processSeisanYearMonth('.', SEISAN_DB, YYYY, MM, filesdone, MAXFILES=999999, startdate=startdate)
+        failedWAVfiles, filesdone = processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES=MAXFILES)
         if len(failedWAVfiles)>0:
             fptr=open('failedWAVfiles.txt','a')
             for element in failedWAVfiles:

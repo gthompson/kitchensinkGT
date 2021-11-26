@@ -406,6 +406,14 @@ def enhance_stream(stream_in, CALDIR=None, master_inv=False, quality_threshold=0
 #
 
 def save_enhanced_stream(st, eventdf, enhanced_wavpath, save_pickle=False):
+
+    if enhanced_wavpath[-6:] == '.mseed':
+        enhanced_wavpath = enhanced_wavpath[:-6]
+
+    parentdir = os.path.dirname(enhanced_wavpath)
+    if not os.path.exists(parentdir):
+        os.makedirs(parentdir)
+
     # save Miniseed
     st.write(enhanced_wavpath + '.mseed', 'MSEED')
     
