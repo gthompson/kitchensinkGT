@@ -11,7 +11,7 @@ import cartopy.feature as cf
 LIBpath = os.path.join( os.getenv('HOME'),'src','kitchensinkGT', 'LIB')
 sys.path.append(LIBpath)
 from libseisGT import get_seed_band_code
-from metrics import process_trace, ampengfft, freq_change
+from metrics import process_trace, ampengfft
 sys.path.append(os.path.join( os.getenv('HOME'),'src', 'icewebPy') )
 import IceWeb
 
@@ -146,6 +146,15 @@ def inventory_fix_id_mvo(inv):
         station.code = sta
     inv[0].code = net
     return inv
+
+def load_mvo_master_inventory(XMLDIR):
+    master_station_xml = os.path.join(XMLDIR, 'MontserratDigitalSeismicNetwork.xml')
+    if os.path.exists(master_station_xml):
+        print('Loading ',master_station_xml)
+        return read_inventory(master_station_xml)
+    else:
+        print('Could not find ',master_station_xml)        
+        return None
 
 def load_mvo_inventory(tr, CALDIR):
     this_inv = None
@@ -356,13 +365,16 @@ def read_monty_wavfile_and_correct_traceIDs(wavpath, bool_ASN=False):
 
 #
 
-def enhance_stream(stream_in, CALDIR=None, quality_threshold=0.0):
+def enhance_stream(stream_in, CALDIR=None, master_inv=False, quality_threshold=0.0):
     # if CALDIR provided, will try to correct traces
     st = stream_in.copy()
     for tr in st:
-        this_inv = None            
-        if CALDIR: # try to find corresponding station XML
-            this_inv = load_mvo_inventory(tr, CALDIR)
+        this_inv = None
+        if CALDIR: # this means user wants to correct traces
+            if master_inv:
+                this_inv = master_inv
+            else:
+                this_inv = load_mvo_inventory(tr, CALDIR)
             if tr.stats.channel[0:2]=='SN': # accelerometer channels
                 tr.stats.calib = 27500000
                 tr.data = tr.data / tr.stats.calib # approx calib from comparing with co-located differentiated LA100 waveforms
@@ -448,6 +460,36 @@ def read_enhanced_stream(enhanced_wavpath):
     return st        
 
 #
+
+def respfiles2masterstationxml(SEISAN_DATA, xmlfile):# Merge Montserrat RESP files
+    # A function we are only likely to use once, but an important one to keep
+    from obspy.io.xseed.core import _read_resp
+    from libseisGT import create_dummy_inventory, merge_inventories
+    station0hypfile = os.path.join(SEISAN_DATA, 'DAT', 'STATION0_MVO.HYP')
+    station_locationsDF = parse_STATION0HYP(station0hypfile) 
+    respfiles = glob.glob(os.path.join(SEISAN_DATA, 'CAL', 'RESP*'))
+    master_inv = create_dummy_inventory()
+    for respfile in respfiles:
+        this_inv = None
+        print('RESP file = ',respfile)
+        this_inv = _read_resp(respfile)
+        this_inv = inventory_fix_id_mvo(this_inv)
+        sta_code = this_inv.networks[0].stations[0].code
+        location = station_locationsDF[station_locationsDF['name']==sta_code].iloc[0].to_dict()
+        for station in this_inv.networks[0].stations:
+            station.latitude = location['lat']
+            station.longitude = location['lon']
+            station.elevation = location['elev']
+            for channel in station.channels:
+                channel.latitude = location['lat']
+                channel.longitude = location['lon']
+                channel.elevation = location['elev']
+                channel.depth = 0.0
+                if channel.sample_rate==75.19:
+                    channel.sample_rate=75.0
+        merge_inventories(master_inv, this_inv)  
+    master_inv.write(xmlfile,format="STATIONXML", validate=True)
+
 
 if __name__ == '__main__':
     pass

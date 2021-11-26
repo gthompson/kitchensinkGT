@@ -1195,6 +1195,109 @@ def inventory_fix_id(inv, networkcode=None, stationcode=None, channelcode=None):
 '''
 
 
+
+def create_dummy_inventory():
+    from obspy.core.inventory import Inventory, Network, Station, Channel, Site
+    from obspy.clients.nrl import NRL    
+    dummy_inv = Inventory(networks=[], source='Glenn Thompson')
+    net = Network(
+        # This is the network code according to the SEED standard.
+        code="MV",
+        # A list of stations. We'll add one later.
+        stations=[],
+        description="Montserrat Digital Seismic Network",
+        # Start-and end dates are optional.
+        start_date=obspy.UTCDateTime(1996, 9, 1))
+
+    sta = Station(
+        # This is the station code according to the SEED standard.
+        code="ABC",
+        latitude=1.0,
+        longitude=2.0,
+        elevation=345.0,
+        creation_date=obspy.UTCDateTime(2016, 1, 2),
+        site=Site(name="First station"))
+
+    cha = Channel(
+        # This is the channel code according to the SEED standard.
+        code="HHZ",
+        # This is the location code according to the SEED standard.
+        location_code="",
+        # Note that these coordinates can differ from the station coordinates.
+        latitude=1.0,
+        longitude=2.0,
+        elevation=345.0,
+        depth=10.0,
+        azimuth=0.0,
+        dip=-90.0,
+        sample_rate=200)
+
+    # By default this accesses the NRL online. Offline copies of the NRL can
+    # also be used instead
+    nrl = NRL()
+    # The contents of the NRL can be explored interactively in a Python prompt,
+    # see API documentation of NRL submodule:
+    # http://docs.obspy.org/packages/obspy.clients.nrl.html
+    # Here we assume that the end point of data logger and sensor are already
+    # known:
+    response = nrl.get_response( # doctest: +SKIP
+        sensor_keys=['Streckeisen', 'STS-1', '360 seconds'],
+        datalogger_keys=['REF TEK', 'RT 130 & 130-SMA', '1', '200'])
+
+
+    # Now tie it all together.
+    #cha.response = response
+    #sta.channels.append(cha)
+    #sta = []
+    #net.stations.append(sta)
+    dummy_inv.networks.append(net)
+    
+    return dummy_inv
+
+
+def merge_channels(chan1, chan, channel_codes):
+    index2 = channel_codes.index(chan.code)
+    print('Want to merge channel:')
+    print(chan)
+    print('into:')
+    print(chan1[index2])
+    print(chan1[index2].startDate)
+
+    
+def add_channel(chan1, chan):
+    # add as new channel
+    print('Adding new channel %s' % chan.code)
+    chan1.append(chan)  
+    
+def merge_stations(sta1, sta, station_codes):
+    index = station_codes.index(sta.code)
+    print('Merging station')  
+    for chan in sta.channels:
+        channel_codes = [chan.code for chan in sta1[index].channels]
+        if chan.code in channel_codes: 
+            #merge_channels(sta1[index].channels, chan, channel_codes)
+            add_channel(sta1[index].channels, chan)
+        else: # add as new channel
+            add_channel(sta1[index].channels, chan)           
+            
+def add_station(sta1, sta):
+    # add as new station
+    print('Adding new station %s' % sta.code)
+    sta1.append(sta)            
+            
+def merge_inventories(inv1, inv2):
+    for sta in inv2.networks[0].stations:
+        if inv1.networks[0].stations:
+            station_codes = [sta.code for sta in inv1.networks[0].stations]
+            if sta.code in station_codes: 
+                merge_stations(inv1.networks[0].stations, sta, station_codes)
+            else:
+                add_station(inv1.networks[0].stations, sta)
+        else:
+            add_station(inv1.networks[0].stations, sta)  
+
+
+
 ######################################################################
 ##                  Modeling  tools                                 ##
 ######################################################################

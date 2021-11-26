@@ -265,7 +265,7 @@ def select_next_event(dfall, subclasses_for_ML):
     return None
 
 #
-
+"""
 from obspy.core import read
 def _deconvolve_instrument_response(st):
     for tr in st:
@@ -283,7 +283,7 @@ def _deconvolve_instrument_response(st):
             tr.remove_response(inventory=this_inv, output="VEL")
             tr.stats['units'] = 'm/s'
             add_to_trace_history(tr, 'deconvolved')
-
+"""
 #
 
 def _guess_subclass(row, fingerprints, subclasses_for_ML):
@@ -340,7 +340,7 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
         # plot whole event file
         st = read(picklepath) #.select(station='MBWH')
         st.filter('bandpass', freqmin=0.5, freqmax=25.0, corners=4)
-        _deconvolve_instrument_response(st)
+        #_deconvolve_instrument_response(st)
 
         # compute ampeng to show later
         """

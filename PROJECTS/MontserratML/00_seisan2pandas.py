@@ -15,7 +15,8 @@ LIBpath = os.path.join( os.getenv('HOME'),'src','kitchensinkGT', 'LIB')
 sys.path.append(LIBpath)
 from libMVO import fix_trace_id, inventory_fix_id_mvo, load_mvo_inventory \
     read_monty_wavfile_and_correct_traceIDs, enhance_stream, save_enhanced_stream, \
-    metrics2df, read_enhanced_stream, plot_station_amplitude_map, parse_STATION0HYP, add_station_locations
+    metrics2df, read_enhanced_stream, plot_station_amplitude_map, parse_STATION0HYP, \
+    add_station_locations, load_mvo_master_inventory
 from metrics import process_trace, choose_best_traces, select_by_index_list, ampengfft \
     Mlrichter, Eseismic_Boatwright, Eseismic2magnitude, compute_stationEnergy
 from libseisGT import Stream_min_starttime, detect_network_event #, plot_seismograms 
