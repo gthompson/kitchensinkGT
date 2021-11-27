@@ -59,7 +59,7 @@ def get_sfile_list(SEISAN_DATA, DB, startdate, enddate):
 
 
 
-def eventdf2catalogdf(eventdf, st, paths):
+def eventdf2catalogdf(eventdf, st, waveformfilepath):
     # Summarize event
     print('Create a summary row for whole event')
     numOfRows = eventdf.shape[0]
@@ -72,7 +72,7 @@ def eventdf2catalogdf(eventdf, st, paths):
     df.sort_values(by=['quality'], inplace=True)
     df = df.head(10) # get 10 best rows    
     catalogrow = df.median(axis = 0, skipna = True).to_dict()        
-    catalogrow['path']=paths['wavfile']
+    catalogrow['path']=waveformfilepath
     catalogrow['num_traces']=numOfRows
     filetime=df.iloc[0]['starttime']
     catalogrow['filetime']=filetime
@@ -114,7 +114,8 @@ def eventdf2catalogdf(eventdf, st, paths):
             t0 = tr.stats.starttime
             bottom, top = plt.ylim()
             plt.vlines([catalogrow['ontime']-t0, catalogrow['offtime']-t0], bottom, top )
-            plt.savefig(paths['detectionfile'])            
+            detectionpngfile = waveformfilepath.replace('.mseed','_detection.png')
+            plt.savefig(detectionpngfile)            
 
     return catalogrow
 
@@ -145,7 +146,11 @@ def enhanceWAV(wavfile):
 
     wavbase = os.path.basename(wavfile)
 
+    
+    # we only need to create the uncorrected miniseed file if it does not exist - which means we need to load the wavfile first
     if not os.path.exists(paths['miniseedfile_u']):
+        
+        print('%s not found. Loading %s' % (paths['miniseedfile_u'], wavfile))
     
         raw_st = read_monty_wavfile_and_correct_traceIDs(wavfile, bool_ASN=False)
         add_station_locations(raw_st, station_locationsDF)
@@ -155,19 +160,34 @@ def enhanceWAV(wavfile):
         uncorrected_df = metrics2df(uncorrected_st)
         save_enhanced_stream(uncorrected_st, uncorrected_df, paths['miniseedfile_u'], save_pickle=False) # SCAFFOLD
 
-    if os.path.exists(paths['miniseedfile_c']) and os.path.exists(paths['traceCSVfile_c']):
-        corrected_st = read_enhanced_stream(paths['miniseedfile_c'].replace('.mseed','') )
-        mag_df = pd.read_csv(paths['traceCSVfile_c'])
-    else:
+    
+
+    # we only need to create the corrected miniseed file if it does not exist - which means we need to load the wavfile first
+    # unless we did that above (does raw_st exist?)
+    if not os.path.exists(paths['miniseedfile_c']):
+        print('%s not found. ' % (paths['miniseedfile_u']))      
         try:
             raw_st
         except:
+            print('Loading %s' % (wavfile))  
             raw_st = read_monty_wavfile_and_correct_traceIDs(wavfile, bool_ASN=False)
             add_station_locations(raw_st, station_locationsDF)
         
         corrected_st = enhance_stream(raw_st, paths['CALDIR'], master_inv=MASTER_INV)
+
+    # we only need to create the corrected CSV file if it does not exist 
+    # we may have to load the corrected miniseed file, unless we did that above
+    if not os.path.exists(paths['traceCSVfile_c']):
+        try:
+            corrected_st
+        except:
+            if os.path.exists(paths['miniseedfile_c']):
+                corrected_st = read(paths['miniseedfile_c'])
+
         corrected_df = metrics2df(corrected_st)
         save_enhanced_stream(corrected_st, corrected_df, paths['miniseedfile_c'], save_pickle=False)
+              
+              
         #plot_station_amplitude_map(corrected_st, station0hypfile=station0hypfile)
         #plot_seismograms(corrected_st, outfile='corrected_seismograms.png')
     
@@ -190,31 +210,23 @@ def enhanceWAV(wavfile):
         mag_df.to_csv(paths['traceCSVfile_c'], index=False)
 
         # These stats can be used for network magnitudes
-        mag_df[['magA','magE']].describe()
-    
-
-    corrected_st.select(component='[ENZ]') # subset to seismic components only
-    if len(corrected_st)==0:
-        eventrow = {}
-        return eventrow
-    else:
-        eventrow = eventdf2catalogdf(mag_df, corrected_st, paths)        
-        return eventrow    
+        #mag_df[['magA','magE']].describe()
+        
+    return paths['miniseedfile_c']
     
 
 
 def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES=999999, startdate=None):
-    failedWAVfiles=[]
-    LoD = []
-
-    # We aim to add a couple of columns from the S-file, and save to this
-    reawavCSVfile=os.path.join(SEISAN_DATA, 'miniseed_c', SEISAN_DB, 'CATALOG_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
-    if os.path.exists(reawavCSVfile):
-        return failedWAVfiles, filesdone
+    summaryLoD = []
+    summaryfile=os.path.join(SEISAN_DATA, 'miniseed_c', SEISAN_DB, 'summary_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
     
     # Get s-file list
+    startdate_thismonth = dt.datetime(int(YYYY), int(MM), 1)
     if not startdate:
-        startdate = dt.datetime(int(YYYY), int(MM), 1)
+        startdate = startdate_thismonth
+    else:
+        if startdate < startdate_thismonth:
+            startdate = startdate_thismonth
     if int(MM)<12:
         enddate = dt.datetime(int(YYYY), int(MM)+1, 1)
     else:
@@ -227,36 +239,66 @@ def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES
         print('Processing %d of %d: %s' % (i, len(slist), sfile) )
         if i==MAXFILES:
             break
-            
-        s = Sfile(sfile, use_mvo_parser=True)
+        try:
+            s = Sfile(sfile, use_mvo_parser=True)
+            d = s.to_dict()
+        except:
+            os.system('echo sfile >> bad_sfiles.log')
+            continue
         #s.cat()
-        #s.printEvents()
-        d = s.to_dict()
-        #pprint(d)
+        #s.printEvents()        
+        #pprint(d) 
         
+        summarydict = {'sfile':os.path.basename(s.path), 'DSN_wavfile':None, 'DSN_exists':False, 'ASN_wavfile':None, 'ASN_exists':False, 'corrected_DSN_mseed':None, 'corrected_ASN_mseed':None, 'mainclass':s.mainclass, 'subclass':s.subclass}          
         for item in ['wavfile1', 'wavfile2']:
             if d[item]:
-                if os.path.exists(d[item]):
-                    wavbase = os.path.basename(d[item])
-                    if 'MVO' in wavbase:
-                        print('Processing ',d[item])
-                        eventrow=[]
-                        eventrow = enhanceWAV(d[item])
-                        if eventrow:
-                            eventrow['sfile']=os.path.basename(s.path)
-                            eventrow['mainclass']=s.mainclass
-                            eventrow['subclass']=s.subclass
-                            LoD.append(eventrow)
-                            filesdone += 1
-                            if filesdone >= MAXFILES:
-                                break
-    if LoD:
-        df = pd.DataFrame(LoD)
-        print('Writing ',reawavCSVfile)
-        df.drop(df.filter(regex="Unname"),axis=1, inplace=True)
-        df = df.set_index('filetime')       
-        df.to_csv(reawavCSVfile, index=True) 
-    return failedWAVfiles, filesdone
+                wavbase = os.path.basename(d[item])
+                if 'MVO' in wavbase:
+                    summarydict['DSN_wavfile'] = wavbase
+                    if os.path.exists(d[item]):
+                        summarydict['DSN_exists'] = True
+                        try:
+                            DSN_mseedfile = enhanceWAV(d[item])
+                            summarydict['corrected_DSN_mseed'] = DSN_mseedfile
+                        except:
+                            os.system('echo sfile, %s >> seisan2pandas_failed.log' % wavbase)
+                            
+                elif 'SPN' in wavbase:
+                    summarydict['ASN_wavfile'] = wavbase
+                    if os.path.exists(d[item]):
+                        summarydict['ASN_exists'] = True 
+                        
+        summaryLOD.append(summarydict)
+        summarydf = pd.DataFrame(summaryLOD)
+        summarydf.to_csv(summaryfile, index=False)
+        filesdone += 1     
+        if filesdone >= MAXFILES:
+            break  
+    return filesdone
+
+
+
+def create_details_file(SEISAN_DATA, SEISAN_DB, YYYY, MM):
+    
+    miniseeddir = os.path.join(SEISAN_DATA, 'miniseed_c', SEISAN_DB)
+    summaryfile=os.path.join(miniseeddir, 'summary_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
+    detailsfile=os.path.join(miniseeddir, 'details_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
+    if os.path.exists(summaryfile):
+        summarydf = pd.read_csv(summmaryfile)
+        
+        for i,row in summarydf.iterrows():
+            mseedfile = row['corrected_DSN_mseed']
+            if mseedfile:
+                corrected_st = read(mseedfile)
+                corrected_st.select(component='[ENZ]') # subset to seismic components only
+                if len(corrected_st)>0:
+                    eventcsvfile = mseedfile.replace('.mseed','.csv')
+                    event_df = pd.read_csv(eventcsvfile)
+                    eventrow = eventdf2catalogdf(event_df, corrected_st, mseedfile)
+                    for key in eventrow.keys():
+                        summarydf.loc[i,key] = eventrow[key]
+        summarydf.to_csv(detailsfiles)          
+
 
 #######################################################################
 
@@ -272,7 +314,7 @@ if os.path.exists(station0hypfile):
 else:
     print(station0hypfile,' not found')
     exit()
-print(station_locationsDF)
+
 MASTER_INV = read_inventory(master_station_xml)
 bool_shortperiod=False
 bool_correct_data=True
@@ -291,10 +333,6 @@ for yeardir in yeardirs:
             break
         MM = os.path.basename(monthdir)
         print('\n**** Processing %s ****' % monthdir)
-        failedWAVfiles, filesdone = processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES=MAXFILES)
-        if len(failedWAVfiles)>0:
-            fptr=open('failedWAVfiles.txt','a')
-            for element in failedWAVfiles:
-                fptr.write(element)
-                fptr.write('\n')
-            fptr.close() 
+        filesdone = processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES=MAXFILES)
+        #create_details_file(SEISAN_DATA, SEISAN_DB, YYYY, MM)
+
