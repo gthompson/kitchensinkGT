@@ -141,46 +141,57 @@ def enhanceWAV(wavfile):
     paths = wavfile2paths(wavfile)
     for item in ['miniseeddir_r', 'miniseeddir_u', 'miniseeddir_r']:
         if not os.path.exists(paths[item]):
-            os.makedirs(paths[item])  
-    
-    ### Part I added
+            os.makedirs(paths[item]) 
+
     wavbase = os.path.basename(wavfile)
 
-    raw_st = read_monty_wavfile_and_correct_traceIDs(wavfile, bool_ASN=False)
-    add_station_locations(raw_st, station_locationsDF)
-
-    uncorrected_st = enhance_stream(raw_st)
-    uncorrected_df = metrics2df(uncorrected_st)
-    save_enhanced_stream(uncorrected_st, uncorrected_df, paths['miniseedfile_u'], save_pickle=False) # SCAFFOLD
-
-    corrected_st = enhance_stream(raw_st, paths['CALDIR'], master_inv=MASTER_INV)
-    corrected_df = metrics2df(corrected_st)
-    save_enhanced_stream(corrected_st, corrected_df, paths['miniseedfile_c'], save_pickle=False)
-    #plot_station_amplitude_map(corrected_st, station0hypfile=station0hypfile)
-    #plot_seismograms(corrected_st, outfile='corrected_seismograms.png')
+    if not os.path.exists(paths['miniseedfile_u']):
     
-    dome_lat = 16.7166638
-    dome_lon = -62.1833326 
+        raw_st = read_monty_wavfile_and_correct_traceIDs(wavfile, bool_ASN=False)
+        add_station_locations(raw_st, station_locationsDF)
 
-    mag_df = corrected_df
-    mag_df['R'] = degrees2kilometers(locations2degrees(mag_df['lat'], mag_df['lon'], dome_lat, dome_lon))*1000.0
-    mag_df['magA'] = Mlrichter(mag_df['peakamp'], R=mag_df['R']) 
-    mag_df['Eseismic'] = Eseismic_Boatwright(mag_df['energy'], R=mag_df['R'])
-    mag_df['magE'] = Eseismic2magnitude(mag_df['Eseismic'])
-    for i,row in mag_df.iterrows():
-        if row['units']!='m/s':
-            mag_df.loc[i,'magA'] = None
-            mag_df.loc[i,'Eseismic'] = None
-            mag_df.loc[i,'magE'] = None
-    print(mag_df)
-    
-    # Need to then add the station magnitudes back into the corrected_df and save it.
-    mag_df.to_csv(paths['traceCSVfile_c'], index=False)
+        uncorrected_st = enhance_stream(raw_st)
 
-    # These stats can be used for network magnitudes
-    mag_df[['magA','magE']].describe()
+        uncorrected_df = metrics2df(uncorrected_st)
+        save_enhanced_stream(uncorrected_st, uncorrected_df, paths['miniseedfile_u'], save_pickle=False) # SCAFFOLD
+
+    if os.path.exists(paths['miniseedfile_c']) and os.path.exists(paths['traceCSVfile_c']):
+        corrected_st = read_enhanced_stream(paths['miniseedfile_c'].replace('.mseed','') )
+        mag_df = pd.read_csv(paths['traceCSVfile_c'])
+    else:
+        try:
+            raw_st
+        except:
+            raw_st = read_monty_wavfile_and_correct_traceIDs(wavfile, bool_ASN=False)
+            add_station_locations(raw_st, station_locationsDF)
+        
+        corrected_st = enhance_stream(raw_st, paths['CALDIR'], master_inv=MASTER_INV)
+        corrected_df = metrics2df(corrected_st)
+        save_enhanced_stream(corrected_st, corrected_df, paths['miniseedfile_c'], save_pickle=False)
+        #plot_station_amplitude_map(corrected_st, station0hypfile=station0hypfile)
+        #plot_seismograms(corrected_st, outfile='corrected_seismograms.png')
     
-    ### End of part added
+        dome_lat = 16.7166638
+        dome_lon = -62.1833326 
+
+        mag_df = corrected_df
+        mag_df['R'] = degrees2kilometers(locations2degrees(mag_df['lat'], mag_df['lon'], dome_lat, dome_lon))*1000.0
+        mag_df['magA'] = Mlrichter(mag_df['peakamp'], R=mag_df['R']) 
+        mag_df['Eseismic'] = Eseismic_Boatwright(mag_df['energy'], R=mag_df['R'])
+        mag_df['magE'] = Eseismic2magnitude(mag_df['Eseismic'])
+        for i,row in mag_df.iterrows():
+            if row['units']!='m/s':
+                mag_df.loc[i,'magA'] = None
+                mag_df.loc[i,'Eseismic'] = None
+                mag_df.loc[i,'magE'] = None
+        print(mag_df)
+    
+        # Need to then add the station magnitudes back into the corrected_df and save it.
+        mag_df.to_csv(paths['traceCSVfile_c'], index=False)
+
+        # These stats can be used for network magnitudes
+        mag_df[['magA','magE']].describe()
+    
 
     corrected_st.select(component='[ENZ]') # subset to seismic components only
     if len(corrected_st)==0:
