@@ -268,8 +268,8 @@ def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES
                     if os.path.exists(d[item]):
                         summarydict['ASN_exists'] = True 
                         
-        summaryLOD.append(summarydict)
-        summarydf = pd.DataFrame(summaryLOD)
+        summaryLoD.append(summarydict)
+        summarydf = pd.DataFrame(summaryLoD)
         summarydf.to_csv(summaryfile, index=False)
         filesdone += 1     
         if filesdone >= MAXFILES:
