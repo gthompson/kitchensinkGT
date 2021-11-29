@@ -196,7 +196,7 @@ def clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.1, 20.0],
             try:
                 tr.remove_response(inventory=inv)
             except:
-                print('No matching response info found')
+                print('No matching response info found for %s' % tr.id)
             else:
                 add_to_trace_history(tr, 'calibrated')
                 # update the calib value
