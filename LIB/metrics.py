@@ -43,6 +43,7 @@ def process_trace(tr, inv=None, quality_threshold=0.0):
     try:
         qcTrace(tr)
     except:
+        print('qcTrace failed on %s for raw trace' % tr.id)
         tr.stats['quality_factor'] = -1
     else:        
     	tr.stats["quality_factor"] = trace_quality_factor(tr) #0 = blank trace, 1 = has some 0s and -1s, 3 = all looks good
@@ -57,7 +58,11 @@ def process_trace(tr, inv=None, quality_threshold=0.0):
         clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.5, 30.0], corners=6, zerophase=False, inv=inv)
     
         # Update other stats
-        qcTrace(tr)
+        try:
+            qcTrace(tr)
+        except:
+            print('qcTrace failed on %s for cleaned trace' % tr.id)
+
     
     
 def qcTrace(tr):
@@ -75,14 +80,15 @@ def qcTrace(tr):
      'percent_availability': 100.0}           
     """
     if len(tr.data)>0:
-        tr.write('temp.mseed')
+        tmpfilename = '%s%s.mseed' % (tr.id, tr.stats.starttime.isoformat())
+        tr.write(tmpfilename)
         try:
-            mseedqc = MSEEDMetadata(['temp.mseed']) 
+            mseedqc = MSEEDMetadata([tmpfilename]) 
         except:
             pass
         else:
             tr.stats['metrics'] = mseedqc.meta
-            os.remove('temp.mseed')
+            os.remove(tmpfilename)
             add_to_trace_history(tr, 'MSEED metrics computed (similar to ISPAQ/MUSTANG).')
     else:
         tr.stats['quality_factor'] = -100

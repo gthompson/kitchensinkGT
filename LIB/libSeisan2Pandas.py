@@ -190,11 +190,11 @@ def process1event(sfile, bool_overwrite, station_locationsDF=None,  MASTER_INV=N
                 summarydict['DSN_wavfile'] = wavbase
                 if os.path.exists(d[item]):
                     summarydict['DSN_exists'] = True
-                    #try:
-                    DSN_mseedfile = enhanceWAV(d[item], bool_overwrite=bool_overwrite, station_locationsDF=station_locationsDF,  MASTER_INV=MASTER_INV)
-                    summarydict['corrected_DSN_mseed'] = DSN_mseedfile
-                    #except:
-                    #    os.system('echo sfile, %s >> seisan2pandas_failed.log' % wavbase)
+                    try:
+                        DSN_mseedfile = enhanceWAV(d[item], bool_overwrite=bool_overwrite, station_locationsDF=station_locationsDF,  MASTER_INV=MASTER_INV)
+                        summarydict['corrected_DSN_mseed'] = DSN_mseedfile
+                    except:
+                        os.system('echo sfile, %s >> seisan2pandas_failed.log' % wavbase)
 
             elif 'SPN' in wavbase:
                 summarydict['ASN_wavfile'] = wavbase

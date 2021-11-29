@@ -43,11 +43,8 @@ def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES
                 print('Already processed %s' % sfile )
                 continue      
         print('Processing %d of %d: %s' % (i, len(slist), sfile) )
-
         summarydict = process1event(sfile, bool_overwrite, station_locationsDF=station_locationsDF, MASTER_INV=MASTER_INV)
         summarydf.append(summarydict, ignore_index=True)      
-        #summaryLOD.append(summarydict)
-        #summarydf = pd.DataFrame(summaryLOD)
         summarydf.to_csv(summaryfile, index=False)
         filesdone += 1     
         if filesdone >= MAXFILES:
@@ -139,16 +136,17 @@ def eventdf2catalogdf(eventdf, st, waveformfilepath, bool_detect_event):
 
 #######################################################################
 print('Usage %s [STARTYEAR [STARTMONTH [MAXFILES] ] ]' % sys.argv[0])
-STARTYEAR = None
+STARTYEAR = "1996"
 STARTMONTH = "01"
 MAXFILES = 999999
 argc = len(sys.argv)
-if argc>0:
-    STARTYEAR = sys.argv[1]
+print(argc)
 if argc>1:
-    STARTMONTH = sys.argv[2]
+    STARTYEAR = sys.argv[1]
 if argc>2:
-    MAXFILES = int(sys.argv[3])
+    STARTMONTH = sys.argv[2]
+if argc>3:
+    MAXFILES = sys.argv[3]
     
 # import controlling variables - actually not globals
 SEISAN_DATA, SEISAN_DB, station_locationsDF, MASTER_INV, \
