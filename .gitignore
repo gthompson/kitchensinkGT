@@ -3,9 +3,13 @@
 *.pyc
 .vscode/settings.json
 #*.csv
+fingerprint*
+*swp
 PROJECTS/MVOcatalog/Untitled.ipynb
 PROJECTS/MontserratML/paris+t.xlsx
+PROJECTS/MontserratML/utils/RESP*
 LIB/Untitled.ipynb
 LIB/seisanDBtools/untitled
 LIB/list_of_functions.txt
 PROJECTS/MVOcatalog/quake.xml
+PROJECTS/fitness/best*.csv

@@ -80,11 +80,20 @@ def correct_nslc(traceID, Fs, shortperiod=None):
     # type of seismometer, oriented North?
     # let's handle these directly here
     if len(chan)==2:
+        # could be a 2006 era waveform trace ID where given as .STAT.C.[BS]H
         if len(loc)==1:
             chan=chan+loc # now length 3
             orientationcode = loc
             if not loc.isnumeric():
-                loc=''   
+                loc='' 
+        elif len(loc)==0:
+            # could be arrival row from an Sfile, where the "H" is omitted
+            # or an AEF line where trace dead and orientation missing
+            instrumentcode = 'H'
+            if chan[1] in 'ZNE':
+                orientationcode = chan[1]
+            else:
+                orientationcode = '' # sometimes get two-character chans from AEF lines which omit component when trace is dead, e.g. 01-0954-24L.S200601, 
     if len(chan)==3:
         if chan[0:2]=='SB':
             bandcode = get_seed_band_code(Fs, shortperiod=False) # just because we know it is BB sensor

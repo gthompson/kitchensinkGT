@@ -356,7 +356,7 @@ class Sfile:
                     if asta[0:2]=='MB' and self.filetime.year < 2005:
                         Fs = 75
                     fixedID = correct_nslc(traceID, Fs, shortperiod=False)
-                    print(traceID,'->',fixedID)                    
+                    #print(traceID,'->',fixedID)                    
                     if 'time_residual' in thisarrival:
                         tres = QuantityError(uncertainty=thisarrival['time_residual'])
                         p = Pick(time = atime, waveform_id = fixedID, onset=onset, phase_hint=aphase, time_errors=tres, backazimuth=180+thisarrival['azimuth'] % 360)
