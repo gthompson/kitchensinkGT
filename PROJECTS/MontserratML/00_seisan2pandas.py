@@ -73,7 +73,7 @@ if argc>3:
     
 # import controlling variables - actually not globals
 SEISAN_DATA, SEISAN_DB, station_locationsDF, MASTER_INV, \
-bool_detect_event, bool_overwrite = set_globals()
+bool_overwrite = set_globals()
 if not isinstance(station_locationsDF, pd.DataFrame):
     print('Station coordinates not loaded. Exiting. Although we could change code and get these from StationXML file')
     exit()

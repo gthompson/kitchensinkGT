@@ -217,8 +217,7 @@ def set_globals():
         station_locationsDF = None
 
     MASTER_INV = read_inventory(master_station_xml)
-    bool_detect_event=True
     bool_overwrite=False
     return SEISAN_DATA, SEISAN_DB, station_locationsDF, MASTER_INV, \
-           bool_detect_event, bool_overwrite
+           bool_overwrite
 
