@@ -11,20 +11,39 @@ from libSeisan2Pandas import get_sfile_list, process1event, set_globals
 from libseisGT import detect_network_event
 from metrics import choose_best_traces
 
+
+def LoD2df(lod, df, csvfile):
+    if len(df.index)>0:
+        lod0 = df.to_dict('records')
+        lod0.extend(lod)
+        df = pd.DataFrame(lod0)  
+    elif len(lod)>0:
+        df = pd.DataFrame(lod)
+    df.drop_duplicates(subset=['sfile', 'DSN_wavfile'],keep='last',inplace=True)
+    if len(df.index)>1:
+        df.to_csv(csvfile, index=False)
+    return df
     
 def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES=999999, startdate=None, \
                            bool_overwrite=False, station_locationsDF=None, MASTER_INV=None, bool_index_only=False):
     
+    LoD = []
     
     # The summary file created here is just an index to different files
     miniseeddir = os.path.join(SEISAN_DATA, 'miniseed_c', SEISAN_DB)
     sfileindexfile=os.path.join(miniseeddir, 'sfileindex_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
-
-    if os.path.exists(sfileindexfile) and bool_overwrite:
-        sfileindex_df = pd.read_csv(summaryfile)
+    
+    if os.path.exists(sfileindexfile) and not bool_overwrite:
+        print('Reading %s' % sfileindexfile)
+        sfileindex_df = pd.read_csv(sfileindexfile)
+        sfiles_done_already = sfileindex_df['sfile'].to_list()     
+        #print('Last file processed for %s/%s was %s ' % (YYYY,MM,sfiles_done_already[-1]) )        
     else:
+        print('Starting with blank DataFrame')
+        sfiles_done_already = []
         sfileindex_df = pd.DataFrame(columns=['sfile', 'DSN_wavfile', 'DSN_exists', 'ASN_wavfile', 'ASN_exists', 'corrected_DSN_mseed', 'corrected_ASN_mseed', 'mainclass', 'subclass']) 
-
+   
+        
     # Get s-file list
     startdate_thismonth = dt.datetime(int(YYYY), int(MM), 1)
     if not startdate:
@@ -39,25 +58,29 @@ def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES
     slist = sorted(get_sfile_list(SEISAN_DATA, SEISAN_DB, startdate, enddate))
 
     for i,sfile in enumerate(slist):
-        
+        sbase = os.path.basename(sfile)
+        if sbase in sfiles_done_already:
         # is this sfile already in summarydf? if so, skip it, unless bool_overwrite
-        if sfileindex_df['sfile'].str.contains( os.path.basename(sfile) ).any():
+        #if sfileindex_df['sfile'].str.contains(  ).any():
             # already processed
-            if not bool_overwrite:
-                print('Already processed %s' % sfile )
-                continue      
-        print('Processing %d of %d: %s' % (i, len(slist), sfile) )
+            #if not bool_overwrite:
+            print('Already processed %s' % sbase )
+            continue  
+        print('Processing %d of %d: %s' % (i, len(slist), sbase) )
         try:
+            print('Calling process1event')
             sfileindex_dict = process1event(sfile, bool_overwrite, station_locationsDF=station_locationsDF, \
                                     MASTER_INV=MASTER_INV, bool_index_only=bool_index_only)
-            sfileindex_df.append(sfileindex_dict, ignore_index=True)  
+            LoD.append(sfileindex_dict)
+            #sfileindex_df = LoD2df(LoD, sfileindex_df, sfileindexfile) # SCAFFOLD   
         except:
-            if len(sfileindex_df.index)>1:
-                sfileindex_df.to_csv(sfileindexfile, index=False)
+            print('Got exception. Saving to ',sfileindexfile)
+            sfileindex_df = LoD2df(LoD, sfileindex_df, sfileindexfile) # SCAFFOLD
         filesdone += 1     
         if filesdone >= MAXFILES:
             break  
-    sfileindex_df.to_csv(sfileindexfile, index=False)        
+    print('Done with %s/%s. Saving to %s' % (YYYY,MM,sfileindexfile)  )  
+    sfileindex_df = LoD2df(LoD, sfileindex_df, sfileindexfile) # SCAFFOLD      
     return filesdone
 
 

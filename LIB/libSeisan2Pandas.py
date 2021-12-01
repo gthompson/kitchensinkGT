@@ -211,8 +211,8 @@ def process1event(sfile, bool_overwrite, station_locationsDF=None,  MASTER_INV=N
 
 def set_globals():
     SEISAN_DATA = os.path.join( os.getenv('HOME'),'DATA','MVO')
-    master_station_xml = './MontserratDigitalSeismicNetwork.xml'
-    os.system("cp %s %s/CAL/" % (master_station_xml, SEISAN_DATA) )
+    #master_station_xml = './MontserratDigitalSeismicNetwork.xml'
+    #os.system("cp %s %s/CAL/" % (master_station_xml, SEISAN_DATA) )
     os.chdir(SEISAN_DATA)
     master_station_xml = 'CAL/MontserratDigitalSeismicNetwork.xml'
     SEISAN_DB = 'MVOE_'
