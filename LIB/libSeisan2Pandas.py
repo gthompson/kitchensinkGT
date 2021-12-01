@@ -170,10 +170,10 @@ def enhanceWAV(wavfile, bool_overwrite=False, station_locationsDF=None, MASTER_I
         
     return paths['miniseedfile_c']
     
-def process1event(sfile, bool_overwrite, station_locationsDF=None,  MASTER_INV=None):
-         
+def process1event(sfile, bool_overwrite, station_locationsDF=None,  MASTER_INV=None, bool_index_only=False):
+    
     try:
-        s = Sfile(sfile, use_mvo_parser=True)
+        s = Sfile(sfile, fast_mode=True)
         d = s.to_dict()
         sfileindex_dict = {'sfile':os.path.basename(s.path), 'DSN_wavfile':None, 'DSN_exists':False, 'ASN_wavfile':None, 'ASN_exists':False, 'corrected_DSN_mseed':None, 'corrected_ASN_mseed':None, 'mainclass':s.mainclass, 'subclass':s.subclass}
     except:
@@ -190,11 +190,17 @@ def process1event(sfile, bool_overwrite, station_locationsDF=None,  MASTER_INV=N
                 sfileindex_dict['DSN_wavfile'] = wavbase
                 if os.path.exists(d[item]):
                     sfileindex_dict['DSN_exists'] = True
-                    try:
-                        DSN_mseedfile = enhanceWAV(d[item], bool_overwrite=bool_overwrite, station_locationsDF=station_locationsDF,  MASTER_INV=MASTER_INV)
-                        sfileindex_dict['corrected_DSN_mseed'] = DSN_mseedfile
-                    except:
-                        os.system('echo sfile, %s >> seisan2pandas_failed.log' % wavbase)
+                    if bool_index_only:
+                        paths = wavfile2paths(d[item])  
+                        DSN_mseedfile = paths['miniseedfile_c']
+                        if os.path.exists(DSN_mseedfile):
+                            sfileindex_dict['corrected_DSN_mseed'] = DSN_mseedfile
+                    else:
+                        try:
+                            DSN_mseedfile = enhanceWAV(d[item], bool_overwrite=bool_overwrite, station_locationsDF=station_locationsDF,  MASTER_INV=MASTER_INV)
+                            sfileindex_dict['corrected_DSN_mseed'] = DSN_mseedfile
+                        except:
+                            os.system('echo sfile, %s >> seisan2pandas_failed.log' % wavbase)
 
             elif 'SPN' in wavbase:
                 sfileindex_dict['ASN_wavfile'] = wavbase
@@ -218,6 +224,5 @@ def set_globals():
 
     MASTER_INV = read_inventory(master_station_xml)
     bool_overwrite=False
-    return SEISAN_DATA, SEISAN_DB, station_locationsDF, MASTER_INV, \
-           bool_overwrite
+    return SEISAN_DATA, SEISAN_DB, station_locationsDF, MASTER_INV, bool_overwrite
 

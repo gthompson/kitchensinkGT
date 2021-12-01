@@ -12,7 +12,7 @@ class Sfile:
     # Prototypes
     #__init__(self, sfilepath): Construct S-file object from Sfile at path
 
-    def __init__(self, path, use_mvo_parser=False):
+    def __init__(self, path, use_mvo_parser=False, fast_mode=False):
     
         self.path = path.strip()
         if not os.path.exists(self.path):
@@ -66,7 +66,9 @@ class Sfile:
         self.filetime = spath2datetime(self.path)
         
         if _is_sfile(self.path): 
-            if use_mvo_parser:
+            if fast_mode:
+                self = self.parse_sfile_fast()
+            elif use_mvo_parser:
                 self = self.parse_sfile()
             else:
                 # Here we just parse using ObsPy
@@ -531,6 +533,44 @@ class Sfile:
         print(evobj.event_descriptions)
         for i, originobj in enumerate(evobj.origins):
             print(i, originobj)
+            
+    def parse_sfile_fast(self):
+        print('Parsing ',self.path)
+        fptr = open(self.path,'r') 
+        row = fptr.readlines()
+        fptr.close()
+
+        # File opened ok, parse each line in a way that depends on the 80th character (line[79])
+        for line in row:
+            result = line.find("VOLC")
+            if line[-1] == '3' or result>-1:
+                if line[1:7]== 'ExtMag':
+                    continue
+                elif line[1:4]=='URL':
+                    continue
+                elif result:
+                    if line[result:result+9]=="VOLC MAIN":
+                        self.subclass = line[result+10:result+20].strip()
+
+                            
+            if line.find('VOLC MBLYTBH')>-1:
+                continue
+
+            if len(line) < 80:
+                continue
+
+            if line[79] == '1':
+                self.mainclass = line[21:23].strip()
+ 
+
+            if line[79] == '6':
+                wavfiles = line[1:79].split()
+                for wavfile in wavfiles:
+                    wavfullpath = os.path.join(os.path.dirname(self.path).replace('REA','WAV'), wavfile)
+                    self.wavfiles.append(Wavfile(wavfullpath))
+
+
+
             
 def spath2datetime(spath):
     # Date/time info from sfile path

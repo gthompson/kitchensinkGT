@@ -13,7 +13,7 @@ from metrics import choose_best_traces
 
     
 def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES=999999, startdate=None, \
-                           bool_overwrite=False, station_locationsDF=None, MASTER_INV=None):
+                           bool_overwrite=False, station_locationsDF=None, MASTER_INV=None, bool_index_only=False):
     
     
     # The summary file created here is just an index to different files
@@ -47,21 +47,35 @@ def processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, MAXFILES
                 print('Already processed %s' % sfile )
                 continue      
         print('Processing %d of %d: %s' % (i, len(slist), sfile) )
-        summarydict = process1event(sfile, bool_overwrite, station_locationsDF=station_locationsDF, MASTER_INV=MASTER_INV)
-        sfileindex_df.append(summarydict, ignore_index=True)      
-        sfileindex_df.to_csv(sfileindexfile, index=False)
+        try:
+            sfileindex_dict = process1event(sfile, bool_overwrite, station_locationsDF=station_locationsDF, \
+                                    MASTER_INV=MASTER_INV, bool_index_only=bool_index_only)
+            sfileindex_df.append(sfileindex_dict, ignore_index=True)  
+        except:
+            if len(sfileindex_df.index)>1:
+                sfileindex_df.to_csv(sfileindexfile, index=False)
         filesdone += 1     
         if filesdone >= MAXFILES:
             break  
+    sfileindex_df.to_csv(sfileindexfile, index=False)        
     return filesdone
 
 
 
 #######################################################################
-print('Usage %s [STARTYEAR [STARTMONTH [MAXFILES] ] ]' % sys.argv[0])
+print('Usage %s STARTYEAR STARTMONTH MAXFILES bool_index_only bool_overwrite' % sys.argv[0])
+    
+# import controlling variables - actually not globals
+SEISAN_DATA, SEISAN_DB, station_locationsDF, MASTER_INV, bool_overwrite = set_globals()
+if not isinstance(station_locationsDF, pd.DataFrame):
+    print('Station coordinates not loaded. Exiting. Although we could change code and get these from StationXML file')
+    exit()    
 STARTYEAR = "1996"
 STARTMONTH = "01"
 MAXFILES = 999999
+bool_index_only = False
+
+# command line arguments
 argc = len(sys.argv)
 print(argc)
 if argc>1:
@@ -69,14 +83,14 @@ if argc>1:
 if argc>2:
     STARTMONTH = sys.argv[2]
 if argc>3:
-    MAXFILES = sys.argv[3]
-    
-# import controlling variables - actually not globals
-SEISAN_DATA, SEISAN_DB, station_locationsDF, MASTER_INV, \
-bool_overwrite = set_globals()
-if not isinstance(station_locationsDF, pd.DataFrame):
-    print('Station coordinates not loaded. Exiting. Although we could change code and get these from StationXML file')
-    exit()
+    MAXFILES = int(sys.argv[3])
+if argc>4:
+    if sys.argv[4]=='1':
+        bool_index_only = True
+if argc>5:
+    if sys.argv[5]=='1':
+        bool_overwrite = True  
+
     
 # the default is to loop over years/months
 filesdone = 0
@@ -98,6 +112,7 @@ for yeardir in yeardirs:
         print('\n**** Processing %s ****' % monthdir)
         filesdone = processSeisanYearMonth(SEISAN_DATA, SEISAN_DB, YYYY, MM, filesdone, \
                                            MAXFILES=MAXFILES, bool_overwrite=bool_overwrite, \
-                                           station_locationsDF=station_locationsDF, MASTER_INV=MASTER_INV)
+                                           station_locationsDF=station_locationsDF, \
+                                           MASTER_INV=MASTER_INV, bool_index_only=bool_index_only)
 
 
