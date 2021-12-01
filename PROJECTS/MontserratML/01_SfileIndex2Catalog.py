@@ -23,10 +23,7 @@ def create_catalog(SEISAN_DATA, SEISAN_DB, YYYY, MM, bool_detect_event):
     if bool_detect_event:
         catalogfile=os.path.join(miniseeddir, 'detected_catalog_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
     else:
-        catalogfile=os.path.join(miniseeddir, 'catalog_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
-    if os.path.exists(sfileindexfile):
-        sfileindex_df = pd.read_csv(sfileindexfile)
-        
+        catalogfile=os.path.join(miniseeddir, 'catalog_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) 
         for i,row in sfileindex_df.iterrows():
             mseedfile = row['corrected_DSN_mseed']
             
