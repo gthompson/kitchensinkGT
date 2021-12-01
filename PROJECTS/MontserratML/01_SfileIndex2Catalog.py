@@ -31,10 +31,11 @@ def create_catalog(SEISAN_DATA, SEISAN_DB, YYYY, MM, bool_detect_event):
     else:
         catalogfile=os.path.join(miniseeddir, 'catalog_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
         for i,row in sfileindex_df.iterrows():
+            #print(row)
             mseedfile = row['corrected_DSN_mseed']
             
             # this part seems to be same functionality as read_enhanced_wav
-            if mseedfile:
+            if isinstance(mseedfile, str):
                 
                 eventcsvfile = mseedfile.replace('.mseed','.csv')
                 event_df = pd.read_csv(eventcsvfile)
@@ -55,21 +56,14 @@ def create_catalog(SEISAN_DATA, SEISAN_DB, YYYY, MM, bool_detect_event):
         sfileindex_df.to_csv(catalogfile)          
 
       
-def eventdf2catalogrow(eventdf, mseedfile, bool_detect_event):
+def eventdf2catalogrow(df, mseedfile, bool_detect_event):
     # Summarize event
-    print('Create a summary row for whole event')
-    numOfRows = eventdf.shape[0]
-    if bool_correct_data:
-        df = eventdf[eventdf["units"] == 'm/s']
-        if len(df.index)==0:
-            df = eventdf
-    else:
-        df = eventdf
+    #print('Create a summary row for whole event')
     df.sort_values(by=['quality'], inplace=True)
     df = df.head(10) # get 10 best rows    
     catalogrow = df.median(axis = 0, skipna = True).to_dict()        
     catalogrow['path']=os.path.basename(mseedfile).replace('.mseed','')
-    catalogrow['num_traces']=numOfRows
+    catalogrow['num_traces']=len(df.index)
     filetime=df.iloc[0]['starttime']
     catalogrow['filetime']=filetime
     try: # is filetime a string or a datetime object?
