@@ -177,7 +177,7 @@ def process1event(sfile, bool_overwrite, station_locationsDF=None,  MASTER_INV=N
         d = s.to_dict()
         sfileindex_dict = {'sfile':os.path.basename(s.path), 'DSN_wavfile':None, 'DSN_exists':False, 'ASN_wavfile':None, 'ASN_exists':False, 'corrected_DSN_mseed':None, 'corrected_ASN_mseed':None, 'mainclass':s.mainclass, 'subclass':s.subclass}
     except:
-        os.system('echo sfile >> bad_sfiles.log')
+        os.system('echo %s >> bad_sfiles.log' % sfile)
         return None
     #s.cat()
     #s.printEvents()        
@@ -200,7 +200,7 @@ def process1event(sfile, bool_overwrite, station_locationsDF=None,  MASTER_INV=N
                             DSN_mseedfile = enhanceWAV(d[item], bool_overwrite=bool_overwrite, station_locationsDF=station_locationsDF,  MASTER_INV=MASTER_INV)
                             sfileindex_dict['corrected_DSN_mseed'] = DSN_mseedfile
                         except:
-                            os.system('echo sfile, %s >> seisan2pandas_failed.log' % wavbase)
+                            os.system('echo %s, %s >> seisan2pandas_failed.log' % (sfile, wavbase))
 
             elif 'SPN' in wavbase:
                 sfileindex_dict['ASN_wavfile'] = wavbase
