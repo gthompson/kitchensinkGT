@@ -20,7 +20,10 @@ def create_catalog(SEISAN_DATA, SEISAN_DB, YYYY, MM, bool_detect_event):
     # then there would be no need to read the miniseed file and run the detection
     miniseeddir = os.path.join(SEISAN_DATA, 'miniseed_c', SEISAN_DB)
     sfileindexfile=os.path.join(miniseeddir, 'sfileindex_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
-    catalogfile=os.path.join(miniseeddir, 'catalog_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
+    if bool_detect_event:
+        catalogfile=os.path.join(miniseeddir, 'detected_catalog_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
+    else:
+        catalogfile=os.path.join(miniseeddir, 'catalog_%s%s%s.csv' % (SEISAN_DB, YYYY, MM) )
     if os.path.exists(sfileindexfile):
         sfileindex_df = pd.read_csv(sfileindexfile)
         

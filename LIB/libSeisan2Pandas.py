@@ -175,7 +175,7 @@ def process1event(sfile, bool_overwrite, station_locationsDF=None,  MASTER_INV=N
     try:
         s = Sfile(sfile, use_mvo_parser=True)
         d = s.to_dict()
-        summarydict = {'sfile':os.path.basename(s.path), 'DSN_wavfile':None, 'DSN_exists':False, 'ASN_wavfile':None, 'ASN_exists':False, 'corrected_DSN_mseed':None, 'corrected_ASN_mseed':None, 'mainclass':s.mainclass, 'subclass':s.subclass}
+        sfileindex_dict = {'sfile':os.path.basename(s.path), 'DSN_wavfile':None, 'DSN_exists':False, 'ASN_wavfile':None, 'ASN_exists':False, 'corrected_DSN_mseed':None, 'corrected_ASN_mseed':None, 'mainclass':s.mainclass, 'subclass':s.subclass}
     except:
         os.system('echo sfile >> bad_sfiles.log')
         return None
@@ -187,20 +187,20 @@ def process1event(sfile, bool_overwrite, station_locationsDF=None,  MASTER_INV=N
         if d[item]:
             wavbase = os.path.basename(d[item])
             if 'MVO' in wavbase:
-                summarydict['DSN_wavfile'] = wavbase
+                sfileindex_dict['DSN_wavfile'] = wavbase
                 if os.path.exists(d[item]):
-                    summarydict['DSN_exists'] = True
+                    sfileindex_dict['DSN_exists'] = True
                     try:
                         DSN_mseedfile = enhanceWAV(d[item], bool_overwrite=bool_overwrite, station_locationsDF=station_locationsDF,  MASTER_INV=MASTER_INV)
-                        summarydict['corrected_DSN_mseed'] = DSN_mseedfile
+                        sfileindex_dict['corrected_DSN_mseed'] = DSN_mseedfile
                     except:
                         os.system('echo sfile, %s >> seisan2pandas_failed.log' % wavbase)
 
             elif 'SPN' in wavbase:
-                summarydict['ASN_wavfile'] = wavbase
+                sfileindex_dict['ASN_wavfile'] = wavbase
                 if os.path.exists(d[item]):
-                    summarydict['ASN_exists'] = True 
-    return summarydict
+                    sfileindex_dict['ASN_exists'] = True 
+    return sfileindex_dict
         
 
 def set_globals():
