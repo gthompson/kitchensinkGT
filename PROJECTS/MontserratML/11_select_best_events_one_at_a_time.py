@@ -244,6 +244,9 @@ def select_next_event(dfall, subclasses_for_ML):
 
         # mechanism to weight out checked events
         df = df[df['ignore']==False]
+        
+        # weight out events with less than 3 traces
+        df = df[df['num_traces']>2]
 
         if len(df.index)>0:
             # we use three criteria for ranking events. detection_quality has the largest magnitude, but can be missing, so we also add snr, 
@@ -367,17 +370,17 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
         """
 
         # plot all
-        #st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event.png'), size=(600,100), method='full');
+        st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event.png'));
         #st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event.png'), method='full');
-        plot_seismograms(st, outfile=os.path.join(CWD, 'current_event.png'))
+        #plot_seismograms(st, outfile=os.path.join(CWD, 'current_event.png'))
         # also plot a fixed 30-seconds around the peaktime
         #starttime = st[0].stats.starttime + df.iloc[0,'peaktime']-10
         starttime = st[0].stats.starttime + df.loc[thiswav,'peaktime']-10
         endtime = starttime + 20
         st.trim(starttime=starttime, endtime=endtime, pad=True, fill_value=None)
-        #st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event_zoomed.png'), size=(600,100), method='full')
+        st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event_zoomed.png'));
         #st.plot(equal_scale=False, outfile=os.path.join(CWD, 'current_event_zoomed.png'), method='full');
-        plot_seismograms(st, outfile=os.path.join(CWD, 'current_event_zoomed.png'))
+        #plot_seismograms(st, outfile=os.path.join(CWD, 'current_event_zoomed.png'))
 
         # Show a map of amplitude distribution
         try:
@@ -742,6 +745,7 @@ else: # create one
         exit()
     
 # ensure we always have the same index and columns
+"""
 correct_columns = ['filetime', 'path', 'sfile', 'num_traces', 'Fs', 'calib', 
                    'subclass', 'new_subclass', 'quality', 'weight',
                    'checked', 'split', 'delete', 'ignore',
@@ -758,6 +762,7 @@ correct_columns = ['filetime', 'path', 'sfile', 'num_traces', 'Fs', 'calib',
                    'trigger_duration', 'ontime', 'offtime', 
                    'cft_peak_wmean', 'cft_std_wmean', 'coincidence_sum',
                    'detection_quality'] # removed starttime
+"""
 good_columns = []
 for thiscol in dfall.columns:
     if 'ntitle' not in thiscol:

@@ -293,7 +293,10 @@ def plot_station_amplitude_map(st, station0hypfile=None, outfile=None):
          
     # save or show
     if outfile:
-        plt.savefig(outfile,  bbox_inches='tight');
+        try:
+            plt.savefig(outfile,  bbox_inches='tight');
+        except:
+            plt.show();
     else:
         plt.show();
  
