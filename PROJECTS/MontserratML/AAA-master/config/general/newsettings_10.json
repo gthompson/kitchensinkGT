@@ -1,6 +1,6 @@
 {
 	"general":{
-		"project_root":"/Users/thompsong/src/AAA-master/",
+		"project_root":"./AAA-master/",
 		"analysis_type":"continuous",
 		"path_to_specific_settings_file":"config/specific/usecase1_continuous_classification/usecase1_EXAMPLE.json",
 		"path_to_res":"res/",
@@ -19,7 +19,7 @@
 	"learning":{
 		"algo":"RandomForestClassifier(n_estimators=100,criterion='entropy',bootstrap=True, class_weight=None)",
 		"cv":"StratifiedShuffleSplit(n_splits=30, train_size=0.5, test_size=0.5)",
-		"path_to_catalogue":"catalog/MVO_labelled_events_filtered.pd"		
+		"path_to_catalogue":"catalog/30_MVO_labelled_events_filtered.pd"		
 	},
 	
 	"features":{

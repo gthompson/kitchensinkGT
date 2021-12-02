@@ -1,6 +1,6 @@
 {	"data_to_analyze":{
-		"path_to_data":"/Users/thompsong/Dropbox/MVO_labelled_events/",
-		"data_files":"*.pickle",
+		"path_to_data":"./miniseed_c",
+		"data_files":"*.mseed",
 		"reading_function":"read_montserrat",
 		"reading_arguments":{
 		}

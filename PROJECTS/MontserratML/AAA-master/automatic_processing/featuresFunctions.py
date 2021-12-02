@@ -532,7 +532,7 @@ def band_ratio_1(signal, arg_dict):
     # but arg_dict does have fs and window_length, so I could recalculate band ratio
     # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
     # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('../MONTSERRAT/precomputed_metrics.csv')
+    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
     return tracedf.iloc[0]['bandratio_[1.0_6.0_11.0]']
 
 def band_ratio_2(signal, arg_dict):
@@ -541,7 +541,7 @@ def band_ratio_2(signal, arg_dict):
     # but arg_dict does have fs and window_length, so I could recalculate band ratio
     # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
     # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('../MONTSERRAT/precomputed_metrics.csv')
+    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
     return tracedf.iloc[0]['bandratio_[0.8_4.0_16.0]']
 
 def medianF(signal, arg_dict):
@@ -550,7 +550,7 @@ def medianF(signal, arg_dict):
     # but arg_dict does have fs and window_length, so I could recalculate band ratio
     # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
     # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('../MONTSERRAT/precomputed_metrics.csv')
+    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
     return tracedf.iloc[0]['medianF']
 
 def peakF(signal, arg_dict):
@@ -559,7 +559,7 @@ def peakF(signal, arg_dict):
     # but arg_dict does have fs and window_length, so I could recalculate band ratio
     # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
     # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('../MONTSERRAT/precomputed_metrics.csv')
+    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
     return tracedf.iloc[0]['peakF']
 
 def bw_min(signal, arg_dict):
@@ -568,7 +568,7 @@ def bw_min(signal, arg_dict):
     # but arg_dict does have fs and window_length, so I could recalculate band ratio
     # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
     # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('../MONTSERRAT/precomputed_metrics.csv')
+    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
     return tracedf.iloc[0]['bw_min']
 
 def bw_max(signal, arg_dict):
@@ -577,5 +577,5 @@ def bw_max(signal, arg_dict):
     # but arg_dict does have fs and window_length, so I could recalculate band ratio
     # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
     # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('../MONTSERRAT/precomputed_metrics.csv')
+    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
     return tracedf.iloc[0]['bw_max']

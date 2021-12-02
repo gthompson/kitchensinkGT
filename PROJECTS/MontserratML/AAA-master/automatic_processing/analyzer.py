@@ -42,7 +42,8 @@ import datetime
 from features import FeatureVector
 import pickle
 import numpy as np
-from DataReadingFunctions import requestObservation
+#from DataReadingFunctions import requestObservation
+from DataReadingFunctions import read_montserrat
 from sklearn import preprocessing
 from tools import butter_bandpass_filter
 from featuresFunctions import energy, energy_u
@@ -122,9 +123,10 @@ class Analyzer:
 
         # Read all labeled signatures (labels+data) from the catalogue, and extract features
         tStart = time.time()
-        for i in range(len(self.catalogue.index)):
-            if self._verbatim > 2:
-                print('Data index: ', i)
+        catalog_length = len(self.catalogue.index)
+        for i in range(catalog_length):
+            if self._verbatim > 1:
+                print('Processing waveform %d of %d', (i, catalog_length))
             secondFloat = self.catalogue.iloc[i]['second']
             tStartSignature = datetime.datetime(int(self.catalogue.iloc[i]['year']),     \
                                                 int(self.catalogue.iloc[i]['month']),    \
@@ -135,8 +137,9 @@ class Analyzer:
                                                 int((secondFloat-int(secondFloat))*1000000)) #microseconds
             duration = self.catalogue.iloc[i]['length']
             path = self.catalogue.iloc[i]['path']
-            (fs, signature) = requestObservation(config, tStartSignature, duration, path, verbatim=0)
-
+            #(fs, signature) = requestObservation(config, tStartSignature, duration, path, verbatim=0)
+            (fs, signature) = read_montserrat(path, config, verbatim)
+            print(fs, len(signature)) # SCAFFOLD
             # If problem
             if len(signature) < 40:
                 if verbatim > 2:
