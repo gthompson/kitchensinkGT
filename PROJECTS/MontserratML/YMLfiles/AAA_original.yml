@@ -1,0 +1,17 @@
+name: AAA_original
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - numpy==1.13.3
+  - scipy==0.18.1
+  - pandas==0.19.2
+  - matplotlib==1.5.3
+  - numpy
+  - obspy==1.0.2
+  - sympy==1.0
+  - scikit-learn==0.18.1
+  - pip:
+    - python-speech-features==0.4
+    - soundfile==0.8.1
+prefix: /Users/gt/opt/anaconda3/envs/AAA
