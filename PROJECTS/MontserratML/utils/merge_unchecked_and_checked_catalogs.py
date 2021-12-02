@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-
+import pandas as pd
+import os
 def fix_df(df):
     good_columns = []
     for thiscol in df.columns:
@@ -16,20 +17,20 @@ def df2csv_without_index(df, csvfile):
 
     
 #full_unchecked_csv = os.path.join(SEISAN_DATA, 'MachineLearning', SEISAN_DB, 'labelling', '%scatalog.csv' % SEISAN_DB)
-full_unchecked_csv = os.path.join('/Volumes/shareddrive/thompsong', 'MachineLearning', \
-                                  SEISAN_DB, 'labelling', '%s11_master_catalog.csv' % SEISAN_DB)
+#full_unchecked_csv = os.path.join('/Volumes/shareddrive/thompsong', 'MachineLearning', \
+#                                  SEISAN_DB, 'labelling', '%s11_master_catalog.csv' % SEISAN_DB)
 
-
-full_unchecked_cat = pd.read_csv(full_unchecked_csv)    
+full_unchecked_csv = '/home/thompsong/DATA/MVO/MachineLearning/MVOE_/labelling/MVOE_11_master_catalog.csv'
+full_unchecked_cat = pd.read_csv(full_unchecked_csv)  
 unchecked = fix_df(full_unchecked_cat)
-unchecked.head()
+print('unchecked has %d rows' % len(unchecked) )  
 unchecked2 = unchecked.copy()
 
 old_checked_csv = "../CSVfiles/catalog_unique.csv"
 old_checked_csv = "11_merged_catalog.csv"
 old_checked_cat = pd.read_csv(old_checked_csv)
 checked = fix_df(old_checked_cat)
-checked.head()
+print('checked has %d rows' % len(checked) )  
 checked2 = checked[['path', 'quality','subclass','D', 'R',
        'r', 'e', 'l', 'h', 't', 'new_subclass', 'weight', 'checked', 'split',
        'delete', 'ignore']]
@@ -41,6 +42,6 @@ print('After merging there are %d checked rows out of %d total' % (num_checked,l
 
 # WRITE
 if len(unchecked)==len(unchecked2):    
-    df2csv_without_index(unchecked2, '11_merged_catalog.csv')
+    df2csv_without_index(unchecked2, '11_remerged_catalog.csv')
     # manually copy this to ~/DATA/MVO/MachineLearning/SEISAN_DB/original/merged_catalog.csv
 print('Done')
