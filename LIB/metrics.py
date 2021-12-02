@@ -54,6 +54,9 @@ def process_trace(tr, inv=None, quality_threshold=0.0):
     
     if tr.stats.quality_factor > quality_threshold: # only clean traces better than the threshold
 
+        # Check for spikes - been seeing this in 1998 data
+        check_for_spikes(tr)
+
         """ CLEAN (DETREND, BANDPASS, CORRECT) TRACE """
         clean_trace(tr, taperFraction=0.05, filterType="bandpass", freq=[0.5, 30.0], corners=6, zerophase=False, inv=inv)
     
@@ -63,7 +66,33 @@ def process_trace(tr, inv=None, quality_threshold=0.0):
         except:
             print('qcTrace failed on %s for cleaned trace' % tr.id)
 
-    
+def check_for_spikes(tr):
+    if not 'metrics' in tr.stats:
+        if not 'history' in tr.stats:
+            tr.stats['history'] = list()    
+        
+        """ RAW DATA QC METRICS """
+        try:
+            qcTrace(tr)
+        except:
+            print('qcTrace failed on %s for raw trace' % tr.id)
+            tr.stats['quality_factor'] = -1
+        else:        
+            tr.stats["quality_factor"] = trace_quality_factor(tr) #0 = blank trace, 1 = has some 0s and -1s, 3 = all looks good
+            tr.stats.quality_factor -= tr.stats.metrics['num_gaps']
+            tr.stats.quality_factor -= tr.stats.metrics['num_overlaps']
+            tr.stats.quality_factor *= tr.stats.metrics['percent_availability']/100.0
+            tr.stats.metrics["twin"] = tr.stats.npts /  tr.stats.sampling_rate # before or after detrending  
+    m = tr.stats.metrics
+    peak2peak = m['sample_max']-m['sample_min']
+    positive_spike_metric = (m['sample_upper_quartile']-m['sample_min'])/peak2peak
+    negative_spike_metric = (m['sample_max']-m['sample_lower_quartile'])/peak2peak
+    if positive_spike_metric < 0.01:
+        print('Positive spike(s) suspected on %s' % tr.id)
+        tr.stats['quality_factor'] = -1
+    if negative_spike_metric < 0.01:
+        print('Negative spike(s) suspected on %s' % tr.id)  
+        tr.stats['quality_factor'] = -1
     
 def qcTrace(tr):
     """ qcTrace(tr) DATA QUALITY CHECKS """

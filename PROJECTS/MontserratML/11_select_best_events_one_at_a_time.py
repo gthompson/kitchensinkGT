@@ -19,6 +19,7 @@ from modutils import yn_choice
 #from IPython.display import clear_output
 from obspy import read, read_inventory #, remove_response
 from libMVO import fix_trace_id, inventory_fix_id_mvo, load_mvo_inventory, plot_station_amplitude_map, read_enhanced_stream
+from metrics import check_for_spikes
 #from statsmodels.stats.weightstats import DescrStatsW
 #from obspy.core import read
 #import matplotlib.pyplot as plt
@@ -340,11 +341,38 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
     p = Path(mseedpath)
     mseedpath = os.path.join(pandaSeisDBDir, p.parts[-3], p.parts[-2], p.parts[-1])
 
+    
+    # we are adding a check here for spikes that will now run as part of 00_ but wasn't in place when we ran it before
+    # so we add it here. if we suspect spikes, we mark that trace ID for removal and do this after we load the MSEED file below. The reason we do the spike check on the raw WAV file is because filters run to produce the MSEED file distort the spike
     if os.path.exists(mseedpath):
+        wavpath = mseedpath.replace('miniseed_c', 'WAV').replace('.mseed','')
+        rawst = read(wavpath)
+        for tr in rawst:
+            check_for_spikes(tr)
+            
+        good_traces = 0
+        trace_ids_to_eliminate = []
+        fix_trace_id(rawst)
+        for tr in rawst:
+            check_for_spikes(tr)
+            if tr.stats.quality_factor > 1.0:
+                good_traces += 1
+            else:
+            trace_ids_to_eliminate.append(tr.id)
+
 
         # plot whole event file
         #st = read(mseedpath) #.select(station='MBWH')
         st = read_enhanced_stream(mseedpath)
+        
+        # adding due to spike checks above
+        for tr in st:
+            if tr.id in trace_ids_to_eliminate:
+                st.remove(tr)
+        if len(st)<3:
+            print('not enough traces after removing spiky traces')
+            return False
+                
         st.filter('bandpass', freqmin=0.5, freqmax=25.0, corners=4)
         #_deconvolve_instrument_response(st)
 
