@@ -17,8 +17,8 @@ sys.path.append(LIBpath)
 from libseisGT import add_to_trace_history, plot_seismograms 
 from modutils import yn_choice
 #from IPython.display import clear_output
-from obspy import read_inventory #, remove_response
-from libMVO import fix_trace_id, inventory_fix_id_mvo, load_mvo_inventory, plot_station_amplitude_map
+from obspy import read, read_inventory #, remove_response
+from libMVO import fix_trace_id, inventory_fix_id_mvo, load_mvo_inventory, plot_station_amplitude_map, read_enhanced_stream
 #from statsmodels.stats.weightstats import DescrStatsW
 #from obspy.core import read
 #import matplotlib.pyplot as plt
@@ -40,7 +40,8 @@ def read_volcano_def(volcanodefcsv):
 def build_master_event_catalog(pandaSeisDBDir, SEISAN_DB, catalogfile, subclasses_for_ML, max_duration = 300):
     # load all the year/month CSV files
     #csvfiles = glob(os.path.join(pandaSeisDBDir, 'reawav_%s??????.csv' % SEISANDB))
-    csvfiles = glob(os.path.join(pandaSeisDBDir, 'reawav_%s[12][0-9][0-9][0-9][0-1][0-9].csv' % SEISAN_DB))
+    #csvfiles = glob(os.path.join(pandaSeisDBDir, 'reawav_%s[12][0-9][0-9][0-9][0-1][0-9].csv' % SEISAN_DB))
+    csvfiles = glob(os.path.join(pandaSeisDBDir, 'catalog_%s[12][0-9][0-9][0-9][0-1][0-9].csv' % SEISAN_DB))
     frames = []
     if len(csvfiles)==0:
         print('No reawav*.csv files found. Cannot proceed')
@@ -331,14 +332,16 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
     
     subclass = df.loc[thiswav, 'new_subclass']
     orig_subclass = df.loc[thiswav, 'subclass']
+    mseedpath = df.loc[thiswav, 'corrected_DSN_mseed']
     empty_df = pd.DataFrame()
-    p = Path(thiswav)
-    picklepath = os.path.join(pandaSeisDBDir, p.parts[-3], p.parts[-2], p.parts[-1] + '.pickle')
+    p = Path(mseedpath)
+    mseedpath = os.path.join(pandaSeisDBDir, p.parts[-3], p.parts[-2], p.parts[-1])
 
-    if os.path.exists(picklepath):
+    if os.path.exists(mseedpath):
 
         # plot whole event file
-        st = read(picklepath) #.select(station='MBWH')
+        #st = read(mseedpath) #.select(station='MBWH')
+        st = read_enhanced_stream(mseedpath)
         st.filter('bandpass', freqmin=0.5, freqmax=25.0, corners=4)
         #_deconvolve_instrument_response(st)
 
@@ -377,7 +380,10 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
         plot_seismograms(st, outfile=os.path.join(CWD, 'current_event_zoomed.png'))
 
         # Show a map of amplitude distribution
-        plot_station_amplitude_map(st, station0hypfile=station0hypfile, outfile='current_map.png')
+        try:
+            plot_station_amplitude_map(st, station0hypfile=station0hypfile, outfile='current_map.png')
+        except:
+            print('plot_station_amplitude_map has crashed')
 
         # show webpage
         if sys.platform=='linux':
@@ -391,13 +397,13 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
         #print(dfall[dfall['checked']==True].groupby('new_subclass').size())
         #print(row)
         #print(' ')
-        print('Loaded %s, original class: %s, current class: %s' % (picklepath, orig_subclass, subclass))
+        print('Loaded %s, original class: %s, current class: %s' % (mseedpath, orig_subclass, subclass))
 
         # station amplitudes and energies
         #print(dfenergy)
 
         # trace df metrics
-        csvpath = picklepath.replace('.pickle', '.csv')
+        csvpath = mseedpath.replace('.mseed', '.csv')
         tracedf = pd.read_csv(csvpath)
         #if 'bandratio_[1.0_6.0_11.0]' in tracedf.columns:
         #    tracedf.rename(columns = {'bandratio_[1.0_6.0_11.0]':'band_ratio'}, inplace = True)
@@ -469,7 +475,7 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
             #return df, False     
             return False
     else: # BAD
-        print("%s not found" % picklepath)
+        print("%s not found" % mseedpath)
         #return empty_df, False
         return False
 
@@ -695,13 +701,14 @@ def _df2file_without_index(df, catfile, indexcol=None):
 
 # setup main directory paths & input/output files
 SEISAN_DATA = os.path.join( os.getenv('HOME'),'DATA','MVO') # e.g. /home/user/seismo
-pandaSeisDir = os.path.join(SEISAN_DATA, 'pandaSeis') # e.g. /home/user/seismo/pandaSeis
+#pandaSeisDir = os.path.join(SEISAN_DATA, 'pandaSeis') # e.g. /home/user/seismo/pandaSeis
+pandaSeisDir = os.path.join(SEISAN_DATA, 'miniseed_c') # e.g. /home/user/seismo/pandaSeis
 SEISAN_DB = 'MVOE_' # e.g. the seisan database name (e.g. MVOE_) under /home/user/seismo/WAV and /home/user/seismo/REA
 pandaSeisDBDir = os.path.join(pandaSeisDir, SEISAN_DB) # e.g. /home/user/seismo/pandaSeis/MVOE_
 AAA_DATA_DIR = os.path.join(SEISAN_DATA, 'MachineLearning', SEISAN_DB) # e.g. /home/user/seismo/MachineLearning/MVOE_
-master_event_catalog = os.path.join(AAA_DATA_DIR, 'labelling', '%scatalog.csv' % SEISAN_DB)
-master_event_catalog_original = os.path.join(AAA_DATA_DIR, 'original', '%scatalog.csv' % SEISAN_DB)
-aaa_input_file = os.path.join(AAA_DATA_DIR, 'runAAA', '%slabelled_events.csv' % SEISAN_DB) 
+master_event_catalog = os.path.join(AAA_DATA_DIR, 'labelling', '%s11_master_catalog.csv' % SEISAN_DB)
+master_event_catalog_original = os.path.join(AAA_DATA_DIR, 'original', '%s11_master_catalog_original.csv' % SEISAN_DB)
+aaa_input_file = os.path.join(AAA_DATA_DIR, 'runAAA', '%s11_labelled_events.csv' % SEISAN_DB) 
 _make_parent_dir(master_event_catalog)
 _make_parent_dir(master_event_catalog_original)
 _make_parent_dir(aaa_input_file)
@@ -751,7 +758,11 @@ correct_columns = ['filetime', 'path', 'sfile', 'num_traces', 'Fs', 'calib',
                    'trigger_duration', 'ontime', 'offtime', 
                    'cft_peak_wmean', 'cft_std_wmean', 'coincidence_sum',
                    'detection_quality'] # removed starttime
-dfall = dfall[correct_columns] # subset to correct columns
+good_columns = []
+for thiscol in dfall.columns:
+    if 'ntitle' not in thiscol:
+        good_columns.append(thiscol)
+dfall = dfall[good_columns] # subset to correct columns
 dfall.set_index('path', inplace=True) # try this
 dfall.sort_index(inplace=True)   
     

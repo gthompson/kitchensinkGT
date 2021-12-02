@@ -437,7 +437,8 @@ def save_enhanced_stream(st, eventdf, enhanced_wavpath, save_pickle=False):
 #        
         
 def read_enhanced_stream(enhanced_wavpath):
-    
+    enhanced_wavpath = enhanced_wavpath.replace('.mseed','')    
+
     # read Miniseed
     st = read(enhanced_wavpath + '.mseed', 'MSEED')
     
