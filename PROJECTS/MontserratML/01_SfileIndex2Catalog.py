@@ -33,6 +33,13 @@ def create_catalog(SEISAN_DATA, SEISAN_DB, YYYY, MM, bool_detect_event):
         for i,row in sfileindex_df.iterrows():
             #print(row)
             mseedfile = row['corrected_DSN_mseed']
+            if not os.path.exists(mseedfile): # corrected_DSN_mseed is full path, so if sfileindex came from a different computer, start of path may be wrong
+                fileparts = mseedfile.split(SEISAN_DB)
+                #print(fileparts)
+                parentdir = os.path.basename(fileparts[0][:-1])
+                #print(SEISAN_DATA, parentdir, SEISAN_DB)
+                mseedfile = os.path.join(SEISAN_DATA, parentdir, SEISAN_DB) +  fileparts[1]
+                #print(mseedfile)
             
             # this part seems to be same functionality as read_enhanced_wav
             if isinstance(mseedfile, str):
