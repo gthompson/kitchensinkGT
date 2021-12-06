@@ -49,6 +49,8 @@ from numpy import histogram
 from python_speech_features import mfcc
 
 import pandas as pd # added by Glenn
+from os.path import isfile
+METRICS_CSV = './AAA-master/MONTSERRAT/precomputed_metrics.csv'
 
 def threshold(a, threshmin=None, threshmax=None, newval=0 ): # added by Glenn to avoid using scipy.stats.threshold which has been removed from scipy
 
@@ -527,55 +529,50 @@ def mfcc_vector(signal, arg_dict):
 ### ADDED BY GLENN
 
 def band_ratio_1(signal, arg_dict):
-    # how do i figure out which tracedf or pickle file to read?
-    # there is probably no time information in signal or arg_dict
-    # but arg_dict does have fs and window_length, so I could recalculate band ratio
-    # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
-    # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
-    return tracedf.iloc[0]['bandratio_[1.0_6.0_11.0]']
+    val = 0.0    
+    if isfile(METRICS_CSV):
+        tracedf = pd.read_csv(METRICS_CSV)
+        val = tracedf.iloc[0]['bandratio_[1.0_6.0_11.0]']
+    return val    
 
 def band_ratio_2(signal, arg_dict):
-    # how do i figure out which tracedf or pickle file to read?
-    # there is probably no time information in signal or arg_dict
-    # but arg_dict does have fs and window_length, so I could recalculate band ratio
-    # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
-    # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
-    return tracedf.iloc[0]['bandratio_[0.8_4.0_16.0]']
+    val = 0.0    
+    if isfile(METRICS_CSV):
+        tracedf = pd.read_csv(METRICS_CSV)
+        val = tracedf.iloc[0]['bandratio_[0.8_4.0_16.0]']
+    return val
 
 def medianF(signal, arg_dict):
-    # how do i figure out which tracedf or pickle file to read?
-    # there is probably no time information in signal or arg_dict
-    # but arg_dict does have fs and window_length, so I could recalculate band ratio
-    # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
-    # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
-    return tracedf.iloc[0]['medianF']
+    val = 0.0    
+    if isfile(METRICS_CSV):
+        tracedf = pd.read_csv(METRICS_CSV)
+        val = tracedf.iloc[0]['medianF']
+    return val
 
 def peakF(signal, arg_dict):
-    # how do i figure out which tracedf or pickle file to read?
-    # there is probably no time information in signal or arg_dict
-    # but arg_dict does have fs and window_length, so I could recalculate band ratio
-    # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
-    # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
-    return tracedf.iloc[0]['peakF']
+    val = 0.0    
+    if isfile(METRICS_CSV):
+        tracedf = pd.read_csv(METRICS_CSV)
+        val = tracedf.iloc[0]['peakF']
+    return val
 
 def bw_min(signal, arg_dict):
-    # how do i figure out which tracedf or pickle file to read?
-    # there is probably no time information in signal or arg_dict
-    # but arg_dict does have fs and window_length, so I could recalculate band ratio
-    # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
-    # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
-    return tracedf.iloc[0]['bw_min']
+    val = 0.0    
+    if isfile(METRICS_CSV):
+        tracedf = pd.read_csv(METRICS_CSV)
+        val = tracedf.iloc[0]['bw_min']
+    return val
 
 def bw_max(signal, arg_dict):
-    # how do i figure out which tracedf or pickle file to read?
-    # there is probably no time information in signal or arg_dict
-    # but arg_dict does have fs and window_length, so I could recalculate band ratio
-    # alternatively, I just use a fixed file here, but I ensure in read_montserrat that the correct pickle or tracedf file is given?
-    # I would also like to add band_low, band_high, peakf, medianf
-    tracedf = pd.read_csv('./AAA-master/MONTSERRAT/precomputed_metrics.csv')
-    return tracedf.iloc[0]['bw_max']
+    val = 0.0    
+    if isfile(METRICS_CSV):
+        tracedf = pd.read_csv(METRICS_CSV)
+        val = tracedf.iloc[0]['bw_max']
+    return val
+
+def bandwidth(signal, arg_dict):
+    val = 0.0    
+    if isfile(METRICS_CSV):
+        tracedf = pd.read_csv(METRICS_CSV)
+        val = tracedf.iloc[0]['bw_max'] - tracedf.iloc[0]['bw_min']
+    return val

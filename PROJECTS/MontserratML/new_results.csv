@@ -1,2 +1,2 @@
 ,traceID,classes,minWeight,NtraceID,Nclasses,Nweight,counts,acc_mean,acc_std
-0,MV.MBWH..SHZ,"e,h,l,t,r",0,513,513,513,"[110, 93, 103, 106, 101]",24.7,1.7
+0,MV.MBWH..SHZ,"l,t",0,513,204,204,"[103, 101]",50.5,3.9

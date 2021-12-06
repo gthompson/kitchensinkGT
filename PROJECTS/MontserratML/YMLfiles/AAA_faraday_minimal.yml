@@ -1,4 +1,4 @@
-name: AAA_faraday_minimal
+name: AAA_minimal
 channels:
   - conda-forge
   - defaults
@@ -33,4 +33,4 @@ dependencies:
  - pip:
     - python-speech-features==0.6
     - soundfile==0.10.3.post1
-prefix: /Users/gt/opt/anaconda3/envs/AAA
+prefix: /Users/gt/opt/anaconda3/envs/AAA_minimal

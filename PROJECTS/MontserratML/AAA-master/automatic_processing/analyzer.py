@@ -42,8 +42,7 @@ import datetime
 from features import FeatureVector
 import pickle
 import numpy as np
-#from DataReadingFunctions import requestObservation
-from DataReadingFunctions import read_montserrat
+from DataReadingFunctions import requestObservation, read_montserrat
 from sklearn import preprocessing
 from tools import butter_bandpass_filter
 from featuresFunctions import energy, energy_u
@@ -55,6 +54,7 @@ import time
 from tools import extract_features
 from copy import deepcopy
 
+import os
 import pandas as pd # added by Glenn
 
 
@@ -124,9 +124,12 @@ class Analyzer:
         # Read all labeled signatures (labels+data) from the catalogue, and extract features
         tStart = time.time()
         catalog_length = len(self.catalogue.index)
+        WAVTOPDIR = config.data_to_analyze['path_to_data'] # Glenn. path has miniseed_c hardcoded at start. I want to change this to whatever the config says
         for i in range(catalog_length):
-            if self._verbatim > 1:
-                print('Processing waveform %d of %d', (i, catalog_length))
+            if verbatim > 1:
+                print('Processing waveform %d of %d' % (i, catalog_length))
+            if verbatim > 3:
+                print(self.catalogue.iloc[i].to_string())
             secondFloat = self.catalogue.iloc[i]['second']
             tStartSignature = datetime.datetime(int(self.catalogue.iloc[i]['year']),     \
                                                 int(self.catalogue.iloc[i]['month']),    \
@@ -136,47 +139,83 @@ class Analyzer:
                                                 int(secondFloat), \
                                                 int((secondFloat-int(secondFloat))*1000000)) #microseconds
             duration = self.catalogue.iloc[i]['length']
-            path = self.catalogue.iloc[i]['path']
-            #(fs, signature) = requestObservation(config, tStartSignature, duration, path, verbatim=0)
-            (fs, signature) = read_montserrat(path, config, verbatim)
-            print(fs, len(signature)) # SCAFFOLD
-            # If problem
-            if len(signature) < 40:
-                if verbatim > 2:
-                    print('Data is not considered', tStartSignature)
-                allFeatures[i] = None
-                allLabels[i] = None
-                continue
-
-            if returnData:
-                allData[i] = signature
-
+            path = self.catalogue.iloc[i]['path']     
+            path = path.replace('miniseed_c', WAVTOPDIR)
+            
             # Get label and check that it is single label (multi label not supported yet)
             lab = self.catalogue.iloc[i]['class']
             if type(lab) is list:
                 print('Multi label not implemented for learning yet')
                 return None
             allLabels[i] = lab
+            
+            # LOAD WAVEFORM
+            #(fs, signature) = requestObservation(config, tStartSignature, duration, path, verbatim=0)
+            # first check for features file
+            
+            # what traceID are we looking for - should figure out how to write this into the config
+            fptr = open('./AAA-master/MONTSERRAT/current_traceID.txt','r')
+            traceID = fptr.read()
+            fptr.close()      
+            
+            
+            # NEED TO LOAD DATA - FIRST CHECK IF FEATURES ALREADY COMPUTED
+            mseedbase = os.path.basename(path)
+            featurespkl = os.path.join('features',mseedbase.replace('.mseed', '.%s.pkl' % traceID))
+            if os.path.exists(featurespkl):
+                featuresList = pd.read_pickle(featurespkl)
+            else:
+                # LOAD WAVEFORM
+                (fs, signature) = requestObservation(config, tStartSignature, duration, path, verbatim=verbatim)
+                #(fs, signature) = read_montserrat(path, config, verbatim, traceID=traceID)
+                if verbatim>2:
+                    print(fs, len(signature)) # SCAFFOLD
+                    
+                # If problem
+                if len(signature) < 40:
+                    if verbatim > 2:
+                        print('Data is not considered', tStartSignature)
+                    allFeatures[i] = None
+                    allLabels[i] = None
+                    continue
 
-            # Filtering if needed
-            #f_min = self.catalogue.iloc[i]['f0']
-            #f_max = self.catalogue.iloc[i]['f1']
-            # SCAFFOLD
-            """
-            f_min = 0.5
-            f_max = 25.0
-            if f_min and f_max:
-                butter_order = config.analysis['butter_order']
-                signature = butter_bandpass_filter(signature, f_min, f_max, fs, order=butter_order)
-            """
+                if returnData:
+                    allData[i] = signature
 
-            # Preprocessing & features extraction
-            allFeatures[i] = extract_features(config, signature.reshape(1, -1), features, fs)
+                # Filtering if needed
+                #f_min = self.catalogue.iloc[i]['f0']
+                #f_max = self.catalogue.iloc[i]['f1']
+                # SCAFFOLD
+               
+                f_min = 0.5
+                f_max = 25.0
+                if f_min and f_max:
+                    butter_order = config.analysis['butter_order']
+                    signature = butter_bandpass_filter(signature, f_min, f_max, fs, order=butter_order)
+               
+               
 
+                # Preprocessing & features extraction
+                featuresList = extract_features(config, signature.reshape(1, -1), features, fs)
+                
+                # Save featuresList to pickle file
+                if not os.path.exists('features'):
+                    os.makedirs('features')
+                with open(featurespkl, 'wb') as f:
+                    pickle.dump(featuresList, f)
+            
+            # APPEND FEATURES FOR THIS EVENT+TRACE TO ALLFEATURES
+            allFeatures[i] = featuresList[0] # subscript 0 not needed
+            if verbatim > 2:
+                print('Got %d features for %s in %s' % (len(featuresList), traceID, path))  
+            if verbatim > 3:
+                print(featuresList)
+        
+        # OUTPUT COMPUTATION TIME
         tEnd = time.time()
         if verbatim>0:
             print('Training data have been read and features have been extracted ', np.shape(allFeatures))
-            print('Computation time: ', tEnd-tStart)
+            print('Computation time for reading and feature computation: ', tEnd-tStart)
 
 
         # Compress labels and features in case of None values (if reading is empty for example)

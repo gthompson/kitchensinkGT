@@ -45,7 +45,13 @@ import datetime
 from obspy import UTCDateTime
 from obspy.clients.arclink.client import Client
 from tools import filter_data
-import pandas as pd # added by Glenn
+
+# added by Glenn
+import pandas as pd 
+import os, sys
+LIBpath = os.path.join( os.getenv('HOME'),'src','kitchensinkGT', 'LIB')
+sys.path.append(LIBpath)
+from libMVO import fix_trace_id
 
 def read_ubinas(file_path, config, verbatim=0):
     """ Read Ubinas data.
@@ -234,7 +240,7 @@ def requestObservation(config, tStart, duration, pathToRecording, verbatim=0):
     else:
         # Read full recording
         reading_function = config.data_to_analyze['reading_function']
-        [data, fs, tStartRecording, tEndRecording, length_n] = reading_function(pathToRecording,config,verbatim=0)
+        [data, fs, tStartRecording, tEndRecording, length_n] = reading_function(pathToRecording,config,verbatim=verbatim)
         """
         try:
             tStartSignatureInRecording = (tStart - tStartRecording).total_seconds()
@@ -245,15 +251,19 @@ def requestObservation(config, tStart, duration, pathToRecording, verbatim=0):
             fs = 1
             signature = np.array([0])
         """
+        if verbatim>3:
+            print('Fs=',fs,' duration=',duration)
         tStartSignatureInRecording = (tStart - tStartRecording).total_seconds()
         nStartSignatureInRecording = int(tStartSignatureInRecording*fs)
+        if not duration or np.isnan(duration): # added by Glenn as length is coming is as NaN, though it wasn't in Paris in July
+            duration = np.min([15.0, len(data)/fs])
         nEndSignatureInRecording = nStartSignatureInRecording + int(duration*fs)
         signature = data[nStartSignatureInRecording:nEndSignatureInRecording]        
         return fs, signature
+    
 
-def read_montserrat(file_path, config, verbatim):
+def read_montserrat(file_path, config, verbatim, traceID=None):
     """ Read Montserrat data.
-    /!\ Signature of this function should not be modified and is similar for all applications (i,e, read_XXX)
     INPUT:
     - file_path: to file containing data (.dat here):
     - verbatim
@@ -269,29 +279,42 @@ def read_montserrat(file_path, config, verbatim):
     t_start = None 
     t_end = None 
     length_n = None
-
-    verbatim=1
     
     # what traceID are we looking for - should figure out how to write this into the config
-    fptr = open('./AAA-master/MONTSERRAT/current_traceID.txt','r')
-    traceID = fptr.read()
-    fptr.close()
+    if not traceID:
+        fptr = open('./AAA-master/MONTSERRAT/current_traceID.txt','r')
+        traceID = fptr.read()
+        fptr.close()    
+
+    
+    # first check for features file
+    mseedbase = os.path.basename(file_path)
+    features_filepath = os.path.join('features',mseedbase.replace('.mseed', '.%s.features.pkl' % traceID))
+   
     
     # Read and check reading
     #file_path = file_path.replace('eventFiles', '../MONTSERRAT/eventFiles')
     if not isfile(file_path):
-        print("File not found: ",file_path)
-        return None, None
-    stream = obspy.read(file_path)
+        
+        # look for WAV file instead, which lacks the .mseed extension
+        file_path_wav = file_path.replace('.mseed','')
+        if not isfile(file_path_wav): 
+            print("File not found: ",file_path)
+            return None, None
+        else:
+            stream = obspy.read(file_path_wav)
+            fix_trace_id(stream)
+    else:
+        stream = obspy.read(file_path)
     
-    if verbatim > 1:
+    if verbatim > 3:
         print('Got %d traces from %s' % (len(stream), file_path))
     
     stream = stream.select(id=traceID)
     L = len(stream)
-    if verbatim > 1:
+    if verbatim > 3:
         print('%d traces match %s' % (L, traceID))     
-        print(stream)
+    print(stream)
 
     if L==1:
         trace = stream.traces[0]
@@ -312,21 +335,22 @@ def read_montserrat(file_path, config, verbatim):
         # file_path is to a pickle file, I think.
         # we want to put that, or the corresponding trace csv file, into a fixed place so that featureFunctions.py can access it.
         tracecsv = file_path.replace('.mseed','.csv')
+        outcsv = './AAA-master/MONTSERRAT/precomputed_metrics.csv'
         if isfile(tracecsv):
             tracedf = pd.read_csv(tracecsv)
             # subset for this traceID
             tracedf = tracedf[tracedf['id']==traceID]
-            #outcsv = '../MONTSERRAT/precomputed_metrics.csv'
-            outcsv = './AAA-master/MONTSERRAT/precomputed_metrics.csv'
             if len(tracedf.index)==1:
                 tracedf.to_csv(outcsv)
             elif isfile(outcsv):
                 os.system('rm %s' % outcsv)
         else:
             print('Could not find %s' % tracecsv)
+            if isfile(outcsv):
+                os.system('rm %s' % outcsv)
 
     else: 
         print('Found %d traces for %s in %s: ' % (L, traceID, file_path) )
 
-    #return s, fs, t_start, t_end, length_n
-    return fs, s
+    return s, fs, t_start, t_end, length_n
+    #return fs, s

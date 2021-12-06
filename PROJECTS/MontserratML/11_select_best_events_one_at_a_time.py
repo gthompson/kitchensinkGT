@@ -358,7 +358,7 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
             if tr.stats.quality_factor > 1.0:
                 good_traces += 1
             else:
-            trace_ids_to_eliminate.append(tr.id)
+                trace_ids_to_eliminate.append(tr.id)
 
 
         # plot whole event file
@@ -371,6 +371,8 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
                 st.remove(tr)
         if len(st)<3:
             print('not enough traces after removing spiky traces')
+            df.loc[thiswav, 'ignore'] = True
+            df.loc[thiswav, 'checked'] = True
             return False
                 
         st.filter('bandpass', freqmin=0.5, freqmax=25.0, corners=4)
@@ -758,7 +760,10 @@ station0hypfile = os.path.join(SEISAN_DATA, 'DAT', 'STATION0_MVO.HYP')
 
 # Load a previously created master event catalog from AAA_DATA_DIR - or create a new one from pandaSeisDBDir
 if os.path.exists(catalog_pickle_file):
-    dfall = pd.read_pickle(catalog_pickle_file)    
+    try:
+        dfall = pd.read_pickle(catalog_pickle_file)   
+    except:
+        dfall = pd.read_csv(master_event_catalog) # how do i ignore the index?
 elif os.path.exists(master_event_catalog): # load the one that exists from AAA_DATA_DIR, and trim the columns
     dfall = pd.read_csv(master_event_catalog) # how do i ignore the index?
 else: # create one 
@@ -813,6 +818,7 @@ while iterate_again:
     
     # get index (path) of next event
     nextwav = select_next_event(dfall, subclasses_for_ML)
+    print('Selected ',nextwav)
     
     # manually QC the next event. each time we choose the class with least checked examples
     bool_quit = qc_event(dfall, nextwav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station0hypfile)
