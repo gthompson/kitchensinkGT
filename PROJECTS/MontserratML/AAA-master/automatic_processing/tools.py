@@ -43,7 +43,7 @@ from os import mkdir
 import matplotlib
 matplotlib.use('TkAgg')
 
-from sympy.ntheory import factorint
+#from sympy.ntheory import factorint
 import matplotlib.pylab as plt
 from scipy.signal import butter, lfilter, filtfilt
 import scipy.signal as sg
@@ -54,7 +54,9 @@ from datetime import datetime, timedelta
 from featuresFunctions import energy, energy_u
 from math import sqrt
 
-
+from functools import reduce
+def factorint(n):
+    return set(reduce(list.__add__, ([i, n//i] for i in range(1, int(n++0.5) + 1) if n % i == 0)))
 
 def display_cat(cat):
     """

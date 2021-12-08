@@ -607,7 +607,7 @@ def magnitude2Eseismic(mag, correction=3.7):
         Eseismic = np.power(10, 1.5 * mag + correction)
     return Eseismic
 
-def Mlrichter(val, R, a=1.6, b=0.15, g=0):
+def Mlrichter(val, R, a=1.6, b=-0.15, g=0):
     """
     MLRICHTER Compute a Richter local magnitude
       ml=Mlrichter(peakamp, R, a, b, g)
@@ -623,6 +623,9 @@ def Mlrichter(val, R, a=1.6, b=0.15, g=0):
        this also agrees with Wikipedia for distances less than 200 km
    
        g is station correction
+
+       Note: I erroneously had b=0.15 when running Seisan 2 Pandas, so my values are too high by 0.3
+       But I need to work out real a and b values for Montserrat, and determine station corrections, g
     """
     if isinstance(val,Stream): # Stream
         ml = []

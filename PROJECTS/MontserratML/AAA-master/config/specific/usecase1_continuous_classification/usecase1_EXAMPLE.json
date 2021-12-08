@@ -1,5 +1,5 @@
 {	"data_to_analyze":{
-		"path_to_data":"./miniseed_c",
+		"path_to_data":"./link_WAV",
 		"data_files":"*.mseed",
 		"reading_function":"read_montserrat",
 		"reading_arguments":{
