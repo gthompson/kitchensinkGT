@@ -240,6 +240,9 @@ def requestObservation(config, tStart, duration, pathToRecording, verbatim=0):
     else:
         # Read full recording
         reading_function = config.data_to_analyze['reading_function']
+        print(reading_function, pathToRecording)
+        print(config)
+        print(verbatim)
         [data, fs, tStartRecording, tEndRecording, length_n] = reading_function(pathToRecording,config,verbatim=verbatim)
         """
         try:

@@ -569,27 +569,34 @@ def _count_by_subclass(df):
 #    
     
 #def to_AAA(df, subclasses_for_ML, outfile, SEISAN_DATA, ignore_extra_columns=True, copy_to_path=None):
-def to_AAA(df, subclasses_for_ML, outfile, ignore_extra_columns=True):
+def to_AAA(df2, subclasses_for_ML, outfile, ignore_extra_columns=True):
     
     """
     create output file for AAA
     """ 
+    df = df2.copy()
     included_subclasses = subclasses_for_ML.copy()
     #minweight = 0
     #df = df[df['weight']>=minweight]
     df = df[df['checked']==True]
-    if len(df.index)==0:
+    if len(df.index)<500:
         print('You need to reclassify some events first')
         return    
-    
+    print('Checked events: %d' % len(df.index)) 
     print(' ') 
+
+    """
     print('Now we have the following number of events by subclass:')
     L = []
     for i, subclass in enumerate(subclasses_for_ML):
         df_subclass = df[df['new_subclass']==subclass]
         L.append(len(df_subclass.index))
         print('- %s: %d' % (subclass, L[i]))
+    """
     
+    print('all subclasses = ',df['new_subclass'].unique())
+    print('included subclasses = ',included_subclasses)
+
     minnumevents = 10
     removed_subclasses = []
     for subclass in df['new_subclass'].unique():
@@ -639,6 +646,9 @@ def to_AAA(df, subclasses_for_ML, outfile, ignore_extra_columns=True):
     """
     
     # subset and rename columns for output
+    print(dfAAA.columns)
+    if not 'path' in dfAAA.columns:
+        dfAAA.reset_index(inplace=True)
     if ignore_extra_columns:
         dfAAA=dfAAA[['new_subclass','year','month','day','hour','minute','second','length','path']]     
     dfAAA.rename(columns = {'new_subclass':'class'}, inplace = True)
@@ -726,7 +736,12 @@ def _df2file_without_index(df, catfile, indexcol=None):
     if catfile[-3:]=='csv':
         df.to_csv(catfile, index=False)
     if catfile[-3:]=='pkl':
-        df.to_pickle(catalog_pickle_file) 
+        df.to_pickle(catfile) 
+
+def number_of_checked_events(df):
+    df2 = df[df['checked']==True]
+    print('Got %d checked event' % len(df2.index) )
+
 
 # FUNCTIONS END ##########################################
 ##########################################################
@@ -739,7 +754,8 @@ pandaSeisDir = os.path.join(SEISAN_DATA, 'miniseed_c') # e.g. /home/user/seismo/
 SEISAN_DB = 'MVOE_' # e.g. the seisan database name (e.g. MVOE_) under /home/user/seismo/WAV and /home/user/seismo/REA
 pandaSeisDBDir = os.path.join(pandaSeisDir, SEISAN_DB) # e.g. /home/user/seismo/pandaSeis/MVOE_
 AAA_DATA_DIR = os.path.join(SEISAN_DATA, 'MachineLearning', SEISAN_DB) # e.g. /home/user/seismo/MachineLearning/MVOE_
-master_event_catalog = os.path.join(AAA_DATA_DIR, 'labelling', '%s11_master_catalog.csv' % SEISAN_DB)
+#master_event_catalog = os.path.join(AAA_DATA_DIR, 'labelling', '%s11_master_catalog.csv' % SEISAN_DB)
+master_event_catalog = '/Users/thompsong/DATA/MVO/MachineLearning/MVOE_/labelling/11_merged_catalog.csv'
 master_event_catalog_original = os.path.join(AAA_DATA_DIR, 'original', '%s11_master_catalog_original.csv' % SEISAN_DB)
 aaa_input_file = os.path.join(AAA_DATA_DIR, 'runAAA', '%s11_labelled_events.csv' % SEISAN_DB) 
 _make_parent_dir(master_event_catalog)
@@ -776,26 +792,10 @@ else: # create one
     else:
         print('Unable to make ',master_event_catalog_original, '. Quitting.')
         exit()
-    
+   
+number_of_checked_events(dfall)
+ 
 # ensure we always have the same index and columns
-"""
-correct_columns = ['filetime', 'path', 'sfile', 'num_traces', 'Fs', 'calib', 
-                   'subclass', 'new_subclass', 'quality', 'weight',
-                   'checked', 'split', 'delete', 'ignore',
-                   'D', 'R', 'r', 'e', 'l', 'h', 't',
-                   'year', 'month', 'day', 'hour', 'minute', 'second',
-                   'peaktime', 'peakA', 'peakamp', 'energy',
-                   'signal_level', 'noise_level', 'snr',
-                   'peakF', 'medianF', 'bandratio_[0.8_4.0_16.0]', 'bandratio_[1.0_6.0_11.0]', 'bw_max', 'bw_min',
-                   'sample_min', 'sample_max', 'sample_mean',
-                   'sample_rms', 'sample_stdev',
-                   'sample_lower_quartile', 'sample_median', 'sample_upper_quartile',
-                   'kurtosis', 'skewness',
-                   'num_gaps', 'percent_availability',                   
-                   'trigger_duration', 'ontime', 'offtime', 
-                   'cft_peak_wmean', 'cft_std_wmean', 'coincidence_sum',
-                   'detection_quality'] # removed starttime
-"""
 good_columns = []
 for thiscol in dfall.columns:
     if 'ntitle' not in thiscol:
@@ -805,10 +805,11 @@ dfall.set_index('path', inplace=True) # try this
 dfall.sort_index(inplace=True)   
     
     
+number_of_checked_events(dfall)
 # LOOPING BEGINS HERE ####################################
 
-iterate_again = True # changed this back to do the loop
-changes_made = False
+iterate_again = False # changed this back to do the loop
+changes_made = True
 while iterate_again:
 
     # get/update the fingerprints of each event class
@@ -841,10 +842,11 @@ if changes_made:
 
     # remove events we marked for deletion, splitting or to ignore
     dfsubset = remove_marked_events(dfall)
+    number_of_checked_events(dfsubset)
 
     #to_AAA(dfsubset, subclasses_for_ML, aaa_infile, SEISAN_DATA, ignore_extra_columns=False)
     print('Updating %s' % aaa_input_file)
-    to_AAA(dfsubset, subclasses_for_ML, aaa_input_file, ignore_extra_columns=False)
+    to_AAA(dfsubset, subclasses_for_ML, aaa_input_file, ignore_extra_columns=False) # need filetime column
 
     report_checked_events(dfall, subclasses_for_ML)
 else:

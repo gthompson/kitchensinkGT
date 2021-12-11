@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-print('got here')
 ################################
 # General setup                #
 ################################
@@ -51,9 +50,9 @@ traceIDs = ['MV.MBWH..SHZ', 'MV.MBLG..SHZ', 'MV.MBRY..SHZ']
 minWeights = range(4)
 classes_to_include = [ ['l', 't'], ['e', 'r'], ['h', 'l', 't'], ['h', 'l', 't', 'r'], ['e', 'h', 'l', 't', 'r'] ]
 
-traceIDs = ['MV.MBWH..SHZ']
-minWeights = range(1)
-classes_to_include = [ ['l', 't'] ]
+traceIDs = ['MV.MBWH..SHZ', 'MV.MBLG..SHZ', 'MV.MBGB..BHZ', 'MV.MBGH..BHZ']
+minWeights = range(4)
+classes_to_include = [ ['r', 'e', 'l', 'h', 't'], ['r', 'l', 'h', 't' ] ]
 
 
 #############
@@ -154,4 +153,4 @@ for traceID in traceIDs:
             counter += 1
             
 resultsDF = pd.DataFrame(results_list)
-resultsDF.to_csv('new_results.csv')
+resultsDF.to_csv('new_results2.csv')

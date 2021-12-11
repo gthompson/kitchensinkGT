@@ -166,8 +166,8 @@ class Analyzer:
                 featuresList = pd.read_pickle(featurespkl)
             else:
                 # LOAD WAVEFORM
-                (fs, signature) = requestObservation(config, tStartSignature, duration, path, verbatim=verbatim)
-                #(fs, signature) = read_montserrat(path, config, verbatim, traceID=traceID)
+                #(fs, signature) = requestObservation(config, tStartSignature, duration, path, verbatim=verbatim)
+                (fs, signature) = read_montserrat(path, config, verbatim, traceID=traceID)
                 if verbatim>2:
                     print(fs, len(signature)) # SCAFFOLD
                     

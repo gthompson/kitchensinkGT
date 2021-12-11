@@ -18,12 +18,12 @@
 	
 	"learning":{
 		"algo":"RandomForestClassifier(n_estimators=100,criterion='entropy',bootstrap=True, class_weight=None)",
-		"cv":"StratifiedShuffleSplit(n_splits=30, train_size=0.5, test_size=0.5)",
+		"cv":"StratifiedShuffleSplit(n_splits=50, train_size=0.7, test_size=0.3)",
 		"path_to_catalogue":"catalog/30_MVO_labelled_events_filtered.pd"		
 	},
 	
 	"features":{
-		"path_to_config":"config/specific/features/features_montserrat.json",		
+		"path_to_config":"config/specific/features/features_01.json",		
 		"computation_domains":"time spectral cepstral",
 		"thresholding":"True",
 		"thresholds":"[0.8, 0.8, 0.8, 0.8, 0.8]"
