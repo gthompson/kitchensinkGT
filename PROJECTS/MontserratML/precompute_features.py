@@ -1,10 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-# In[ ]:
-
-
-#!/usr/bin/env python
 ################################
 # General setup                #
 ################################
@@ -71,7 +66,13 @@ for i in range(catalog_length):
     if verbatim > 1:
         print('Processing waveform %d of %d' % (i, catalog_length))
     secondFloat = cat.iloc[i]['second']
-    tStartSignature = datetime.datetime(int(cat.iloc[i]['year']),                                             int(cat.iloc[i]['month']),                                            int(cat.iloc[i]['day']),                                              int(cat.iloc[i]['hour']),                                             int(cat.iloc[i]['minute']),                                           int(secondFloat),                                         int((secondFloat-int(secondFloat))*1000000)) #microseconds
+    tStartSignature = datetime.datetime(int(cat.iloc[i]['year']),
+                                        int(cat.iloc[i]['month']),                                            
+                                        int(cat.iloc[i]['day']),                                              
+                                        int(cat.iloc[i]['hour']),                                             
+                                        int(cat.iloc[i]['minute']),                                           
+                                        int(secondFloat),                                         
+                                        int((secondFloat-int(secondFloat))*1000000)) #microseconds
     duration = cat.iloc[i]['length']
     path = cat.iloc[i]['path']     
     path = path.replace('miniseed_c', WAVTOPDIR)
