@@ -298,15 +298,7 @@ def read_montserrat(file_path, config, verbatim, traceID=None):
     # Read and check reading
     #file_path = file_path.replace('eventFiles', '../MONTSERRAT/eventFiles')
     if not isfile(file_path):
-        
-        # look for WAV file instead, which lacks the .mseed extension
-        file_path_wav = file_path.replace('.mseed','')
-        if not isfile(file_path_wav): 
-            print("File not found: ",file_path)
-            return None, None
-        else:
-            stream = obspy.read(file_path_wav)
-            fix_trace_id(stream)
+        return None, None
     else:
         stream = obspy.read(file_path)
     
@@ -355,5 +347,5 @@ def read_montserrat(file_path, config, verbatim, traceID=None):
     else: 
         print('Found %d traces for %s in %s: ' % (L, traceID, file_path) )
 
-    return s, fs, t_start, t_end, length_n
-    #return fs, s
+    #return s, fs, t_start, t_end, length_n
+    return fs, s

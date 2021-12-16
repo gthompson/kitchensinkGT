@@ -37,86 +37,7 @@ def read_volcano_def(volcanodefcsv):
 
 #
 
-#def build_master_event_catalog(csvdir, seisandbname, catalogfile, subclasses_for_ML, max_duration = 300):
-def build_master_event_catalog(pandaSeisDBDir, SEISAN_DB, catalogfile, subclasses_for_ML, max_duration = 300):
-    # load all the year/month CSV files
-    #csvfiles = glob(os.path.join(pandaSeisDBDir, 'reawav_%s??????.csv' % SEISANDB))
-    #csvfiles = glob(os.path.join(pandaSeisDBDir, 'reawav_%s[12][0-9][0-9][0-9][0-1][0-9].csv' % SEISAN_DB))
-    csvfiles = glob(os.path.join(pandaSeisDBDir, 'catalog_%s[12][0-9][0-9][0-9][0-1][0-9].csv' % SEISAN_DB))
-    frames = []
-    if len(csvfiles)==0:
-        print('No reawav*.csv files found. Cannot proceed')
-        exit()
-    for csvfile in csvfiles:
-        df = pd.read_csv(csvfile)
-        frames.append(df) 
-    dfall = pd.concat(frames, sort=True)
-    # perhaps path should be the index instead? no, just let it go through without indexing or sorting
-    #dfall.set_index('filetime', inplace=True) # we will need this later to remerge
-    #dfall.set_index('path', inplace=True)
-    #dfall.sort_index(inplace=True)
-    """
-    for index, row in dfall.iterrows():
         
-        # For simplicity, copy 'D' and 'R' mainclass to subclass
-        if row['mainclass'] in ['D', 'R']: # Do I need L here too?
-            dfall.loc[index, 'subclass']=row['mainclass']
-    """ 
-    # replace loop above
-    for mainclass in ['R', 'D']:
-        dfall.loc[dfall['mainclass'] == mainclass, 'subclass'] = mainclass
-    
-    # Drop the mainclass column, as it is now superfluous.
-    dfall.drop(columns=['mainclass'], inplace=True)
-    
-    # Add an etype column
-    #dfall['etype'] = dfall['subclass'].replace(subclasses, etypes)
-    
-    # Add columns to assign a percentage for each subclass
-    for subclass in subclasses_for_ML:
-        dfall[subclass] = 0
-    
-    # But set column for actual subclass to 100%  
-    """
-    for index, row in dfall.iterrows():            
-        # Set dfall['h'] to 100 if dfall['subclass']=='h', etc
-        dfall.loc[index, row['subclass']] = 100        
-    """
-    # replace row operations above
-    for subclass in subclasses_for_ML:
-        dfall.loc[dfall['subclass'] == subclass, subclass] = 100
-        
-    # Add a new_subclass column
-    dfall['new_subclass'] = dfall['subclass']
-
-    # Add weight column. I will give really clear events higher weight when I process them
-    dfall['weight']=3 # weight for events I have not visually checked
-    
-    # Add column that records if event is checked
-    dfall['checked']=False
-    
-    # Add column that records if event is marked for splitting
-    dfall['split']=False    
-    
-    # Add column that records if event is marked for deletion
-    dfall['delete']=False
-    
-    # Add column that records if event should be ignored
-    # Ignore any events longer than 1-minute, as they are likely to contain multiple events 
-    # or just be unhelpful for classifying short signals which are more common
-    # SCAFFOLD - the twin column no longer seems to exist
-    #dfall['ignore'] = dfall['twin']>max_duration
-    dfall['ignore'] = False
-    
-    # Now we have a catalog dataframe we can work with. Let's save this.
-    #dfall2 = dfall.reset_index()    
-    #dfall2.to_csv(catalogfile)
-    _df2file_without_index(dfall.copy(), catalogfile)
-    
-    return dfall
-
-#    
-    
 def _select_best_events(df, allowed_subclasses, N=100, exclude_checked=True):
     # When we are iterating, we want to exclude the checked events, else we are repeating our work.
     # When we return our final list, we do not want to exclude checked events
@@ -269,27 +190,6 @@ def select_next_event(dfall, subclasses_for_ML):
             subclasses.remove(nextclass)
     return None
 
-#
-"""
-from obspy.core import read
-def _deconvolve_instrument_response(st):
-    for tr in st:
-        this_inv = None
-        need_to_correct = False
-        if 'units' in tr.stats:
-            if 'units'=='Counts':
-                need_to_correct = True
-        else:
-            need_to_correct = True
-        if need_to_correct:           
-            if bool_correct_data: # try to find corresponding station XML
-                this_inv = load_mvo_inventory(tr, os.path.join(SEISAN_DATA, 'CAL'))
-        if this_inv and tr.stats['units'] == 'Counts':
-            tr.remove_response(inventory=this_inv, output="VEL")
-            tr.stats['units'] = 'm/s'
-            add_to_trace_history(tr, 'deconvolved')
-"""
-#
 
 def _guess_subclass(row, fingerprints, subclasses_for_ML):
     chance_of = {}
@@ -324,11 +224,17 @@ def _guess_subclass(row, fingerprints, subclasses_for_ML):
     
     print('The event is classified as %s, but here are our guesses:' % row['subclass'])
     total = 0
+    maxchance = 0
+    maxclass = ''
     for subclass in chance_of.keys():
         total += chance_of[subclass]
+        if chance_of[subclass] > maxchance:
+            maxchance = chance_of[subclass]
+            maxclass = subclass
     for subclass in chance_of.keys():
         if total>0:
             print('%s: %.0f' % (subclass, 100*chance_of[subclass]/total), end=', ')
+    return maxclass, maxchance
 
 
 from pathlib import Path
@@ -341,6 +247,23 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
     p = Path(mseedpath)
     mseedpath = os.path.join(pandaSeisDBDir, p.parts[-3], p.parts[-2], p.parts[-1])
 
+    # trace df metrics
+    csvpath = mseedpath.replace('.mseed', '.csv')
+    tracedf = pd.read_csv(csvpath)
+    #if 'bandratio_[1.0_6.0_11.0]' in tracedf.columns:
+    #    tracedf.rename(columns = {'bandratio_[1.0_6.0_11.0]':'band_ratio'}, inplace = True)
+    tracedf.sort_values(by=['peakamp'], ascending=False, inplace=True)
+    print(' ')
+    #print(tracedf[['id', 'medianF', 'bw_min', 'peakF', 'bw_max', 'band_ratio', 'kurtosis']])
+    print(tracedf[['id', 'medianF', 'bw_min', 'peakF', 'bw_max', 'bandratio_[1.0_6.0_11.0]', 'kurtosis']])
+
+    # fingerprint guesses
+    print(' ')
+    maxclass, maxchance = _guess_subclass(df.loc[thiswav], fingerprints, subclasses_for_ML)
+    if subclass==maxclass:
+        return False
+    
+    #print(suggested_weight)
     
     # we are adding a check here for spikes that will now run as part of 00_ but wasn't in place when we ran it before
     # so we add it here. if we suspect spikes, we mark that trace ID for removal and do this after we load the MSEED file below. 
@@ -436,20 +359,7 @@ def qc_event(df, thiswav, subclasses_for_ML, seisan_subclasses, fingerprints, pa
         # station amplitudes and energies
         #print(dfenergy)
 
-        # trace df metrics
-        csvpath = mseedpath.replace('.mseed', '.csv')
-        tracedf = pd.read_csv(csvpath)
-        #if 'bandratio_[1.0_6.0_11.0]' in tracedf.columns:
-        #    tracedf.rename(columns = {'bandratio_[1.0_6.0_11.0]':'band_ratio'}, inplace = True)
-        tracedf.sort_values(by=['peakamp'], ascending=False, inplace=True)
-        print(' ')
-        #print(tracedf[['id', 'medianF', 'bw_min', 'peakF', 'bw_max', 'band_ratio', 'kurtosis']])
-        print(tracedf[['id', 'medianF', 'bw_min', 'peakF', 'bw_max', 'bandratio_[1.0_6.0_11.0]', 'kurtosis']])
 
-        # fingerprint guesses
-        print(' ')
-        _guess_subclass(df.loc[thiswav], fingerprints, subclasses_for_ML)
-        #print(suggested_weight)
 
         # Input
         checked = False
@@ -762,7 +672,9 @@ aaa_input_file = os.path.join(AAA_DATA_DIR, 'runAAA', '%s11_labelled_events.csv'
 _make_parent_dir(master_event_catalog)
 _make_parent_dir(master_event_catalog_original)
 _make_parent_dir(aaa_input_file)
+rechecked_event_catalog = '/Users/thompsong/DATA/MVO/MachineLearning/MVOE_/labelling/20_rechecked_catalog.csv'
 catalog_pickle_file = os.path.basename(master_event_catalog).replace('.csv','.pkl') 
+rechecked_pickle_file = os.path.basename(rechecked_event_catalog).replace('.csv','.pkl') 
 
 # read items from Seisan software setup
 volcanodefcsv = 'CSVfiles/volcano_def.csv'
@@ -776,23 +688,15 @@ subclasses_for_ML = ['D', 'R', 'r', 'e', 'l', 'h', 't'] # subclasses allowed for
 station0hypfile = os.path.join(SEISAN_DATA, 'DAT', 'STATION0_MVO.HYP')
 
 # Load a previously created master event catalog from AAA_DATA_DIR - or create a new one from pandaSeisDBDir
-if os.path.exists(catalog_pickle_file):
+if os.path.exists(rechecked_pickle_file):
     try:
-        dfall = pd.read_pickle(catalog_pickle_file)   
+        dfall = pd.read_pickle(rechecked_pickle_file)   
     except:
-        dfall = pd.read_csv(master_event_catalog) # how do i ignore the index?
-elif os.path.exists(master_event_catalog): # load the one that exists from AAA_DATA_DIR, and trim the columns
-    dfall = pd.read_csv(master_event_catalog) # how do i ignore the index?
-else: # create one 
-    print('%s does not exist, will try to create a new master event catalog from pandaSeisDBDir' % master_event_catalog)
-    dfall = build_master_event_catalog(pandaSeisDBDir, SEISAN_DB, master_event_catalog_original, subclasses_for_ML)
-    if os.path.exists(master_event_catalog_original):
-        print(master_event_catalog_original, ' created')
-        print('Copying to %s' % master_event_catalog)
-        os.system("cp %s %s" % (master_event_catalog_original, master_event_catalog))
-    else:
-        print('Unable to make ',master_event_catalog_original, '. Quitting.')
-        exit()
+        dfall = pd.read_csv(rechecked_event_catalog) # how do i ignore the index?
+elif os.path.exists(rechecked_event_catalog): # load the one that exists from AAA_DATA_DIR, and trim the columns
+    dfall = pd.read_csv(rechecked_event_catalog) # how do i ignore the index?
+else:
+    exit()
    
 number_of_checked_events(dfall)
  
@@ -808,27 +712,29 @@ dfall.sort_index(inplace=True)
     
 number_of_checked_events(dfall)
 # LOOPING BEGINS HERE ####################################
-
-iterate_again = False # changed this back to do the loop
+print(dfall.columns)
 changes_made = True
-while iterate_again:
+for eventnum in range(len(dfall.index)):
+    row = dfall.iloc[eventnum]
+    
+    if not row['checked']:
+        continue
+    nextwav = row['DSN_wavfile']
 
     # get/update the fingerprints of each event class
     #fingerprints = get_weighted_fingerprints(dfall, subclasses_for_ML, N=100, exclude_checked=False)
     fingerprints = get_fingerprints(dfall, subclasses_for_ML, N=100, exclude_checked=False)
     save_fingerprints(fingerprints, subclasses_for_ML)
     
-    # get index (path) of next event
-    nextwav = select_next_event(dfall, subclasses_for_ML)
     print('Selected ',nextwav)
     
     # manually QC the next event. each time we choose the class with least checked examples
     bool_quit = qc_event(dfall, nextwav, subclasses_for_ML, seisan_subclasses, fingerprints, pandaSeisDBDir, station0hypfile)
     if bool_quit:
-        iterate_again=False
+        break
     else: # changes made
         changes_made = True
-        _df2file_without_index(dfall.copy(), catalog_pickle_file, 'path')     
+        _df2file_without_index(dfall.copy(), rechecked_pickle_file, 'path')     
 
 # LOOPING ENDS HERE ######################################        
 
@@ -839,13 +745,12 @@ if changes_made:
     print('Quitting. Saving changes.')
     
     print('Updating %s' % master_event_catalog)
-    _df2file_without_index(dfall, master_event_catalog, 'path')
+    _df2file_without_index(dfall, rechecked_event_catalog, 'path')
 
     # remove events we marked for deletion, splitting or to ignore
     dfsubset = remove_marked_events(dfall)
     number_of_checked_events(dfsubset)
 
-    #to_AAA(dfsubset, subclasses_for_ML, aaa_infile, SEISAN_DATA, ignore_extra_columns=False)
     print('Updating %s' % aaa_input_file)
     to_AAA(dfsubset, subclasses_for_ML, aaa_input_file, ignore_extra_columns=False) # need filetime column
 

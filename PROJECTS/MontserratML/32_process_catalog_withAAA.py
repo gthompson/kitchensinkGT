@@ -52,8 +52,13 @@ classes_to_include = [ ['l', 't'], ['e', 'r'], ['h', 'l', 't'], ['h', 'l', 't', 
 
 traceIDs = ['MV.MBWH..SHZ', 'MV.MBLG..SHZ', 'MV.MBGB..BHZ', 'MV.MBGH..BHZ']
 minWeights = range(4)
-classes_to_include = [ ['r', 'e', 'l', 'h', 't'], ['r', 'l', 'h', 't' ] ]
+classes_to_include = [ ['r', 'e', 'l', 'h', 't']]
+combine_re = False
 
+traceIDs = ['MV.MBWH..SHZ', 'MV.MBGB..BHN', 'MV.MBGB..BHZ', 'MV.MBGB..BHE', 'MV.MBLG..SHZ', 'MV.MBGH..BHZ', 'MV.MBGH..BHE', 'MV.MBGH..BHN', 'MV.MBGA..BHE', 'MV.MBGA..BHZ', 'MV.MBGA..BHN', 'MV.MBGE..BHE', 'MV.MBGE..BHZ', 'MV.MBGE..BHN', 'MV.MBBE..BHE', 'MV.MBBE..BHZ', 'MV.MBBE..BHN']
+minWeights = [3]
+classes_to_include = [ ['r', 'e', 'l', 'h', 't'] ]
+combine_re = False
 
 #############
 # Functions #
@@ -109,48 +114,62 @@ def cat_check_numbers(cat, minthresh = 20):
 #######################
 minPerClass = 30
 counter = 0
-results_list = []
-for traceID in traceIDs:
-    
-    # what traceID are we looking for - read_montserrat needs this - should figure out how to write this into the config
-    fptr = open('./AAA-master/MONTSERRAT/current_traceID.txt','w')
-    fptr.write(traceID)
-    fptr.close()
-    
-    for minWeight in minWeights:
-        for include_classes in classes_to_include:
-            # reload cat because we filter it down each time
-            #cat = pickle.load(open(output_path_cat,'rb'))
-            cat = pd.read_csv(csvfile_internal)
-            print(cat['class'].value_counts())
-            print(traceID, include_classes, minWeight)
-            
-            results_dict = {}
-            results_dict['traceID'] = traceID
-            results_dict['classes'] = ','.join(include_classes)
-            results_dict['minWeight'] = minWeight
-            results_dict['NtraceID'] = cat_filter_traceID(cat, alltraces, traceID)
-            cat, N = cat_filter_classes(cat, include_classes) 
-            results_dict['Nclasses'] = N
-            cat, N = cat_filter_weight(cat, minWeight)
-            results_dict['Nweight'] = N
-            tooSmall, lengths = cat_check_numbers(cat, minPerClass)
-            results_dict['counts'] = str(lengths)
-            
-            results_dict['acc_mean'] = None
-            results_dict['acc_std'] = None
-            
-            if N>=minPerClass*len(include_classes) and not tooSmall:
-                #try:
-                    print(cat.groupby('class').size())
-                    analyzer = Analyzer(config, verbatim=verbatim, catalog=cat)
-                    allData, allLabels, acc = analyzer.learn(config, returnData=True, verbatim=verbatim) # If you want the data
-                    results_dict['acc_mean'] = np.round(np.mean(acc)*100, 1)
-                    results_dict['acc_std'] = np.round(np.std(acc)*100, 1)                        
-                    cat['predicted_class'] = allLabels
-                    cat.to_csv(csvfile_internal.replace('.csv','_predicted_%d.csv' % counter)) 
-            results_list.append(results_dict)
-            counter += 1
-            
-resultsDF = pd.DataFrame(results_list)
-resultsDF.to_csv('new_results2.csv')
+
+
+for combine_re in [False, True]:
+    results_list = []
+
+    for traceID in traceIDs:
+
+        # what traceID are we looking for - read_montserrat needs this - should figure out how to write this into the config
+        fptr = open('./AAA-master/MONTSERRAT/current_traceID.txt','w')
+        fptr.write(traceID)
+        fptr.close()
+
+        for minWeight in minWeights:
+            for include_classes in classes_to_include:
+                # reload cat because we filter it down each time
+                #cat = pickle.load(open(output_path_cat,'rb'))
+                cat = pd.read_csv(csvfile_internal)
+                if combine_re:
+                    cat.loc[cat['class']=='e', 'class']='r'
+                    if 'e' in include_classes:
+                        include_classes.remove('e')
+
+                print(cat['class'].value_counts())
+                print(traceID, include_classes, minWeight)
+
+                results_dict = {}
+                results_dict['traceID'] = traceID
+                results_dict['classes'] = ','.join(include_classes)
+                results_dict['minWeight'] = minWeight
+                results_dict['NtraceID'] = cat_filter_traceID(cat, alltraces, traceID)
+                cat, N = cat_filter_classes(cat, include_classes) 
+                results_dict['Nclasses'] = N
+                cat, N = cat_filter_weight(cat, minWeight)
+                results_dict['Nweight'] = N
+                tooSmall, lengths = cat_check_numbers(cat, minPerClass)
+                results_dict['counts'] = str(lengths)
+
+                results_dict['acc_mean'] = None
+                results_dict['acc_std'] = None
+
+                if N>=minPerClass*len(include_classes) and not tooSmall:
+                    #try:
+                        print(cat.groupby('class').size())
+                        analyzer = Analyzer(config, verbatim=verbatim, catalog=cat)
+                        allData, allLabels, acc, allPredictions, allProbabilities = analyzer.learn(config, returnData=True, verbatim=verbatim) # If you want the data
+                        results_dict['acc_mean'] = np.round(np.mean(acc)*100, 1)
+                        results_dict['acc_std'] = np.round(np.std(acc)*100, 1)                        
+                        cat['predicted_class'] = allLabels
+                        cat['traceID'] = traceID
+                        for i, classcol in enumerate(sorted(include_classes)):
+                            colname = 'prob_%s' % classcol
+                            cat[colname] = allProbabilities[:,i]
+                        cat.to_csv(csvfile_internal.replace('.csv','_predicted_%d.csv' % counter)) 
+                results_list.append(results_dict)
+                counter += 1
+
+    resultsDF = pd.DataFrame(results_list)
+    resultsCSV = ''.join(include_classes) + '.csv'
+    resultsDF.to_csv(resultsCSV)

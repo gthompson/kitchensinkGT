@@ -182,17 +182,17 @@ class Analyzer:
                 if returnData:
                     allData[i] = signature
 
+                """
                 # Filtering if needed
-                #f_min = self.catalogue.iloc[i]['f0']
-                #f_max = self.catalogue.iloc[i]['f1']
-                # SCAFFOLD
-               
-                f_min = 0.5
-                f_max = 25.0
+                f_min = self.catalogue.iloc[i]['f0']
+                f_max = self.catalogue.iloc[i]['f1']
+                # SCAFFOLD               
+                #f_min = 0.5
+                #f_max = 25.0
                 if f_min and f_max:
                     butter_order = config.analysis['butter_order']
                     signature = butter_bandpass_filter(signature, f_min, f_max, fs, order=butter_order)
-               
+                """
                
 
                 # Preprocessing & features extraction
@@ -254,42 +254,43 @@ class Analyzer:
         tEndLearning = time.time()
 
         #  Model Evaluation (a) with score, (b) with X-validation
-        if verbatim>0:
-            # NB: When model is trained (and evaluated by X-validation or score),
-            # threshold is NOT used. Threshold is only used when the 'unknown'
-            # class can occur (and this is obvisouly not the case with supervised
-            # training)
-            print('Model has been trained: ', self.model)
-            print('Computation time: ', tEndLearning-tStartLearning)
+        # NB: When model is trained (and evaluated by X-validation or score),
+        # threshold is NOT used. Threshold is only used when the 'unknown'
+        # class can occur (and this is obvisouly not the case with supervised
+        # training)
+        print('Model has been trained: ', self.model)
+        print('Computation time: ', tEndLearning-tStartLearning)
 
-            if featuresIndexes is None:
-                allPredictions = self.model.predict(allFeatures)
-            else:
-                allPredictions = self.model.predict(allFeatures[:,featuresIndexes])
+        if featuresIndexes is None:
+            allPredictions = self.model.predict(allFeatures)
+            allProbabilities = self.model.predict_proba(allFeatures) # added by Glenn
+        else:
+            allPredictions = self.model.predict(allFeatures[:,featuresIndexes])
+            allProbabilities = self.model.predict_proba(allFeatures[:,featuresIndexes])  # added by Glenn
 
-            # (a) Score evaluation
-            print('Model score is: ', accuracy_score(allLabelsStd,allPredictions))
-            lab = list(range(len(self.labelEncoder.classes_))) # 'unknown' class not needed.
-            CM = confusion_matrix(allLabelsStd,allPredictions,labels=lab)
-            print('and associated confusion matrix is:')
-            print_cm(CM, list(self.labelEncoder.classes_),hide_zeroes=True,max_str_label_size=2,float_display=False)
+        # (a) Score evaluation
+        print('Model score is: ', accuracy_score(allLabelsStd,allPredictions))
+        lab = list(range(len(self.labelEncoder.classes_))) # 'unknown' class not needed.
+        CM = confusion_matrix(allLabelsStd,allPredictions,labels=lab)
+        print('and associated confusion matrix is:')
+        print_cm(CM, list(self.labelEncoder.classes_),hide_zeroes=True,max_str_label_size=2,float_display=False)
 
-            # (b) X-validation
-            sss = config.learning['cv']
-            print(sss)
-            CM=list()
-            acc=list()
-            model_Xval = deepcopy(self.model)
-            for (i, (train_index, test_index)) in enumerate(sss.split(allFeatures, allLabelsStd)):
-                predictionsStd = model_Xval.fit(allFeatures[train_index], allLabelsStd[train_index]).predict(allFeatures[test_index])
-                predictions = self.labelEncoder.inverse_transform(predictionsStd)
-                CM.append(confusion_matrix(allLabels[test_index],predictions, labels=self.labelEncoder.classes_))
-                acc.append(accuracy_score(allLabels[test_index],predictions))
-            print('Cross-validation results: ', np.mean(acc)*100, ' +/- ', np.std(acc)*100, ' %')
-            print_cm(np.mean(CM, axis=0),self.labelEncoder.classes_,hide_zeroes=True,max_str_label_size=2,float_display=False)
+        # (b) X-validation
+        sss = config.learning['cv']
+        print(sss)
+        CM=list()
+        acc=list()
+        model_Xval = deepcopy(self.model)
+        for (i, (train_index, test_index)) in enumerate(sss.split(allFeatures, allLabelsStd)):
+            predictionsStd = model_Xval.fit(allFeatures[train_index], allLabelsStd[train_index]).predict(allFeatures[test_index])
+            predictions = self.labelEncoder.inverse_transform(predictionsStd)
+            CM.append(confusion_matrix(allLabels[test_index],predictions, labels=self.labelEncoder.classes_))
+            acc.append(accuracy_score(allLabels[test_index],predictions))
+        print('Cross-validation results: ', np.mean(acc)*100, ' +/- ', np.std(acc)*100, ' %')
+        print_cm(np.mean(CM, axis=0),self.labelEncoder.classes_,hide_zeroes=True,max_str_label_size=2,float_display=False)
 
         if returnData:
-            return allData, allLabels, acc
+            return allData, allLabels, acc, allPredictions, allProbabilities
         else:
             return None
 
