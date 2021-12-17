@@ -56,6 +56,7 @@ from copy import deepcopy
 
 import os
 import pandas as pd # added by Glenn
+import glob
 
 
 class Analyzer:
@@ -156,61 +157,21 @@ class Analyzer:
             # what traceID are we looking for - should figure out how to write this into the config
             fptr = open('./AAA-master/MONTSERRAT/current_traceID.txt','r')
             traceID = fptr.read()
-            fptr.close()      
+            fptr.close()     
             
+            if traceID=='*':
+                mseedbase = os.path.basename(path)
+                allpkls = glob.glob(os.path.join('features',mseedbase.replace('.mseed', '*.%s.pkl')))
+                for featurespkl in allpkls:
+                    print('Reading %s' % featurespkl)
+                    featuresList = pd.read_pickle(featurespkl)
             
-            # NEED TO LOAD DATA - FIRST CHECK IF FEATURES ALREADY COMPUTED
-            mseedbase = os.path.basename(path)
-            featurespkl = os.path.join('features',mseedbase.replace('.mseed', '.%s.pkl' % traceID))
-            if os.path.exists(featurespkl):
-                print('Reading %s' % featurespkl)
-                featuresList = pd.read_pickle(featurespkl)
-            else:
-                # LOAD WAVEFORM
-                #(fs, signature) = requestObservation(config, tStartSignature, duration, path, verbatim=verbatim)
-                (fs, signature) = read_montserrat(path, config, verbatim, traceID=traceID)
-                if verbatim>2:
-                    print(fs, len(signature)) # SCAFFOLD
-                    
-                # If problem
-                if len(signature) < 40:
+                    # APPEND FEATURES FOR THIS EVENT+TRACE TO ALLFEATURES
+                    allFeatures[i] = featuresList[0] # subscript 0 not needed
                     if verbatim > 2:
-                        print('Data is not considered', tStartSignature)
-                    allFeatures[i] = None
-                    allLabels[i] = None
-                    continue
-
-                if returnData:
-                    allData[i] = signature
-
-                """
-                # Filtering if needed
-                f_min = self.catalogue.iloc[i]['f0']
-                f_max = self.catalogue.iloc[i]['f1']
-                # SCAFFOLD               
-                #f_min = 0.5
-                #f_max = 25.0
-                if f_min and f_max:
-                    butter_order = config.analysis['butter_order']
-                    signature = butter_bandpass_filter(signature, f_min, f_max, fs, order=butter_order)
-                """
-               
-
-                # Preprocessing & features extraction
-                featuresList = extract_features(config, signature.reshape(1, -1), features, fs)
-                
-                # Save featuresList to pickle file
-                if not os.path.exists('features'):
-                    os.makedirs('features')
-                with open(featurespkl, 'wb') as f:
-                    pickle.dump(featuresList, f)
-            
-            # APPEND FEATURES FOR THIS EVENT+TRACE TO ALLFEATURES
-            allFeatures[i] = featuresList[0] # subscript 0 not needed
-            if verbatim > 2:
-                print('Got %d features for %s in %s' % (len(featuresList), traceID, path))  
-            if verbatim > 3:
-                print(featuresList)
+                        print('Got %d features for %s in %s' % (len(featuresList), traceID, path))  
+                    if verbatim > 3:
+                        print(featuresList)
         
         # OUTPUT COMPUTATION TIME
         tEnd = time.time()
