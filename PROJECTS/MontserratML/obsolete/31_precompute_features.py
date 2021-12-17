@@ -44,7 +44,7 @@ metrics_to_add = ['bandratio_[0.8_4.0_16.0]', 'bandratio_[1.0_6.0_11.0]',       
 # 0 = quiet
 # 1 = in between
 # 2 = detailed information
-verbatim = 1
+verbatim = 5
 
 # Init project with configuration file
 config = Config('./AAA-master/config/general/newsettings_10.json', verbatim=verbatim)
@@ -79,8 +79,7 @@ for i in range(catalog_length):
 
     # NEED TO LOAD DATA - FIRST CHECK IF FEATURES ALREADY COMPUTED
     mseedbase = os.path.basename(path)
-    
-    # first check for features file
+    print('Trying to read %s' % path)
     if not isfile(path):
         
         # look for WAV file instead, which lacks the .mseed extension
@@ -94,9 +93,30 @@ for i in range(catalog_length):
     else:
         st = obspy.read(path)
         
-    # ADD ANY NEW CHECKS HERE, e.g. THE SPIKES CHECK
+    ###### SPIKES CHECK - won't be needed when we reprocess all data #####
+    # The reason we do the spike check on the raw WAV file is 
+    # because filters run to produce the MSEED file distort the spike
+    wavpath = mseedpath.replace('miniseed_c', 'WAV').replace('.mseed','')
+    rawst = read(wavpath)
+    for tr in rawst:
+        check_for_spikes(tr)
+
+    good_traces = 0
+    trace_ids_to_eliminate = []
+    fix_trace_id(rawst)
+    for tr in rawst:
+        check_for_spikes(tr)
+        if tr.stats.quality_factor > 1.0:
+            good_traces += 1
+        else:
+            trace_ids_to_eliminate.append(tr.id)
+
+    for tr in st:
+        if tr.id in trace_ids_to_eliminate:
+            st.remove(tr)
+    ################ END OF SPIKES CHECK ########################
     
-    if len(st)>0:
+    if len(st)>0 and add_GT_metrics:
         tracecsv = path.replace('.mseed','.csv')
         if isfile(tracecsv):
             tracedf = pd.read_csv(tracecsv)
@@ -128,11 +148,12 @@ for i in range(catalog_length):
         featuresList = extract_features(config, signature, features, fs)
         
         # THIS WOULD BE THE PLACE TO ADD THE PRECOMPUTED FEATURES FROM SEISAN2PANDAS
-        thistracedf = tracedf[tracedf['id']==tr.id]
-        for col in metrics_to_add:
-            featuresList.append(thistracedf[col])
-        bandwidth = thistracedf['bw_max'] - thistracedf['bw_min']
-        featuresList.append(bandwidth)
+        if add_GT_metrics:
+            thistracedf = tracedf[tracedf['id']==tr.id]
+            for col in metrics_to_add:
+                featuresList.append(thistracedf[col])
+            bandwidth = thistracedf['bw_max'] - thistracedf['bw_min']
+            featuresList.append(bandwidth)
         
         with open(featurespkl, 'wb') as f:
             pickle.dump(featuresList, f)
