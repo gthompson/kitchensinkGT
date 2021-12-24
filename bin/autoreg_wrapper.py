@@ -9,7 +9,7 @@ Both checks could be easily added
 '''
 import os, glob
 
-def autoreg_this_dir(thisdir, yyyy, autoreg_infile, fbad, n_good, max_n_files):
+def autoreg_this_dir(thisdir, yyyy, autoreg_infile, fbad, n_good):
     os.chdir(thisdir) # otherwise S-file records absolute path
     # Loop over each WAV file
     wavfiles = glob.glob(os.path.join(thisdir, '%s*S.*' % yyyy )) # THIS FILE PATTERN MUST MATCH YOUR WAV FILES
@@ -21,9 +21,6 @@ def autoreg_this_dir(thisdir, yyyy, autoreg_infile, fbad, n_good, max_n_files):
             os.system('autoreg < %s' % autoreg_infile)
             print('Registered %s' % wavbase)
             n_good += 1
-            if n_good >= max_n_files:
-                print('Hit file limit')
-                return
         except: # it crashed. add to list of bad WAV files
             print('autoreg crashed on %s' % wavbase)
             fbad.write('%s\n' % wavfile)
@@ -36,11 +33,7 @@ def autoreg_this_dir(thisdir, yyyy, autoreg_infile, fbad, n_good, max_n_files):
 seisantopdir = os.getenv('SEISAN_TOP')
 seisandb = 'DSNC_'
 operator = 'GT' # initials of person running program
-test_mode = True # change to False to run on whole archive
 #----------------------------------------#
-max_n_files = 999999
-if test_mode:
-    max_n_files = 100
 
 wavdbdir = os.path.join(seisantopdir, 'WAV', seisandb)
 if os.path.isdir(wavdbdir):
@@ -80,6 +73,6 @@ for yeardir in sorted(yeardirs):
     monthdirs = glob.glob(os.path.join(yeardir, '[01][0-9]'))
     for monthdir in sorted(monthdirs):
         print('Processing ',monthdir)
-        autoreg_this_dir(monthdir, yyyy, autoreg_infile, fbad, n_good, max_n_files)
+        autoreg_this_dir(monthdir, yyyy, autoreg_infile, fbad, n_good)
 
 fbad.close()
