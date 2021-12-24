@@ -9,25 +9,39 @@ Both checks could be easily added
 '''
 import os, glob
 
-def autoreg_this_dir(monthdir, yyyy, autoreg_infile, fbad, n_good):
+def autoreg_this_dir(thisdir, yyyy, autoreg_infile, fbad, n_good, max_n_files):
+    os.chdir(thisdir) # otherwise S-file records absolute path
     # Loop over each WAV file
-    wavfiles = glob.glob(os.path.join(monthdir, '%s*S.*' % yyyy ))
-    print('Processing %s: %d WAV files found' % (monthdir, len(wavfiles)))
-    for wavfile in wavfiles:
-        os.system('dirf %s' % wavfile) # Run dirf - produces filenr.lis with only 1 event
+    wavfiles = glob.glob(os.path.join(thisdir, '%s*S.*' % yyyy )) # THIS FILE PATTERN MUST MATCH YOUR WAV FILES
+    print('Processing %s: %d WAV files found' % (thisdir, len(wavfiles)))
+    for wavfile in sorted(wavfiles):
+        wavbase = os.path.basename(wavfile) 
+        os.system('dirf %s' % wavbase) # Run dirf - produces filenr.lis with only 1 event
         try: # run autoreg
             os.system('autoreg < %s' % autoreg_infile)
-            print('Registered %s' % wavfile)
+            print('Registered %s' % wavbase)
             n_good += 1
+            if n_good >= max_n_files:
+                print('Hit file limit')
+                return
         except: # it crashed. add to list of bad WAV files
-            print('autoreg crashed on %s' % wavfile)
+            print('autoreg crashed on %s' % wavbase)
             fbad.write('%s\n' % wavfile)
     print('registered %d WAV files so far' % n_good)
 
 
 # main program starts here
+
+#--- Change these variables as needed ---#
 seisantopdir = os.getenv('SEISAN_TOP')
 seisandb = 'DSNC_'
+operator = 'GT' # initials of person running program
+test_mode = True # change to False to run on whole archive
+#----------------------------------------#
+max_n_files = 999999
+if test_mode:
+    max_n_files = 100
+
 wavdbdir = os.path.join(seisantopdir, 'WAV', seisandb)
 if os.path.isdir(wavdbdir):
     print(wavdbdir, ' exists.')
@@ -42,8 +56,8 @@ else:
     exit()
 
 # Commands normally entered by keyboard when running autoreg
-autoreg_infile = 'autoreg_commands.txt'
-operator = 'GT' # initials of person running program
+cwd = os.getcwd()
+autoreg_infile = os.path.join(cwd, 'autoreg_commands.txt')
 fptr = open(autoreg_infile, 'w')
 fptr.write('L\n') # L, R, or D class
 fptr.write('m\n') # c (copy) or m (move)
@@ -51,6 +65,7 @@ fptr.write('%s\n' % seisandb) # SEISAN_DB you are registering into
 fptr.write('%s\n' % operator) # SEISAN_DB you are registering into
 fptr.close()
 
+test_mode = True
 n_good = 0 # number of good wavfiles processed so far
 fbad = open('badwavfiles.txt', 'w') # log bad WAV files in this file
 
@@ -58,13 +73,13 @@ fbad = open('badwavfiles.txt', 'w') # log bad WAV files in this file
 # --- For a single directory, can just call autoreg_this_dir directly ---#
 # Loop over year directories
 yeardirs = glob.glob(os.path.join(wavdbdir, '[12][0-9][0-9][0-9]'))
-for yeardir in yeardirs:
+for yeardir in sorted(yeardirs):
     print('Processing ',yeardir)
     yyyy = os.path.basename(yeardir)
     # Loop over month directories
     monthdirs = glob.glob(os.path.join(yeardir, '[01][0-9]'))
-    for monthdir in monthdirs:
+    for monthdir in sorted(monthdirs):
         print('Processing ',monthdir)
-        autoreg_this_dir(monthdir, yyyy, autoreg_infile, fbad, n_good)
+        autoreg_this_dir(monthdir, yyyy, autoreg_infile, fbad, n_good, max_n_files)
 
 fbad.close()
