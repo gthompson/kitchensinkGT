@@ -8,6 +8,8 @@ fingerprint*
 *.png
 *.backup
 *.pd
+*.pdf
+*.eps
 *.pkl
 PROJECTS/MVOcatalog/Untitled.ipynb
 PROJECTS/MontserratML/paris+t.xlsx
