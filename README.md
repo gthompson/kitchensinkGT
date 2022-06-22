@@ -1,5 +1,11 @@
 # kitchensinkGT
 
+Host repo for various projects
+[Repo website](https://gthompson.github.io/kitchensinkGT/index.md)
+
+[Launchpad Erosion Project](https://gthompson.github.io/kitchensinkGT/PROJECTS/ROCKETSEIS/launchpad_erosion/html/index.html)
+
+
 Useful _OTHER 3rd party repos:
 
 1. Codes at https://github.com/geoscience-community-codes
