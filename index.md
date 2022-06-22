@@ -38,5 +38,5 @@ Having trouble with Pages? Check out our [documentation](https://docs.github.com
 
 # Glenn's changes follow
 
-- [Launchpad Erosion Project](https://github.com/gthompson/kitchensinkGT/blob/master/PROJECTS/ROCKETSEIS/launchpad_erosion/html/index.html)
+- [Launchpad Erosion Project](https://gthompson.github.io/kitchensinkGT/PROJECTS/ROCKETSEIS/launchpad_erosion/html/index.html)
 
