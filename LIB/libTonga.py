@@ -713,7 +713,7 @@ def regress_arrival_times(st, reftime, outfile=None):
 
 
 
-def plot_record_section(st2, reftime, outfile=None, starttime=0, endtime=0,                         km_min=0, km_max=40075.0/2, slopes = [],                         scale_factor=1.0, plot_arrivals=False,                         figsize=(16,16), min_spacing_km=0, reduced_speed=None, normalize=False ):
+def plot_record_section(st2, reftime, outfile=None, starttime=0, endtime=0, km_min=0, km_max=40075.0/2, slopes = [], scale_factor=1.0, plot_arrivals=False, figsize=(16,16), min_spacing_km=0, reduced_speed=None, normalize=False ):
     r = np.array(get_distance_vector(st2))
     st = order_traces_by_distance(st2, r)
 
@@ -898,7 +898,10 @@ def machnumber(Pover, Pambient=1e5, vambient=314):
 def pressure_vs_distance(r_station, P_station, crossover_km=100, vambient=314):
     R = circum_earth_m/math.pi
     r_sphere = R * np.sin(r_station / R)
-    Preduced = P_station / (1/r_sphere + 1/np.sqrt(crossover_km * r_sphere)) 
+    if crossover_km == 0:
+    	Preduced = P_station / (1/np.sqrt(r_sphere))
+    else: 
+        Preduced = P_station / (1/r_sphere + 1/np.sqrt(crossover_km * r_sphere)) 
    
     
     r = 1 # 1 km for reduced pressure
@@ -909,16 +912,22 @@ def pressure_vs_distance(r_station, P_station, crossover_km=100, vambient=314):
     t_list = [0]
     v_list = [v]
     M_list = [M]
-    multiplier = 1.001
+    multiplier = 1.0001
     
    
     last_r = r
     while r < circum_earth_km/2: 
         r = r * multiplier
+        if r > last_r + 1:
+            r = last_r + 1
         r_sphere = R * np.sin(r / R)
         
         #P = Preduced/r + Preduced/np.sqrt(crossover_km * r)
-        P = Preduced/r_sphere + Preduced/np.sqrt(crossover_km * r_sphere)
+        #P = Preduced/r_sphere + Preduced/np.sqrt(crossover_km * r_sphere)
+        if crossover_km == 0:
+    	    P = Preduced * (1/np.sqrt(r_sphere))
+        else: 
+            P = Preduced * (1/r_sphere + 1/np.sqrt(crossover_km * r_sphere)) 
         [M,v] = machnumber(P, Pambient=Pambient)
         r_list.append(r)
         P_list.append(P)
