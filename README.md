@@ -1,7 +1,7 @@
 # kitchensinkGT
 
 Host repo for various projects
-[Repo website](https://gthompson.github.io/kitchensinkGT/index.md)
+[Repo website](https://gthompson.github.io/kitchensinkGT/)
 
 [Launchpad Erosion Project](https://gthompson.github.io/kitchensinkGT/PROJECTS/ROCKETSEIS/launchpad_erosion/html/index.html)
 
