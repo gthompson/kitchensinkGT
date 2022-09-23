@@ -1033,7 +1033,7 @@ def Trace_merge_with_BUDfile(this_tr, budfile):
 ##                          FDSN tools                              ##
 ######################################################################
 
-def get_FDSN_inventory(fdsnClient, eventTime, stationXmlFile, network, latitude, longitude,searchRadiusDeg, pretrigSecs, posttrigSecs ):
+def get_FDSN_inventory(fdsnClient, eventTime, stationXmlFile, network, latitude, longitude,searchRadiusDeg, pretrigSecs, posttrigSecs, station='*', channel='*' ):
     """ 
     Load inventory of stations/channels available around this event time. It will attempt to load from file, then from the client
     Written for Miami Lakes project
@@ -1050,6 +1050,8 @@ def get_FDSN_inventory(fdsnClient, eventTime, stationXmlFile, network, latitude,
         try:
             inv = fdsnClient.get_stations(
                 network = network,
+                station = station,
+                channel = channel,
                 latitude = latitude,
                 longitude = longitude,
                 maxradius = searchRadiusDeg,

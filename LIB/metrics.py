@@ -652,6 +652,9 @@ def Eseismic_Boatwright(val, R, rho_earth=2000, c_earth=2500, S=1.0, A=1.0):
     # c_earth 2500 m/s
     # A is attenuation = 1
     # S is site response = 1
+    #
+    # These equations seem to be valid for body waves only, that spread like hemispherical waves in a flat earth.
+    # But if surface waves dominate, they would spread like ripples on a pond, so energy density of wavefront like 2*pi*R
     if isinstance(val,Stream): # Stream
         Eseismic = []
         for tr in val:
@@ -667,12 +670,13 @@ def Eseismic_Boatwright(val, R, rho_earth=2000, c_earth=2500, S=1.0, A=1.0):
         Eseismic = 2 * pi * (R ** 2) * rho_earth * c_earth * (S ** 2) * val / A 
     return Eseismic
 
-def Eacoustic_Boatwright(val, R, rho_atmos=1.2, c_atmos=340):
+def Eacoustic_Boatwright(val, R, rho_atmos=1.2, c_atmos=340, z=100000):
     # val can be a Stream, Trace, a stationEnergy or a list of stationEnergy
     # R in m
     # Following values assumed by Johnson and Aster, 2005:
     # rho_atmos 1.2 kg/m^3
-    # c_atmos 340 m/s   
+    # c_atmos 340 m/s  
+    # z is just an estimate of the atmospheric vertical scale length - the height of ripples of infrasound energy spreading globally
     if isinstance(val,Stream): # Stream
         Eacoustic = []
         for tr in val:
@@ -684,7 +688,11 @@ def Eacoustic_Boatwright(val, R, rho_atmos=1.2, c_atmos=340):
         for thisval in val:
             Eacoustic.append(Eacoustic_Boatwright(thisval, R, rho_atmos, c_atmos, S, A))
     else:
-        Eacoustic = 2 * pi * (R ** 2) / (rho_atmos * c_atmos) * val
+        if R > 100000: # beyond distance z (e.g. 100 km), assume spreading like 2*pi*R
+            E_if_station_were_at_z = 2 * pi * (z ** 2) / (rho_atmos * c_atmos) * val
+            Eacoustic = E_if_station_were_at_z* R/1e5
+        else:
+            Eacoustic = 2 * pi * R ** 2 / (rho_atmos * c_atmos) * val
     return Eacoustic
     
 def VASR(Eacoustic, Eseismic):
