@@ -1,0 +1,3 @@
+Szymon and Alberto learned python
+they immediately programmed a script 
+but unfortunately it had a bug in it and no icecream:(

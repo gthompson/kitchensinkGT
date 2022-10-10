@@ -1,0 +1,2 @@
+The easiest way to check if you have been eaten by a ghost is to compare your current position with your initial position.
+If you have not been eaten by a ghost, you can eat it yourself.

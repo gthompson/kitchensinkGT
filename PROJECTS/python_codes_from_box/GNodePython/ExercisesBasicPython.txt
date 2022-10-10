@@ -1,0 +1,72 @@
+acorr
+axhline - horizontal line
+axis - uses `set_xlim` & `set_ylim`
+axvline - vertical line
+bar
+barh
+clabel - contour label
+contour
+draw
+errorbar
+fill
+get_axis_bgcolor
+get_children
+get_legend
+get_position
+get_title
+get_xaxis
+get_xbound
+get_xlabel
+get_xlim
+get_xmajorticklabels
+get_xminorticklabels
+get_xticklabels
+get_xticks
+get_xticklines
+get_xgridlines
+grid
+hlines - plot horizontal lines
+vlines - vertical
+hold
+invert_xaxis
+ishold
+legend
+loglog
+quiver
+pie
+plot
+plot_date - 1 or both axis are dates
+scatter
+semilogx
+semilogy
+set_aspect('auto'/'equal'/aspectratio)
+set_axis_bgcolor
+set_color_cycle
+set_position
+set_title
+set_xbound
+set_xlabel
+set_xlim
+set_xscale('linear'/'log'/'symlog') - can set log base
+set_xticklabels
+set_xticks
+stem
+step
+table
+text
+twinx - related to plotyy
+xaxis_date - treat x data as dates
+xaxis_inverted
+xcorr
+yaxis_date
+yaxis_inverted
+get_axes
+get_figure
+
+
+imshow
+matshow
+pcolor
+pcolorfast
+pcolormesh
+psd

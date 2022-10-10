@@ -1,0 +1,3 @@
+Lorenzo and Gerd met few minutes ago.
+They participate in a a very cool Python course.
+Now, they are forced to work together, which isn´t too bad.

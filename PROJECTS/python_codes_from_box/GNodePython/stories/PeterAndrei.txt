@@ -1,0 +1,3 @@
+Andrei and Peter visited Berlin in September.
+They attended a crash course in Python.
+The crash wasn´t too bad.
