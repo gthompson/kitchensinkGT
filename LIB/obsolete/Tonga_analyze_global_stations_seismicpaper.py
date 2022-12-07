@@ -1,54 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-# # Background
-# 
-# Inspired by my analysis of Miami Lakes Rboom data to measure the pressure pulse from the Tonga eruption an beamform back to the source, I began drinking in global barometric and infrasound data from IRIS (and Shake.net). Steve then took my measurements and began collating a table of reduced pressure versus other eruptions. This then manifested an invite from Zhigang Peng to collaborate on a Tonga paper to look at all waves emanating from this eruption.
-# 
-# This library includes all the functions developed, and related imports
-# 
-# Glenn Thompson, Jan - Apr 2022
-
-
-
-####################### IMPORTS  #####################
-
-import os, sys, obspy
-import numpy as np
-import math
-import matplotlib.pyplot as plt
-import pickle
-import pandas as pd
-import obspy
-from obspy import UTCDateTime
-from datetime import datetime 
+# Functions from Tonga_analyze_global_stations_seismicpaper.ipynb
+#import os, sys, obspy
+#import numpy as np
+#get_ipython().run_line_magic('matplotlib', 'inline')
+#import matplotlib.pyplot as plt
+#import pickle
 LIBpath = os.path.join( os.getenv('HOME'),'src','kitchensinkGT', 'LIB')
 sys.path.append(LIBpath)
-from libseisGT import inventory2traceid, get_FDSN_inventory, clean_trace, attach_station_coordinates_from_inventory
+from libseisGT import inventory2traceid, get_FDSN_inventory, clean_trace, \
+    attach_station_coordinates_from_inventory
 from obspy.clients.fdsn import Client
-#from obspy.core.util import AttribDict
 from obspy.geodetics import locations2degrees, degrees2kilometers, kilometers2degrees
-from scipy.stats import linregress
+#from scipy.stats import linregress
 
-####################### CONSTANTS #####################
-DATA_ROOT = os.path.join(os.getenv('HOME'), 'DATA', 'HungaTonga')
-if not os.path.isdir(DATA_ROOT):
-    os.makedirs(DATA_ROOT)
-circum_earth_km = 40075
-circum_earth_m = circum_earth_km*1000
-m_per_deg = circum_earth_m/360.0
-
-# location of Hunga-Tonga Hunga-Ha'apai - used for lightning
-sourcelat = -20.536
-sourcelon = -175.382
-
-# earthquake origin from USGS
-olat = -(20 + 34/60 + 12/3600) 
-olon = -(175 + 22/60 + 48/3600)
-otime = obspy.core.UTCDateTime('2022-01-15T04:14:45.000000Z') # main eruption time - on day 2
-
-
-####################### FUNCTIONS FOR SEISMO-ACOUSTICS #####################
 def get_fdsn_identifier(fdsnURL):
     prepend=''
     if 'iris' in fdsnURL:
@@ -59,9 +24,7 @@ def get_fdsn_identifier(fdsnURL):
         prepend='nz_'  
     return prepend
 
-
-
-def get_inventory_and_waveforms(fdsnURL, searchRadiusDeg, olat, olon, startt, endt, chanstring, data_root, overwrite=False, network='*', station='*', location='*'):
+def get_inventory_and_waveforms(fdsnClient, searchRadiusDeg, olat, olon, startt, endt, chanstring, data_root, overwrite=False, network='*', station='*', location='*'):
     fdsnClient = Client(fdsnURL)  
     if not os.path.isdir(data_root):
         print('No such directory %s' % data_root)
@@ -69,15 +32,15 @@ def get_inventory_and_waveforms(fdsnURL, searchRadiusDeg, olat, olon, startt, en
     
     # STEP 1 - FIND STATIONS BY REQUESTING AN INVENTORY
     prepend = get_fdsn_identifier(fdsnURL)
-    stationXmlFile = os.path.join(data_root, 'STATIONXML', '%s%s_within_%.0f_degrees.xml' % (prepend, chanstring, searchRadiusDeg))
-    mseedfile = stationXmlFile.replace('STATIONXML', 'MINISEED').replace('.xml','.mseed')
+    stationXmlFile = os.path.join(data_root, '%s%s_within_%.0f_degrees.xml' % (prepend, chanstring, searchRadiusDeg))
+    mseedfile = stationXmlFile.replace('.xml','.mseed')
     print(stationXmlFile, mseedfile)
     
     if os.path.exists(stationXmlFile) and overwrite==False:
         inv = obspy.read_inventory(stationXmlFile)
     else:
-        inv = get_FDSN_inventory(fdsnClient, startt, stationXmlFile, network, olat, olon,
-             searchRadiusDeg, 0, endt - startt, station = station, channel = chanstring ) # get all low rate, outside barometers
+        inv = get_FDSN_inventory(fdsnClient, startt, stationXmlFile, network, olat, olon, \
+            searchRadiusDeg, 0, endt - startt, station = station, channel = chanstring ) # get all low rate, outside barometers
     trace_ids = inventory2traceid(inv)
     #print(trace_ids)
     
@@ -110,13 +73,15 @@ def get_inventory_and_waveforms(fdsnURL, searchRadiusDeg, olat, olon, startt, en
             
         # save waveform data
         if len(st)>0:
-            st.write(mseedfile)
+            st.write(stationXmlFile.replace('.xml','.mseed'))
         
     return st, inv
 
-
-
-def smart_merge(st):
+def reconstitute_stream(st, inv, fmin=0.0001):
+    T=1.0/fmin
+    
+    # deal with multiple traces with same trace ID, by appending and merging one at a time,
+    # and removing any time there is a fail.
     st2 = obspy.core.Stream()
     for tr_original in st:
         tr = tr_original.copy()
@@ -126,16 +91,6 @@ def smart_merge(st):
         except:
             st2.remove(tr)
             pass
-    return st2
-
-
-
-def reconstitute_stream(st, inv, fmin=0.0001):
-    T=1.0/fmin
-    
-    # deal with multiple traces with same trace ID, by appending and merging one at a time,
-    # and removing any time there is a fail.
-    st2 = smart_merge(st)
         
     # reconstitute as many traces as possible, and return them
     reconstituted = obspy.core.Stream()
@@ -160,11 +115,9 @@ def reconstitute_stream(st, inv, fmin=0.0001):
         # remove response
         try:
             if tr.stats.channel[1]=='H':
-                tr.remove_response(inventory=inv, pre_filt=pre_filt, output='VEL') # was 'DISP'
-                tr.stats['units']='m/s'
+                tr.remove_response(inventory=inv, pre_filt=pre_filt, output='DISP')
             else:
                 tr.remove_response(inventory=inv, pre_filt=pre_filt )
-                tr.stats['units']='Pa'
             reconstituted.append(tr)
             #print(tr.id, ' reconstituted')
         except:
@@ -173,13 +126,11 @@ def reconstitute_stream(st, inv, fmin=0.0001):
             pass
         tr.detrend('linear')
         tr.stats['maxamp_corrected'] = np.max(np.abs(tr.data))
-    if len(failed_ids)>0:
-        print('Failed to reconstitute: ', failed_ids)
+    print('Failed to reconstitute: ', failed_ids)
 
     #reconstituted.plot(equal_scale=True);
     
     return reconstituted
-
 
 
 def attach_station_coordinates_from_inventory(inventory, st):
@@ -194,9 +145,6 @@ def attach_station_coordinates_from_inventory(inventory, st):
                                 'latitude':cha.latitude,
                                 'longitude':cha.longitude,
                                 'elevation':cha.elevation})
-    return
-
-
                             
 def attach_distance_to_stream(st, olat, olon):
     for tr in st:
@@ -208,10 +156,7 @@ def attach_distance_to_stream(st, olat, olon):
             tr.stats['distance'] =  distkm * 1000
         except:
             print('cannot compute distance for %s' % tr.id)
-    return
-       
-
-     
+            
 def remove_outliers(a, t, f=30, amax=2000, amin=1):
     bad_indices = []
     
@@ -241,25 +186,21 @@ def remove_outliers(a, t, f=30, amax=2000, amin=1):
             a[i]=np.NaN 
             t[i]=np.NaN
     #return a, t
-    return
-  
-
-  
+    
 def plot_amplitude_versus_distance(st, units, reftime=None, cmin=300, cmax=420, duration=7200):
     r = []
     a = []
     t = []
     for tr in st:
-        this_r = tr.stats.distance
+        
         if reftime:
-            
+            this_r = tr.stats.distance
             Pmax = []
             tmax = []
             stime = reftime + this_r/cmax
             etime = reftime + this_r/cmin + duration
-            #print(stime, etime)
             if etime < tr.stats.endtime:
-                tr0=tr.copy().trim(starttime=stime, endtime=etime)
+                tr0=tr.copy().trim(starttime=stime, endtime=endt)
                 this_a = np.max(np.abs(tr0.data))
                 this_t = np.argmax(np.abs(tr0.data))*tr0.stats.delta
                 Pmax.append(this_a)
@@ -274,7 +215,7 @@ def plot_amplitude_versus_distance(st, units, reftime=None, cmin=300, cmax=420, 
             stime = reftime + this_r/cmax
             etime = reftime + this_r/cmin + duration
             if etime < tr.stats.endtime:
-                tr0=tr.copy().trim(starttime=stime, endtime=etime)
+                tr0=tr.copy().trim(starttime=stime, endtime=endt)
                 this_a = np.max(np.abs(tr0.data))
                 this_t = np.argmax(np.abs(tr0.data))*tr0.stats.delta
                 Pmax.append(this_a)
@@ -299,16 +240,15 @@ def plot_amplitude_versus_distance(st, units, reftime=None, cmin=300, cmax=420, 
     PR = 12000
     y = PR/np.power(r2,0.5)
     
-    
     # wavefront circumference does not increase like 1/r as assumed because the earth is curved, not flat.
     # so there is a trigonemtric correction to apply. figure this out and use in a better paper, and then
     # estimate attenuation from full energy of N-wave. remove this plot for nopw.
     y2 = []
     r3 = []
-    radius_earth = circum_earth_m/(2*math.pi)
+    radius_earth = circum_earth_m/(2*3.1415)
     for this_r in r2: 
-        real_r = radius_earth * np.sin(this_r/radius_earth)
-        #print(this_r, real_r)
+        real_r = radius_earth * np.arcsin(this_r/radius_earth)
+        print(this_r, real_r)
         r3.append(real_r)
         y2.append(PR / np.power(real_r, 0.5))
     y2 = np.array(y2)
@@ -319,70 +259,26 @@ def plot_amplitude_versus_distance(st, units, reftime=None, cmin=300, cmax=420, 
     fig = plt.figure(figsize=(12,8))
     ax = fig.add_subplot(1,1,1)
     ax.loglog(r, a, 'o')
-    #ax.loglog(r2, y, 'r:') # this is the plot for 1/sqrt(r)
-    #ax.loglog(r2, y2, 'g:')
-    ax.set_ylim(10,1000000)
-    ax.set_xlim(1,circum_earth_km/4)
+    ax.loglog(r2, y, 'r:')
+    ax.loglog(r2, y2, 'g:')
+    ax.set_ylim(10,100000)
+    ax.set_xlim(1,42000)
     ax.set_ylabel('Maximum amplitude (%s)' % units)
     ax.set_xlabel('Distance (km)')
     plt.grid(which='both')
     #plt.savefig('reduced_pressure.eps')
     
+    fig = plt.figure()
+    plt.plot(r2, r3/r2, 'o')
     
-
-    # plot pressure vs distance from model
-    r_msvf = 757.0 # km
-    P_msvf = 780.0 # Pa
-    #Preduced = P_msvf / (1/r_msvf + 1/np.sqrt(crossover_km * r_msvf)) 
- 
-    r_list, P_list, v_list, t_list, M_list = pressure_vs_distance(r_msvf, P_msvf, crossover_km=100, vambient=340)
-    ax.loglog(r_list, P_list, 'k-', linewidth=3)
-    print(r_list[:3],P_list[:3])
-    r_list, P_list, v_list, t_list, M_list = pressure_vs_distance(r_msvf/3, P_msvf, crossover_km=1, vambient=340)
-    ax.loglog(r_list, P_list, 'k--', linewidth=3)    
-    print(r_list[:3],P_list[:3])
-    # straight line fit
-    #fig = plt.figure(figsize=(12,8))
-    #ax = fig.add_subplot(1,1,1)
+    if False:
+        fig = plt.figure(figsize=(4,4))
+        ax = fig.add_subplot(1,1,1)
+        ax.scatter(t, r)
+        ax.set_xlabel('Maximum time (s)')
+        ax.set_ylabel('Distance (km)')
+        plt.show()    
     
-  
-    r_list = [r for (P,r) in zip(P_list,r_list) if math.isnan(P)==False]
-    P_list = [P for P in P_list if math.isnan(P)==False]
-    
-    r_list = r3[10:]
-    P_list = a
-    #print(len(r_list), len(P_list))
-    
-    #print(a)
-            
-  
-    logP = np.log10(np.array(P_list))
-    logR = np.log10(np.array(r_list))
-    
-    logR = logR[:5]
-    logP = logP[:5]
-    print(logR, logP)
-    
-    
-    slope, logp_intercept, r_value, p_value, slope_std_err = linregress(logR, logP)
-    print(slope, logp_intercept)
-
-    logr_intercept = -logp_intercept/slope
-    logr2 = np.arange(0.0, np.log10(circum_earth_km), np.log10(circum_earth_km)/1000 )# 1000 steps
-
-    #print(logr2)
-    logp2 = slope * logr2 + logp_intercept
-    #print(logp2)
-    #ax.plot(logR, logP, 'bx') # line
-    r2 = np.power(10, logr2)
-    p2 = np.power(10, logp2)
-    r4 = radius_earth * np.arcsin(r2/radius_earth)
-    #ax.loglog(r4, p2, '-')
-    ax.set_xlim(1,circum_earth_km/4)
-    return
-  
-
-  
 def plot_reduced_pressure(st, units):
     r = []
     a = []
@@ -400,10 +296,7 @@ def plot_reduced_pressure(st, units):
     ax.set_xlabel('Distance (km)')
     plt.grid()
     plt.show()
-    return
     
-
-
 def yes_or_no(question, default_answer='y', auto=False):
     #while "the answer is invalid":
     if auto==True:
@@ -416,14 +309,10 @@ def yes_or_no(question, default_answer='y', auto=False):
         return True
     if reply[0] == 'n':
         return False
-   
-
-     
+        
 def manually_select_good_traces(st2, trim_mins=0, record_section=False, auto=False, wlen=7200, rmax=999999999):
     r = get_distance_vector(st2)
     st = order_traces_by_distance(st2, r) # sort traces by distance
-    st = smart_merge(st)
-    st.detrend('linear')
     last_distance = -9999999
     last_max_amp = 999999999999
     stkeep = obspy.core.Stream()
@@ -438,7 +327,7 @@ def manually_select_good_traces(st2, trim_mins=0, record_section=False, auto=Fal
             tr.trim(starttime=startt, endtime=endt)
             tr.plot()
             
-            # only recommend to keep a trace if amplitude less than thrice previous
+            # only recommend to keep a trace if amplitude less than twice previous
             this_max_amp = np.max(np.abs(tr.data))
             print('max amp = ', this_max_amp)
             this_distance = tr.stats.distance
@@ -446,7 +335,7 @@ def manually_select_good_traces(st2, trim_mins=0, record_section=False, auto=Fal
                 continue
             print('distance = ', this_distance)
             recommend = 'n'
-            if this_max_amp < 3 * last_max_amp:
+            if this_max_amp < 2 * last_max_amp:
                 if record_section: # if record section, only recommend to keep if at least 100 km from previous kept trace
                     if this_distance > last_distance + 200000:
                         recommend = 'y'
@@ -459,8 +348,6 @@ def manually_select_good_traces(st2, trim_mins=0, record_section=False, auto=Fal
                 last_max_amp = this_max_amp
     return stkeep
 
-
-
 def select_previously_manually_selected_traces(st, good_ids):
     stkeep = obspy.core.Stream()
     for tr in st:
@@ -468,65 +355,50 @@ def select_previously_manually_selected_traces(st, good_ids):
             stkeep.append(tr.copy())
     return stkeep
 
-
-
-def analyze_clientchan(fdsnClient, chanstring, startt, endt, fmin=0.001, network='*', station='*', location='*', searchRadiusDeg=180.0):
+def analyze_clientchan(fdsnClient, chanstring, fmin=0.001, network='*', station='*', location='*'):
     T = np.round(1/fmin,0)
     
-    # raw stream and inventory - note that stationXML and Miniseed files are written if they do not exist already
     this_stream, this_inventory = get_inventory_and_waveforms(fdsnClient, searchRadiusDeg, olat, olon, startt, endt, chanstring, DATA_ROOT, network=network, station=station, location=location, overwrite=False)
     attach_station_coordinates_from_inventory(this_inventory, this_stream)
     attach_distance_to_stream(this_stream, olat, olon)
     
-    # reconstituted Stream
     prepend = get_fdsn_identifier(fdsnClient)
-    reconfile = os.path.join(DATA_ROOT, 'MINISEED', '%s%s_reconstituted_%.0f.mseed' % (prepend, chanstring, T))  
-    this_reconstituted = obspy.Stream()
-    if os.path.exists(reconfile):
-        choice = input('%s exists. Load this (y/n)? Otherwise data will be reconstituted and saved over this' % reconfile)
-        if choice[0].lower() == 'y':
-            this_reconstituted = obspy.read(reconfile)
-    if len(this_reconstituted)==0:
-        this_reconstituted = reconstitute_stream(this_stream, this_inventory, fmin=fmin)
+    this_reconstituted = reconstitute_stream(this_stream, this_inventory, fmin=fmin)
+    reconfile = os.path.join(DATA_ROOT, '%s%s_reconstituted_%.0f.mseed' % (prepend, chanstring, T))    
+    #if chanstring[0]!='L':
+    #    median_downsample_to_1Hz(this_reconstituted)
+    #    reconfile = os.path.join(DATA_ROOT, '%s%s_reconstituted_%.0f_downsampled.mseed' % (prepend, chanstring, T))
+    if not os.path.exists(reconfile):
         this_reconstituted.write(reconfile)
-
-    # good traces
-    good_ids_pickle = os.path.join(DATA_ROOT, 'PICKLE', '%sgood_%s_ids_within_%.0f_degrees.pkl' % (prepend, chanstring, searchRadiusDeg))
-    goodmseedfile = os.path.join(DATA_ROOT, 'MINISEED', '%s%s_good.mseed' % (prepend, chanstring))   
+    
+    good_ids_pickle = os.path.join(DATA_ROOT, '%sgood_%s_ids_within_%.0f_degrees.pkl' % (prepend, chanstring, searchRadiusDeg))
     if os.path.exists(good_ids_pickle):
         with open(good_ids_pickle, 'rb') as f:
             good_ids = pickle.load(f)        
         this_good = select_previously_manually_selected_traces(this_reconstituted, good_ids)
     else:
-        this_good = obspy.Stream()
-        if os.path.exists(goodmseedfile):
-            choice = input('%s exists. Load this (y/n)? Otherwise you have to manually pick traces and overwrite existing file' % goodmseedfile)
-            if choice[0].lower() == 'y':
-                this_good = obspy.read(goodmseedfile)
-        if len(this_good)==0:
-            this_good = manually_select_good_traces(this_reconstituted)
-            good_ids = []
-            for tr in this_good:
-                good_ids.append(tr.id)
-            with open(good_ids_pickle, 'wb') as f:
-                pickle.dump(good_ids, f)    
-            this_good.write(goodmseedfile)   
-    print('Good traces saved as %s ' % goodmseedfile)
- 
+        this_good = manually_select_good_traces(this_reconstituted)
+        good_ids = []
+        for tr in this_good:
+            good_ids.append(tr.id)
+        print(good_ids)
+        print(len(good_ids))
+        with open(good_ids_pickle, 'wb') as f:
+            pickle.dump(good_ids, f)    
+        this_good.write(os.path.join(DATA_ROOT, '%s%s_good.mseed' % (prepend, chanstring)))   
+    
     if chanstring[1]=='D':
         units = 'Pa'
-        #plot_amplitude_versus_distance(this_good, units)
-        #plot_reduced_pressure(this_good, units)
-    elif chanstring[1]=='H':
-        units = 'm/s'
+        plot_amplitude_versus_distance(this_good, units)
+        plot_reduced_pressure(this_good, units)
+    #elif chanstring[1]=='H':
+    #    units = 'm/s'
     #    plot_amplitude_versus_distance(this_good, units)       
     
     good_inv = subset_inv(this_inventory, this_stream, this_good)
     plot_inv(good_inv)
     
     return this_good, good_inv, this_stream, this_inventory
-
-
 
 def subset_inv(inv, st, st_subset):
     # subset an inventory based on a stream object which is a subset of another
@@ -540,14 +412,9 @@ def subset_inv(inv, st, st_subset):
         print('Failed to subset inventory. Returning unchanged')
         return inv
 
-
-
 def plot_inv(inv):
     inv.plot(water_fill_color=[0.0, 0.5, 0.8], continent_fill_color=[0.1, 0.6, 0.1], size=30);
-    return
     
-
-
 def medfilt(x, k):
     """Apply a length-k median filter to a 1D array x.
     Boundaries are extended by repeating endpoints.
@@ -566,7 +433,6 @@ def medfilt(x, k):
     return np.median(y, axis=1)
 
 
-
 def median_downsample_to_1Hz(st, winlec_sec=1.0):
     for tr in st:
         y = medfilt(tr.data, np.round(winlen_secs / tr.stats.delta,0) )
@@ -575,10 +441,8 @@ def median_downsample_to_1Hz(st, winlec_sec=1.0):
             fs_new = tr.stats.sampling_rate/fs
             tr.data = y[0::fs]
             tr.stats.sampling_rate=fs_new
-    return
 
-       
-     
+            
 def plots(this_good, inv, olat, olon, otime, startt=0, endt=0, minf=0, maxf=0, auto=False, cmin=300, cmax=420):  
 
     st = this_good.copy()
@@ -599,101 +463,64 @@ def plots(this_good, inv, olat, olon, otime, startt=0, endt=0, minf=0, maxf=0, a
     print('Select good traces for record section')
     st2 = manually_select_good_traces(st, record_section=True, auto=auto)    
     st2.plot(type='section', scale=10, norm_method='stream', orientation='horizontal', dist_degree=True, ev_coord=[olat,olon]) #, reftime=otime)
-    Return
-
-
 
 def get_distance_vector(st):
     r = []
     for tr in st:
         r.append(tr.stats.distance)
     return r
-     
-   
+        
     
-def order_traces_by_distance(st, r=[], assert_channel_order=False): 
+def order_traces_by_distance(st, r): 
     st2 = obspy.core.Stream()
-    if not r:
-        r = get_distance_vector(st)
-    if assert_channel_order: # modifies r to order channels by (HH)ZNE and then HD(F123) etc.
-        for i, tr in enumerate(st):
-            c1 = int(tr.stats.location)/1000000
-            numbers = 'ZNEF0123456789'
-            c2 = numbers.find(tr.stats.channel[2])/1000000000
-            r[i] += c1 + c2
     indices = np.argsort(r)
+    #print(indices)
     for i in indices:
         tr = st[i].copy()
         st2.append(tr)
-
+        #print(tr)
     return st2
 
-def order_traces_by_id(st):
-    ids = []
-    for tr in st:
-        ids.append(tr.id)
-    ids.sort()
-    st2 = obspy.core.Stream()
-    for id in ids:
-        for tr in st:
-            if tr.id == id:
-                st2.append(tr.copy())
-    return st2            
-
-
-def pick_pressure_onset(st, otime, winsecsmax=7200, speed=310, manual=True):
+def pick_pressure_onset(st, otime, cmin, cmax):
     print('Pick onset times with left mouse button. Middle button to skip trace.')
-    
     for tr in st:
+        mintime = otime + tr.stats.distance/cmax
+        maxtime = otime + tr.stats.distance/cmin
+        winsecs = maxtime - mintime
+        
         good_trace = False
-        if manual == True:
-            winsecs = winsecsmax
-            midtime = otime + tr.stats.distance/speed
-            mintime = midtime - winsecs/2
-            maxtime = midtime + winsecs/2
         
-            
-        
-            while winsecs > 30:
-                tr2 = tr.copy().trim(starttime=mintime, endtime=maxtime)
-                t = np.arange(0,tr2.stats.delta*len(tr2.data),tr2.stats.delta)
-                plt.plot(t, tr2.data)
-                plt.title(tr.id)
-                plt.show()
-                pos = plt.ginput(1, timeout=12.0, show_clicks=True )
-                plt.close()
-                if len(pos)>0:
-                    if len(pos[0])>0:
-                        good_trace = True
-                        x = pos[0][0]
-                        atime = tr2.stats.starttime + x
-                        #print(atime)
-                        winsecs = winsecs / 5
-                        mintime = atime - winsecs/2
-                        maxtime = atime + winsecs/2 
-                    else:
-                        break
+        while winsecs > 180:
+            tr2 = tr.copy().trim(starttime=mintime, endtime=maxtime)
+            t = np.arange(0,tr2.stats.delta*len(tr2.data),tr2.stats.delta)
+            plt.plot(t, tr2.data)
+            plt.title(tr.id)
+            plt.show()
+            pos = plt.ginput(1, timeout=12.0, show_clicks=True )
+            plt.close()
+            if len(pos)>0:
+                if len(pos[0])>0:
+                    good_trace = True
+                    x = pos[0][0]
+                    atime = tr2.stats.starttime + x
+                    print(atime)
+                    winsecs = winsecs / 5
+                    mintime = atime - winsecs/2
+                    maxtime = atime + winsecs/2 
                 else:
                     break
+            else:
+                break
         
-        else:
-            tr0=tr.copy().trim(starttime=stime, endtime=etime)
-            #Pmax = np.max(np.abs(tr0.data))
-            traveltime = np.argmax(np.abs(tr0.data))*tr0.stats.delta
-            atime = stime + traveltime
-            good_trace = True  
-            
-            
+        
         if good_trace:
             traveltime = atime - otime
             tr.stats['arrival'] = obspy.core.util.AttribDict({
-                    'arrivaltime':atime,
-                    'c':tr.stats.distance/traveltime,
-                    'traveltime':traveltime})
-                #print(tr.stats.arrival)
-    return  
+                                'arrivaltime':atime,
+                                'c':tr.stats.distance/traveltime,
+                                'traveltime':traveltime})
+            print(tr.stats.arrival)
         
-
 
 def regress_arrival_times(st, reftime, outfile=None):
     fh = plt.figure(figsize=(16,16))
@@ -729,9 +556,10 @@ def regress_arrival_times(st, reftime, outfile=None):
         fh.savefig(outfile)
     return wavespeed, new_otime, t, d
 
-
-
-def plot_record_section(st2, reftime, outfile=None, starttime=0, endtime=0, km_min=0, km_max=40075.0/2, slopes = [], scale_factor=1.0, plot_arrivals=False, figsize=(16,16), min_spacing_km=0, reduced_speed=None, normalize=False ):
+def plot_record_section(st2, reftime, outfile=None, starttime=0, endtime=0, \
+                        km_min=0, km_max=40075.0/2, slopes = [], \
+                        scale_factor=1.0, plot_arrivals=False, \
+                        figsize=(16,16), min_spacing_km=0, reduced_speed=None, normalize=False ):
     r = np.array(get_distance_vector(st2))
     st = order_traces_by_distance(st2, r)
 
@@ -803,7 +631,8 @@ def plot_record_section(st2, reftime, outfile=None, starttime=0, endtime=0, km_m
         col = [brightness, brightness, brightness]
             
         # plot
-        ah.plot(h, offset_km+(tr.data * km_per_Pa * scale_factor),                 color=col, linewidth=0.5, zorder=(len(st)*2+10-i)*(1.0-brightness) )
+        ah.plot(h, offset_km+(tr.data * km_per_Pa * scale_factor), \
+                color=col, linewidth=0.5, zorder=(len(st)*2+10-i)*(1.0-brightness) )
 
         
     if len(slopes)>0:
@@ -853,9 +682,6 @@ def plot_record_section(st2, reftime, outfile=None, starttime=0, endtime=0, km_m
 
     if outfile:
         fh.savefig(outfile)
-    return  
-
-
 
 def plot_combined_versus_distance(st_list, inv_list, units, corrected=False):
     fig = plt.figure(figsize=(12,12))
@@ -885,11 +711,9 @@ def plot_combined_versus_distance(st_list, inv_list, units, corrected=False):
         ax.set_ylabel('Maximum amplitude (%s)' % units)
     ax.set_xlabel('Distance (km)')
     ax.legend()
-    plt.show()   
-    return    
+    plt.show()       
     
     
-
 def remove_duplicates(st):
     st2 = obspy.core.Stream()
     for tr_original in st:
@@ -901,255 +725,12 @@ def remove_duplicates(st):
             st2.remove(tr)
     return st2
 
-
-
-def machnumber(Pover, Pambient=1e5, vambient=314):
-    g = 1.4 # specific heat ratio for air
-    Pratio = Pover / Pambient
-    f = (1 + g) * Pratio / (2 * g)
-    M = np.sqrt(1 + f)
-    v = vambient * M
-    return (M, v)
-
-
-
-def pressure_vs_distance(r_station, P_station, crossover_km=100, vambient=314):
-    R = circum_earth_m/math.pi
-    r_sphere = R * np.sin(r_station / R)
-    if crossover_km == 0:
-    	Preduced = P_station / (1/np.sqrt(r_sphere))
-    else: 
-        Preduced = P_station / (1/r_sphere + 1/np.sqrt(crossover_km * r_sphere)) 
-   
-    
-    r = 1 # 1 km for reduced pressure
-    r_list = [r]
-    P_list = [Preduced]
-    Pambient = 1e5
-    [M,v] = machnumber(Preduced, Pambient=Pambient, vambient=vambient)
-    t_list = [0]
-    v_list = [v]
-    M_list = [M]
-    multiplier = 1.0001
-    
-   
-    last_r = r
-    while r < circum_earth_km/2: 
-        r = r * multiplier
-        if r > last_r + 1:
-            r = last_r + 1
-        r_sphere = R * np.sin(r / R)
-        
-        #P = Preduced/r + Preduced/np.sqrt(crossover_km * r)
-        #P = Preduced/r_sphere + Preduced/np.sqrt(crossover_km * r_sphere)
-        if crossover_km == 0:
-    	    P = Preduced * (1/np.sqrt(r_sphere))
-        else: 
-            P = Preduced * (1/r_sphere + 1/np.sqrt(crossover_km * r_sphere)) 
-        [M,v] = machnumber(P, Pambient=Pambient)
-        r_list.append(r)
-        P_list.append(P)
-        v_list.append(v)
-        mean_v = np.mean(v_list[-2:])
-        delta_r = (r - last_r)*1000
-        delta_t = delta_r/mean_v
-        t_list.append(t_list[-1]+delta_t)
-        M_list.append(M)
-        last_r = r
-    return (r_list[1:], P_list[1:], v_list[1:], t_list[1:], M_list[1:])
-
-
-DATA_DIR = os.path.join(os.getenv('HOME'), 'DATA', 'HungaTonga')
-
-
-####################### FUNCTIONS FOR LIGHTNING #####################
-
-def read_wwlln():
-    # Load WWLLN data
-    # I got these data from Steve McNutt (email on March 1st) who got them from Bob Holzworth at UW (bobholz@uw.edu)
-    # Cite: Dowden, Brundell, Rodger, Source [2002], J. Atmos. 
-    # Parameters Steve asked for were -24 to -18 lat, -179 to -172 lon, 0400 to 1600 UTC
-    # residual is fit residual in microseconds
-    # I should add a distanceM column from -20.536, -175.382 as for the GLD360 data
-    wwllnpklfile = os.path.join(DATA_DIR, 'LIGHTNING', 'WWLLN.pkl')
-    if os.path.exists(wwllnpklfile):
-        wwllndf = pd.read_pickle(wwllnpklfile)
-    else:    
-        wwllndatafile = os.path.join(DATA_DIR, 'LIGHTNING', 'A20220115.HungaTonga.loc')
-        wwllndf = pd.read_csv(wwllndatafile, names=['date', 'time', 'latitude', 'longitude', 'residual', 'num_stations'])
-
-        # Create a datetime column
-        timestamp = []
-        for i,row in wwllndf.iterrows():
-            this_timestr = row['date'].replace('/','-')+'T'
-            this_timestamp = UTCDateTime(this_timestr + row['time']).datetime
-            timestamp.append(this_timestamp)
-        wwllndf['datetime']=timestamp    
-        wwllndf.sort_values(by='datetime',inplace=True)
-
-        # Add other columns for plotting purposes
-        wwllndf['ones']=np.ones(len(wwllndf['datetime']))
-        wwllndf['cum_events']=np.cumsum(wwllndf['ones'])
-        wwllndf['cum_detections']=np.cumsum(wwllndf['num_stations'])
-
-        add_distanceM_column(wwllndf)
-
-        # add distance weightedDetections
-        weightedDetections = []
-        for i, row in wwllndf.iterrows():
-            try:
-                weightedDetections.append(row['num_stations']/row['distanceM'])
-            except:
-                pass
-        wwllndf['weightedDetections'] = weightedDetections       
-        
-        # Save to pickle files
-        wwllndf.to_pickle(wwllnpklfile)        
-        
-    return wwllndf
-
-
-
-def read_gld360():
-    # Load Vaisala GLD360 data
-    # contact is chris.vagasky@vaisala.com, see email from March 3, 2022
-    # distanceM is from -20.536, -175.382. 
-    gld360pklfile = os.path.join(DATA_DIR, 'LIGHTNING', 'GLD360.pkl')
-    if os.path.exists(gld360pklfile):
-        gld360df = pd.read_pickle(gld360pklfile)
-    else:
-        gld360datafile = os.path.join(DATA_DIR, 'LIGHTNING', 'Hunga_Tonga_Lightning_within_300km_December-January.csv')
-        gld360df = pd.read_csv(gld360datafile)
-
-        # Create a datetime column
-        gld360df['datetime'] = [UTCDateTime(dt).datetime for dt in gld360df['time']]
-        gld360df.sort_values(by='datetime',inplace=True)
-
-        # Add other columns for plotting purposes - do not add cumulative columns unless i subset later
-        gld360df['ones']=np.ones(len(gld360df['datetime']))
-        gld360df['cum_events']=np.cumsum(gld360df['ones'])
-        add_distanceM_column(gld360df) 
-        
-        # add signalPower and distance weightedPower
-        signalPower = []
-        weightedPower = []
-        resistance = 10000 # ohms
-        for i, row in gld360df.iterrows():
-            try:
-                thisSignalPower =  (row['signalStrengthKA']*1000)**2 * resistance
-                signalPower.append(thisSignalPower)
-                weightedPower.append(thisSignalPower/row['distanceM'])
-            except:
-                pass
-        gld360df['signalPower'] = signalPower
-        gld360df['weightedPower'] = weightedPower      
-
-        # Save to pickle files
-        gld360df.to_pickle(gld360pklfile)
-    return gld360df
-
-
-
-def add_distanceM_column(df):
-    if not 'distanceM' in df.columns:
-        df['distanceM'] = [degrees2kilometers(locations2degrees(lat, lon, sourcelat, sourcelon))*1000 for lat,lon in zip(df['latitude'],df['longitude'])]
-    
-
-
-# plot WWLLN data
-def plot_wwlln(df, starttime='1900-01-01', endtime='2100-01-01', radiusM=12500000,                y_columns = ['cum_events', 'cum_detections']):    
-    for ycol in y_columns:
-        if not ycol in df.columns:
-            y_columns.remove(ycol)
-    df2 = df.loc[(df['datetime'] >= starttime)
-            & (df['datetime'] < endtime) & df['distanceM'] < radiusM]       
-    #fig, ax = plt.subplots(len(y_columns),1)
-    linestyle='k.'
-    
-    fig = plt.figure(figsize=(12, 4))
-    ax=[]
-    #fig, ax = plt.subplots(len(y_columns),1)
-    for i in range(len(y_columns)):
-        ax.append(fig.add_subplot(len(y_columns), 1, i+1))
-        #ax[i] = df2.plot.scatter(x='datetime', y=y_columns[i], c='DarkBlue', marker='.')
-        ax[i].plot_date(df2['datetime'], df2[y_columns[i]], linestyle)
-        ax[i].set_ylabel(y_columns[i])
-        xtl = ax[i].get_xticklabels()
-        plt.setp(xtl, rotation=45)
-        if starttime:
-            ax[i].set_xlim(starttime, endtime)
-    return
-
-
-        
-#import matplotlib.dates as mdates 
-def plot_gld360(df, starttime='1900-01-01', endtime='2100-01-01', lightning_type=None, radiusM=12500000,
-                 y_columns = ['cum_events', 'signalStrengthKA', 'weightedCurrent']):
-    for ycol in y_columns:
-        if not ycol in df.columns:
-            y_columns.remove(ycol)
-    df2 = df.loc[(df['datetime'] >= starttime)
-            & (df['datetime'] < endtime) & (df['distanceM'] < radiusM)] 
-
-    linestyle = 'b.'
-    if lightning_type:
-        if lightning_type == 'cloud2cloud':
-            df2 = df2.loc[df2['cloud']==True]
-            linestyle = 'g.'
-        elif lightning_type == 'cloud2ground':
-            df2 = df2.loc[df2['cloud']==False]
-            linestyle = 'r.'
-            
-    df2['cum_events'] = np.cumsum(df2['ones'])
-    
-    st = obspy.Stream()
-    fig = plt.figure(figsize=(12, 4))
-    ax=[]
-    #fig, ax = plt.subplots(len(y_columns),1)
-    for i in range(len(y_columns)):
-        ax.append(fig.add_subplot(len(y_columns), 1, i+1))
-        #ax[i] = df2.plot.scatter(x='datetime', y=y_columns[i], c='DarkBlue', marker='.')
-        ax[i].plot_date(df2['datetime'], df2[y_columns[i]], linestyle)
-        ax[i].set_ylabel(y_columns[i])
-        xtl = ax[i].get_xticklabels()
-        plt.setp(xtl, rotation=45)
-        #ax[i].xaxis.set_major_locator(mdates.DayLocator(interval=4))
-        #ax[i].xaxis.set_major_formatter(mdates.DateFormatter('%b\n%d'))
-        if starttime:
-            ax[i].set_xlim(starttime, endtime)  
-        #tr = obspy.Trace() 
-        #tr.data = 
-    return
-
-
-
-def filter_df(df, starttime, endtime, radiusM=12500000 ): # filter a lightning data frame by time or distance
-    df2 = df.copy()
-    
-    # time filter
-    df3 = df2.loc[(df2['datetime'] >= starttime) & (df2['datetime'] < endtime)]
-    
-    # spatial filter
-    df4 = df3.loc[ (df3['distanceM'] < radiusM)] 
-    
-    return df4
-
-
-
-# Next we want to bin the data in 0.01 s intervals.
-def bin_by_seconds(dfin, dt=60):    
-    df2 = dfin.set_index('datetime', inplace=False)
-    counts = df2.resample('%ds' % dt).sum()
-    #print(counts)
-    return counts
-
-
-
-def column2Trace(df, colname, seconds, net='', sta='', chan=''):
-    tr = obspy.Trace()
-    tr.id = '%s.%s.%d.%s' % (net, sta, seconds, chan)
-    print(df)
-    tr.stats.starttime = obspy.UTCDateTime(df.index[0])
-    tr.stats.delta = seconds
-    tr.data = np.array(df[colname])
-    return tr
+def process_1(st, otime=otime, cmin=300, cmax=430, decimation_factor=10):
+    st_downsample = st.copy()
+    st_downsample.decimate(decimation_factor)
+    r = get_distance_vector(st_downsample)
+    print(r)
+    st_downsample_pick = order_traces_by_distance(st_downsample, r) 
+    st_downsample_pick = manually_select_good_traces(st_downsample_pick, trim_mins=0, record_section=False, auto=False, wlen=7200)
+    #pick_pressure_onset(st_downsample_pick, otime, cmin, cmax)
+    return st_downsample_pick

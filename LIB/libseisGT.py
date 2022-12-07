@@ -1141,6 +1141,18 @@ def get_FDSN_Stream(fdsnClient, trace_ids, outfile, startt, endt ):
             st.write(outfile, format="MSEED")
             
         return st
+        
+def read_raspshakenet(startt, endt, mseedfile, stationXmlFile, \
+                 centerLat, centerLon, searchRadiusDeg):
+    from obspy.clients.fdsn import Client
+    rsclient = Client(base_url='https://fdsnws.raspberryshakedata.com/') 
+    inv = get_FDSN_inventory(rsclient, startt, stationXmlFile, 'AM', \
+                centerLat, centerLon, searchRadiusDeg, 0, 0 )
+    #print(inv)
+    trace_ids = inventory2traceid(inv) 
+    #print(trace_ids)
+    st = get_FDSN_Stream(rsclient, trace_ids, mseedfile, startt, endt )
+    return inv, st
 
 ###############################################https://www.facebook.com/#######################
 ##                  Inventory tools                                 ##
@@ -1342,5 +1354,37 @@ def syngine2stream(station, lat, lon, GCMTeventID, mseedfile):
         synth_disp.write(mseedfile)
     return synth_disp
 
+######################################################################
+##                  SDS  tools                                      ##
+######################################################################
 
+# Read SDS archive
+def read_sds(SDS_TOP, startt, endt, skip_low_rate_channels=True, nslc_tuples=None ):
+    from obspy.clients.filesystem.sds import Client
+    sdsclient = Client(SDS_TOP, sds_type='D', format='MSEED')
+    if not nslc_tuples:
+        nslc_tuples = sdsclient.get_all_nslc(sds_type='D', datetime=startt) 
+    print(nslc_list)
+    st = obspy.Stream()
+    for trace_id in nslc_tuples:
+        net, sta, loc, chan = trace_id
+        if chan[0]=='L' and skip_low_rate_channels:
+            continue
+        this_st = sdsclient.get_waveforms(net, sta, loc, chan, startt, endt, merge=-1)
+        for tr in this_st:
+            st.append(tr)
+        st.merge(fill_value=1)
+    return st
 
+def write_stream2sds(st, SDS_TOP):
+    for tr in st:
+        sdsdir = os.path.join(SDS_TOP, YYYY, tr.stats.network, \
+                tr.stats.station, tr.stats.channel+'.D')
+        YYYY = "%04d" % tr.stats.starttime.year
+        MM = "%02d" % tr.stats.starttime.month
+        DD = "%02d" % tr.stats.starttime.day
+        this_date = datetime.date.fromisoformat('%s-%s-%s' % (YYYY,MM,DD))
+        this_jday = this_date.strftime('%j')        
+        os.makedirs(sdsdir, exist_ok=True)
+        sdsfile = '%s.D.%s.%s' % (tr.id, YYYY, this_jday)
+        tr.write(os.path.join(sdsdir, sdsfile), 'mseed')

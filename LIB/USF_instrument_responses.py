@@ -1,3 +1,5 @@
+from libseisGT import add_to_trace_history
+
 def centaur(inputVoltageRange):
     countsPerVolt = 0.4e6 * 40/inputVoltageRange;
     return countsPerVolt
@@ -32,6 +34,8 @@ countsPerPaChap = centaur(40.0) * ChaparralM25()
 
 def correctUSFstations(st):
     for tr in st:
+        if tr.stats.network=='AM':
+            continue
         if tr.stats.sampling_rate>=50:
             #tr.detrend()
             if tr.stats.channel[1]=='H': # a seismic velocity high-gain channel. L for low gain, N for accelerometer
@@ -51,9 +55,17 @@ def correctUSFstations(st):
                     calib = countsPerPa40
                 else:
                     calib = countsPerPa1
+            if tr.id=='FL.BCHH4.00.HDF':
+                calib=countsPerPaChap
         
             tr.data = tr.data / calib
             tr.stats['calib'] = calib
             tr.stats['units'] = units
             add_to_trace_history(tr, 'calibration_applied')        
-        
+if __name__ == "__main__":
+    print('calibrations:')
+    print('trillium+centaur40 = %f' % countsPerMS)        
+    print('infraBSU+centaur40 = %f' % countsPerPa40)        
+    print('infraBSU+centaur1 = %f' % countsPerPa1)        
+    print('chaparralM25+centaur40 = %f' % countsPerPaChap)        
+    print('chaparralM25+centaur1 = %f' % (countsPerPaChap*40))        
