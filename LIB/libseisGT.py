@@ -1033,7 +1033,7 @@ def Trace_merge_with_BUDfile(this_tr, budfile):
 ##                          FDSN tools                              ##
 ######################################################################
 
-def get_FDSN_inventory(fdsnClient, eventTime, stationXmlFile, network, latitude, longitude,searchRadiusDeg, pretrigSecs, posttrigSecs, station='*', channel='*' ):
+def get_FDSN_inventory(fdsnClient, eventTime, stationXmlFile, network, latitude, longitude, searchRadiusDeg, pretrigSecs, posttrigSecs, station='*', channel='*' ):
     """ 
     Load inventory of stations/channels available around this event time. It will attempt to load from file, then from the client
     Written for Miami Lakes project
@@ -1059,30 +1059,6 @@ def get_FDSN_inventory(fdsnClient, eventTime, stationXmlFile, network, latitude,
                 endtime = endt,
                 level = 'response'
             )
-            '''
-                startbefore (UTCDateTime)
-                startafter (UTCDateTime)
-                endbefore (UTCDateTime)
-                endafter (UTCDateTime)
-                latitude (float)
-                longitude (float)
-                minradius (float)
-                maxradius (float)
-                includerestricted (bool)
-                includeavailability (bool)
-                format (str), Default value: xml, Choices: xml, text, fdsnxml, stationxml, sc3ml
-            '''
-            '''
-            inv = fdsnClient.get_stations(
-                network = network,
-                latitude = latitude,
-                longitude = longitude,
-                maxradius = searchRadiusDeg,
-                startbefore = startt,
-                endafter = endt,
-                level = 'response'
-            )      
-            '''
         except Exception as e: 
             print(e)
             print('-  no inventory available')
@@ -1141,19 +1117,45 @@ def get_FDSN_Stream(fdsnClient, trace_ids, outfile, startt, endt ):
             st.write(outfile, format="MSEED")
             
         return st
-        
-def read_raspshakenet(startt, endt, mseedfile, stationXmlFile, \
-                 centerLat, centerLon, searchRadiusDeg):
+    
+    
+def read_FDSN_station(net, sta, loc, chan, startt, endt, base_url='https://fdsnws.raspberryshakedata.com/', remove_response=False):
     from obspy.clients.fdsn import Client
-    rsclient = Client(base_url='https://fdsnws.raspberryshakedata.com/') 
-    inv = get_FDSN_inventory(rsclient, startt, stationXmlFile, 'AM', \
-                centerLat, centerLon, searchRadiusDeg, 0, 0 )
-    #print(inv)
-    trace_ids = inventory2traceid(inv) 
-    #print(trace_ids)
-    st = get_FDSN_Stream(rsclient, trace_ids, mseedfile, startt, endt )
-    return inv, st
+    thisclient = Client(base_url=base_url)
+    inv = thisclient.get_stations(network=net, station=sta, level='RESP')
+    st = rs.get_waveforms(net, sta, loc, chan, startt, endt)
+    st.attach_response(inv)
+    if remove_response:
+        st = st.remove_response()
+    return st, inv    
 
+def find_FDSN_stations(startt, endt, centerLat, centerLon, searchRadiusDeg, base_url='https://fdsnws.raspberryshakedata.com/', remove_response=False, network='*', station='*', location='*', channel='*'):
+    from obspy.clients.fdsn import Client
+    thisclient = Client(base_url=base_url)
+    inv = fdsnClient.get_stations(
+        network = network,
+        station = station,
+        channel = channel,
+        latitude = latitude,
+        longitude = longitude,
+        maxradius = searchRadiusDeg,
+        starttime = startt,
+        endtime = endt,
+        level = 'response'
+        )
+    st = thisclient.get_waveforms(
+        network,
+        station,
+        location,
+        channel,
+        starttime=startt,
+        endtime=endt)   
+    st.attach_response(inv)
+    if remove_response:
+        st = st.remove_response()
+    return st, inv 
+
+        
 ###############################################https://www.facebook.com/#######################
 ##                  Inventory tools                                 ##
 ######################################################################
@@ -1210,41 +1212,46 @@ def inventory_fix_id(inv, networkcode=None, stationcode=None, channelcode=None):
 
 
 
-def create_dummy_inventory():
+def create_trace_inventory(tr, netname='', sitename='', net_ondate=None, \
+                           sta_ondate=None, lat=0.0, lon=0.0, elev=0.0, depth=0.0, azimuth=0.0, dip=-90.0, stationXml=None):
     from obspy.core.inventory import Inventory, Network, Station, Channel, Site
     from obspy.clients.nrl import NRL    
-    dummy_inv = Inventory(networks=[], source='Glenn Thompson')
+    inv = Inventory(networks=[], source='Glenn Thompson')
+    if not sta_ondate:
+        net_ondate = tr.stats.starttime
+    if not sta_ondate:
+        sta_ondate = tr.stats.starttime        
     net = Network(
         # This is the network code according to the SEED standard.
-        code="MV",
+        code=tr.stats.network,
         # A list of stations. We'll add one later.
         stations=[],
-        description="Montserrat Digital Seismic Network",
+        description=netname,
         # Start-and end dates are optional.
-        start_date=obspy.UTCDateTime(1996, 9, 1))
+        start_date=net_ondate)
 
     sta = Station(
         # This is the station code according to the SEED standard.
-        code="ABC",
-        latitude=1.0,
-        longitude=2.0,
-        elevation=345.0,
-        creation_date=obspy.UTCDateTime(2016, 1, 2),
-        site=Site(name="First station"))
+        code=tr.stats.station,
+        latitude=lat,
+        longitude=lon,
+        elevation=elev,
+        creation_date=sta_ondate, 
+        site=Site(name=sitename))
 
     cha = Channel(
         # This is the channel code according to the SEED standard.
-        code="HHZ",
+        code=tr.stats.channel,
         # This is the location code according to the SEED standard.
-        location_code="",
+        location_code=tr.stats.location,
         # Note that these coordinates can differ from the station coordinates.
-        latitude=1.0,
-        longitude=2.0,
-        elevation=345.0,
-        depth=10.0,
-        azimuth=0.0,
-        dip=-90.0,
-        sample_rate=200)
+        latitude=lat,
+        longitude=lon,
+        elevation=elev,
+        depth=depth,
+        azimuth=azimuth,
+        dip=dip,
+        sample_rate=tr.stats.sampling_rate)
 
     # By default this accesses the NRL online. Offline copies of the NRL can
     # also be used instead
@@ -1260,13 +1267,20 @@ def create_dummy_inventory():
 
 
     # Now tie it all together.
-    #cha.response = response
-    #sta.channels.append(cha)
-    #sta = []
-    #net.stations.append(sta)
-    dummy_inv.networks.append(net)
+    cha.response = response
+    sta.channels.append(cha)
+    net.stations.append(sta)
+    inv.networks.append(net)
     
-    return dummy_inv
+    # And finally write it to a StationXML file. We also force a validation against
+    # the StationXML schema to ensure it produces a valid StationXML file.
+    #
+    # Note that it is also possible to serialize to any of the other inventory
+    # output formats ObsPy supports.
+    if stationXml:
+        print('Writing inventory to %s' % stationXml)
+        inv.write(stationXml, format="stationxml", validate=True)    
+    return inv
 
 
 def merge_channels(chan1, chan, channel_codes):
@@ -1300,6 +1314,25 @@ def add_station(sta1, sta):
     sta1.append(sta)            
             
 def merge_inventories(inv1, inv2):
+    netcodes1 = [this_net.code for this_net in inv1.networks]
+    for net2 in inv2.networks:
+        if net2.code in netcodes1:
+            netpos = netcodes1.index(net2.code)
+            for sta in net2.stations:
+                if inv1.networks[netpos].stations:
+                    station_codes = [sta.code for sta in inv1.networks[netpos].stations]
+                    if sta.code in station_codes: 
+                        merge_stations(inv1.networks[netpos].stations, sta, station_codes)
+                    else:
+                        add_station(inv1.networks[netpos].stations, sta)
+                else:
+                    add_station(inv1.networks[netpos].stations, sta)            
+        else: # this network code from inv2 does not exist in inv1
+            inv1.networks.append(net2)
+            netpos = -1
+            
+            
+'''        
     for sta in inv2.networks[0].stations:
         if inv1.networks[0].stations:
             station_codes = [sta.code for sta in inv1.networks[0].stations]
@@ -1309,7 +1342,7 @@ def merge_inventories(inv1, inv2):
                 add_station(inv1.networks[0].stations, sta)
         else:
             add_station(inv1.networks[0].stations, sta)  
-
+'''
 
 
 ######################################################################
@@ -1358,33 +1391,153 @@ def syngine2stream(station, lat, lon, GCMTeventID, mseedfile):
 ##                  SDS  tools                                      ##
 ######################################################################
 
-# Read SDS archive
-def read_sds(SDS_TOP, startt, endt, skip_low_rate_channels=True, nslc_tuples=None ):
+# Open SDS client
+def open_sds(SDS_TOP):
     from obspy.clients.filesystem.sds import Client
-    sdsclient = Client(SDS_TOP, sds_type='D', format='MSEED')
-    if not nslc_tuples:
-        nslc_tuples = sdsclient.get_all_nslc(sds_type='D', datetime=startt) 
-    print(nslc_list)
+    return Client(SDS_TOP, sds_type='D', format='MSEED')
+
+# Read SDS archive
+def read_sds(sdsclient, startt, endt, skip_low_rate_channels=True, trace_ids=None, speed=1 ):
+    if not trace_ids:
+        #nslc_tuples = sdsclient.get_all_nslc(sds_type='D', datetime=startt) 
+        trace_ids = sds_get_nonempty_traceids(sdsclient, startt, endt)
+
     st = obspy.Stream()
-    for trace_id in nslc_tuples:
-        net, sta, loc, chan = trace_id
+    for trace_id in trace_ids:
+        net, sta, loc, chan = trace_id.split('.')
+        print(net, sta, loc, chan)
         if chan[0]=='L' and skip_low_rate_channels:
             continue
-        this_st = sdsclient.get_waveforms(net, sta, loc, chan, startt, endt, merge=-1)
+        if speed==1:
+            sdsfiles = sdsclient._get_filenames(net, sta, loc, chan, startt, endt)
+            print(sdsfiles)
+            this_st = obspy.Stream()
+            for sdsfile in sdsfiles:
+                if os.path.isfile(sdsfile):
+                    that_st = obspy.read(sdsfile)
+                    that_st.merge()
+                    print(sdsfile, that_st)
+                    for tr in that_st:
+                        this_st.append(tr)  
+            if this_st:
+                this_st.trim(startt, endt)
+        elif speed==2:
+            this_st = sdsclient.get_waveforms(net, sta, loc, chan, startt, endt, merge=-1)
+            
+        #print(this_st)
         for tr in this_st:
             st.append(tr)
-        st.merge(fill_value=1)
+        if st:
+            st.merge(fill_value=1)
     return st
 
-def write_stream2sds(st, SDS_TOP):
+def sds_get_nonempty_traceids(sdsclient, startday, endday=None, skip_low_rate_channels=True):
+    thisday = startday
+    trace_ids = []   
+    if not endday:
+        endday = startday + 86400
+    while thisday<endday:
+        nslc_tuples = sdsclient.get_all_nslc(sds_type='D', datetime=thisday) 
+        for nslc in nslc_tuples:
+            trace_id = '.'.join(nslc)
+            if not trace_id in trace_ids:
+                net, sta, loc, chan = nslc
+                if chan[0]=='L' and skip_low_rate_channels:
+                    continue
+                if sdsclient.has_data(net, sta, loc, chan):
+                    trace_ids.append(trace_id)  
+        thisday = thisday + 86400                    
+    return sorted(trace_ids)
+ 
+
+def sds_percent_available_per_day(sdsclient, startday, endday, skip_low_rate_channels=True, trace_ids=None, speed=1 ):
+    # speed can be 1, 2, or 3. The higher the speed, the less accurate the results.
+    
+    if not trace_ids:
+        trace_ids = sds_get_nonempty_traceids(sdsclient, startday, endday)
+    if len(trace_ids)==0:
+        return
+    else:
+        print(trace_ids)
+    
+    lod = []
+    thisday = startday
+   
+    while thisday<endday:
+        print(thisday.date) #, ' ',newline=False)
+        thisDict = {}
+        thisDict['date']=thisday.date
+        for trace_id in trace_ids:
+            net, sta, loc, chan = trace_id.split('.')
+            
+            if speed<3: # quite slow but most accurate
+                sdsfile = sdsclient._get_filename(net, sta, loc, chan, thisday)
+                this_percent = 0
+                if os.path.isfile(sdsfile):
+                    st = obspy.read(sdsfile)
+                    st.merge()
+                    tr = st[0]
+                    npts_expected = tr.stats.sampling_rate * 86400
+                    if speed==1: # slowest, completely accurate
+                        npts_got = np.count_nonzero(~np.isnan(tr.data))
+                    elif speed==2: # almost as slow, includes np.isnan as valid data sample   
+                        npts_got = tr.stats.npts
+                    this_percent = 100 * npts_got/npts_expected
+
+            elif speed==3: # much faster
+                this_percent = 100*sdsclient.get_availability_percentage(net, sta, loc, chan, thisday, thisday+86400)[0]
+                
+            thisDict[trace_id] = this_percent
+            
+        lod.append(thisDict)
+        thisday = thisday + 86400
+    availabilityDF = pd.DataFrame(lod)
+    print(availabilityDF);
+    return availabilityDF, trace_ids
+
+
+def write_stream2sds(st, sdsclient):
     for tr in st:
-        sdsdir = os.path.join(SDS_TOP, YYYY, tr.stats.network, \
-                tr.stats.station, tr.stats.channel+'.D')
-        YYYY = "%04d" % tr.stats.starttime.year
-        MM = "%02d" % tr.stats.starttime.month
-        DD = "%02d" % tr.stats.starttime.day
-        this_date = datetime.date.fromisoformat('%s-%s-%s' % (YYYY,MM,DD))
-        this_jday = this_date.strftime('%j')        
+        
+        sdsfile = sdsclient._get_filename(tr.stats.network, tr.stats.station, tr.stats.location, tr.stats.channel, tr.stats.starttime, 'D')
+        #YYYY = "%04d" % tr.stats.starttime.year
+        #MM = "%02d" % tr.stats.starttime.month
+        #DD = "%02d" % tr.stats.starttime.day
+        #sdsdir = os.path.join(SDS_TOP, YYYY, tr.stats.network, \
+        #        tr.stats.station, tr.stats.channel+'.D')
+        sdsdir = os.path.dirname(sdsfile)
+
+        #this_date = datetime.date.fromisoformat('%s-%s-%s' % (YYYY,MM,DD))
+        #this_jday = this_date.strftime('%j')        
         os.makedirs(sdsdir, exist_ok=True)
-        sdsfile = '%s.D.%s.%s' % (tr.id, YYYY, this_jday)
-        tr.write(os.path.join(sdsdir, sdsfile), 'mseed')
+        #sdsfile = os.path.join(sdsdir, '%s.D.%s.%s' % (tr.id, YYYY, this_jday))
+        #print(tr)
+        print(sdsfile)
+        if os.path.isfile(sdsfile): # try to load and merge data from file if it already exists
+            st_before = obspy.read(sdsfile)
+            #print('Merging with:')
+            #print(st_before[0])
+            tr_now = tr.copy()
+            st_before.append(tr_now)
+            try:
+                st_before.merge(method=1,fill_value=0)
+            except:
+                print('Could not merge', st_before)
+                pass
+            #print('Now:')
+            #print(st_before)
+            if len(st_before)==1:
+                #print("Just one trace")
+                if st_before[0].stats.sampling_rate >= 1:
+                    if tr.stats.sampling_rate >= 1:
+                        if st_before[0].stats.npts < tr.stats.npts:
+                            tr.write(sdsfile, 'mseed')
+            else:
+                if st_before[0].stats.sampling_rate >= 1:
+                    if tr.stats.sampling_rate >= 1:
+                        if st_before[0].stats.npts < tr.stats.npts:
+                            tr.write(sdsfile, 'mseed')
+        else:    
+            #print(tr)
+            if tr.stats.sampling_rate >= 1:
+                tr.write(sdsfile, 'mseed')

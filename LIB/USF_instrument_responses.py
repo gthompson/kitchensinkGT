@@ -59,7 +59,7 @@ def correctUSFstations(st):
                 calib=countsPerPaChap
         
             tr.data = tr.data / calib
-            tr.stats['calib'] = calib
+            tr.stats['sensitivity'] = calib
             tr.stats['units'] = units
             add_to_trace_history(tr, 'calibration_applied')        
 if __name__ == "__main__":
