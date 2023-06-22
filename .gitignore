@@ -28,3 +28,6 @@ LIB/list_of_functions.txt
 PROJECTS/MVOcatalog/quake.xml
 PROJECTS/fitness/best*.csv
 *.mseed
+*.un~
+*.py~
+PROJECTS/Pinatubo/makerea_wrapper.txt
