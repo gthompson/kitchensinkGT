@@ -31,3 +31,7 @@ PROJECTS/fitness/best*.csv
 *.un~
 *.py~
 PROJECTS/Pinatubo/makerea_wrapper.txt
+PROJECTS/Pinatubo/ListDMXfiles.ipynb
+PROJECTS/Pinatubo/suds2MiniseedPinatubo.ipynb
+PROJECTS/Pinatubo/suds2MiniseedPinatuboWrapperStreamlined.ipynb
+PROJECTS/Pinatubo/suds2MiniseedPinatuboWrapper.ipynb
