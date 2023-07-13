@@ -336,7 +336,7 @@ for filenum, csvfile in enumerate(csvfiles[0:MAXFILES]):
     convertedcsvfile = os.path.join(PKL_DIR, "%s.%s.%s.csv" % (os.path.basename(uploaddir), dirname, csvbase))
     if os.path.isfile(convertedcsvfile) & keep_existing:
         print('- Already DONE')
-        df2 = pd.read_pickle(convertedcsvfile)
+        df2 = pd.read_csv(convertedcsvfile)
     else:
         print('- Reading')
         df2 = read_csv(csvfile)
@@ -376,11 +376,11 @@ for filenum, csvfile in enumerate(csvfiles[0:MAXFILES]):
     if not gpsdf.empty:
         # write out
         gpscsv = convertedcsvfile.replace('.csv','_gps.csv')
-        gpsdf.to_pickle(gpscsv)
+        gpsdf.to_csv(gpscsv)
         passed = False
         
     print('- writing calibrated data to %s' % convertedcsvfile)       
-    df2.to_pickle(convertedcsvfile)
+    df2.to_csv(convertedcsvfile)
     
     #print('- writing to SDS')
     #convert2sds(df2, SDS_TOP)
