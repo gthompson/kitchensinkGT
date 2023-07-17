@@ -21,16 +21,9 @@
 # 
 # # 1. Imports, path variables, and function definitions
 
-# In[ ]:
-
-
 import platform
 osname = platform.system()
 print(osname)
-
-
-# In[ ]:
-
 
 # raw data on April 1, 2022 from 16:10 to 16:40 UTC. Launch from SLC40 at 16:24 UTC, watched from Titusville
 import os, sys, glob, obspy
@@ -51,7 +44,7 @@ if osname=='Darwin':
     SDS_TOP = os.path.join(DROPBOX_TOP, 'DATA', 'SDS')
     WELLDATA_TOP = os.path.join(DROPBOX_TOP, 'DATA', 'KSC', 'KSC_Well_Seismoacoustic_Data/WellData')
     TOB3_DIR = os.path.join(WELLDATA_TOP, 'Uploads')
-    PKL_DIR = os.path.join(WELLDATA_TOP, 'Converted2')
+    PKL_DIR = os.path.join(WELLDATA_TOP, 'Converted')
 elif osname=='Linux':
     HOME = os.getenv('HOME')
     DROPBOX_TOP = '/raid/newhome/thompsong/Dropbox'
@@ -60,7 +53,7 @@ elif osname=='Linux':
         os.mkdir(SDS_TOP)
     WELLDATA_TOP = os.path.join(DROPBOX_TOP, 'DATA', 'KSC', 'KSC_Well_Seismoacoustic_Data/WellData')
     TOB3_DIR = os.path.join(WELLDATA_TOP, 'Uploads')
-    PKL_DIR = os.path.join(HOME, 'Converted2') 
+    PKL_DIR = os.path.join(HOME, 'Converted') 
 elif osname=='Windows':
     HOME = 'C:\\Users\\thompsong'
     DROPBOX_TOP = 'D:\\Dropbox'
@@ -69,7 +62,7 @@ elif osname=='Windows':
         os.mkdir(SDS_TOP)
     WELLDATA_TOP = os.path.join(DROPBOX_TOP, 'DATA', 'KSC', 'KSC_Well_Seismoacoustic_Data', 'WellData')
     TOB3_DIR = os.path.join(WELLDATA_TOP, 'Uploads')
-    PKL_DIR = os.path.join(HOME, 'Converted2') 
+    PKL_DIR = 'D:\\Converted' 
     
 sys.path.append(os.path.join(HOME, 'Documents', 'GitHub', 'kitchensinkGT', 'LIB'))
 from libseisGT import write_stream2sds, read_sds, open_sds, sds_get_nonempty_traceids, sds_percent_available_per_day    
@@ -200,8 +193,6 @@ def convert2units(st):
 # 
 # (From "2022-12-03_ Field Sheet for Deployment of Groundwater Equipment at NASA_Part_II.pdf")
 
-# In[ ]:
-
 
 phase2_startdate = obspy.UTCDateTime(2022,7,21,14,7,0)
 transducers = []
@@ -292,8 +283,6 @@ transducersDF.to_csv(outfile)
 
 # # 3. Read raw data files, apply calibration equations, write out to pickle and SDS
 
-# In[ ]:
-
 
 # Read CSV file converted using LoggerNet
 import pandas as pd
@@ -304,19 +293,21 @@ MAXFILES=9999
 lod = []
 csvfiles = []
 
-def read_csv(csvfile):
+def cast_dataframe(dfcsv):
+    dfcsv['TIMESTAMP'] = pd.to_datetime(dfcsv.TIMESTAMP)
+    dfcsv['RECORD'] = dfcsv['RECORD'].astype(int)
+    for col in dfcsv.columns[2:]:
+        dfcsv[col] = dfcsv[col].astype(float)
+    #return dfcsv
 
+def read_csv(csvfile):
     dfcsv = pd.read_csv(csvfile, 
                 #dtype={'TOA5':str, '100hz_Sensors':int, 'CR6':float, '18084':float, 
                 #        'CR6.Std.12.01':float, 'CPU:VWIRE305_100hz.CR6':float, '20853':float, 'DynamicFreq':float}, 
                 parse_dates=['TOA5'])
     dfcsv.columns = dfcsv.iloc[0]
     dfcsv=dfcsv.iloc[3:]
-    dfcsv['TIMESTAMP'] = pd.to_datetime(dfcsv.TIMESTAMP)
-    dfcsv['RECORD'] = dfcsv['RECORD'].astype(int)
-    #print(dfcsv.columns[2:])
-    for col in dfcsv.columns[2:]:
-        dfcsv[col] = dfcsv[col].astype(float)
+    cast_dataframe(dfcsv)
     return dfcsv
 
 uploaddirs = sorted(glob.glob(os.path.join(TOB3_DIR, '20??????')))
@@ -333,13 +324,19 @@ for filenum, csvfile in enumerate(csvfiles[0:MAXFILES]):
     csvbase = os.path.basename(csvfile)
     print('File %d of %d: %s' % ((filenum+1), maxfiles, csvfile))
     dirname = os.path.basename(os.path.dirname(csvfile))
-    convertedcsvfile = os.path.join(PKL_DIR, "%s.%s.%s.csv" % (os.path.basename(uploaddir), dirname, csvbase))
+    convertedcsvfile = os.path.join(PKL_DIR, "%s.%s.%s" % (os.path.basename(uploaddir), dirname, csvbase))
     if os.path.isfile(convertedcsvfile) & keep_existing:
         print('- Already DONE')
         df2 = pd.read_csv(convertedcsvfile)
+        cast_dataframe(df2)
     else:
         print('- Reading')
-        df2 = read_csv(csvfile)
+        try:
+            df2 = read_csv(csvfile)
+        except:
+            print('Failed to read %s' % csvfile)
+            os.system("mv %s %s.badcsvfile" % (csvfile, csvfile))
+            continue
 
         print('- Applying calibration equations')
         for col in df2.columns:
@@ -351,6 +348,7 @@ for filenum, csvfile in enumerate(csvfiles[0:MAXFILES]):
                     this_transducer = this_transducer.iloc[0].to_dict()
                     #print(this_transducer)
                     df2[col] = compute_psi(df2[col].to_numpy(), this_transducer)
+        print('- writing calibrated data to %s' % convertedcsvfile)       
         df2.to_csv(convertedcsvfile)
 
     # check start & end time 
@@ -378,9 +376,6 @@ for filenum, csvfile in enumerate(csvfiles[0:MAXFILES]):
         gpscsv = convertedcsvfile.replace('.csv','_gps.csv')
         gpsdf.to_csv(gpscsv)
         passed = False
-        
-    print('- writing calibrated data to %s' % convertedcsvfile)       
-    df2.to_csv(convertedcsvfile)
     
     #print('- writing to SDS')
     #convert2sds(df2, SDS_TOP)
@@ -404,5 +399,5 @@ for filenum, csvfile in enumerate(csvfiles[0:MAXFILES]):
     lod.append(thisd)
     lookuptableDF = pd.DataFrame(lod)
     print(lookuptableDF)
-    lookuptableDF.to_csv('lookuptable.csv')    
+lookuptableDF.to_csv('lookuptable.csv')    
 
