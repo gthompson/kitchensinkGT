@@ -21,10 +21,6 @@
 # 
 # # 1. Imports, path variables, and function definitions
 
-import platform
-osname = platform.system()
-print(osname)
-
 # raw data on April 1, 2022 from 16:10 to 16:40 UTC. Launch from SLC40 at 16:24 UTC, watched from Titusville
 import os, sys, glob, obspy
 import numpy as np
@@ -63,7 +59,7 @@ elif osname=='Windows':
     WELLDATA_TOP = os.path.join(DROPBOX_TOP, 'DATA', 'KSC', 'KSC_Well_Seismoacoustic_Data', 'WellData')
     TOB3_DIR = os.path.join(WELLDATA_TOP, 'Uploads')
     PKL_DIR = 'D:\\Converted' 
-    
+lookuptable = os.path.join(PKL_DIR,'lookuptable.csv') 
 sys.path.append(os.path.join(HOME, 'Documents', 'GitHub', 'kitchensinkGT', 'LIB'))
 from libseisGT import write_stream2sds, read_sds, open_sds, sds_get_nonempty_traceids, sds_percent_available_per_day    
 #DROPBOX_PROJECT_DIR = os.path.join(DROPBOX_TOP, 'PROFESSIONAL/RESEARCH/3_Project_Documents/NASAprojects/201602 Rocket Seismology/202010 KSC Launchpad Erosion')
@@ -286,10 +282,9 @@ transducersDF.to_csv(outfile)
 
 # Read CSV file converted using LoggerNet
 import pandas as pd
-keep_existing = False
+keep_existing = True
 allcolumns = []
-#MAXFILES = 124
-MAXFILES=9999
+MAXFILES=99999
 lod = []
 csvfiles = []
 
@@ -312,18 +307,24 @@ def read_csv(csvfile):
 
 uploaddirs = sorted(glob.glob(os.path.join(TOB3_DIR, '20??????')))
 for uploaddir in uploaddirs:
+    print(uploaddir)
     csvfiles_100Hz = sorted(glob.glob(os.path.join(uploaddir, '100hz/*.csv')))
+    print(len(csvfiles_100Hz))
     csvfiles.extend(csvfiles_100Hz)
     csvfiles_baro = sorted(glob.glob(os.path.join(uploaddir,  'Baro/*.csv')))
+    print(len(csvfiles_baro))
     csvfiles.extend(csvfiles_baro)
     csvfiles_20Hz = sorted(glob.glob(os.path.join(uploaddir,  '20hz/*.csv')))
+    print(len(csvfiles_20Hz))
     csvfiles.extend(csvfiles_20Hz)
-
+#print(csvfiles)
+print(len(csvfiles))
 maxfiles = min([len(csvfiles), MAXFILES])
 for filenum, csvfile in enumerate(csvfiles[0:MAXFILES]):
     csvbase = os.path.basename(csvfile)
     print('File %d of %d: %s' % ((filenum+1), maxfiles, csvfile))
     dirname = os.path.basename(os.path.dirname(csvfile))
+    uploaddir = os.path.basename(os.path.dirname(os.path.dirname(csvfile)))
     convertedcsvfile = os.path.join(PKL_DIR, "%s.%s.%s" % (os.path.basename(uploaddir), dirname, csvbase))
     if os.path.isfile(convertedcsvfile) & keep_existing:
         print('- Already DONE')
@@ -335,13 +336,13 @@ for filenum, csvfile in enumerate(csvfiles[0:MAXFILES]):
             df2 = read_csv(csvfile)
         except:
             print('Failed to read %s' % csvfile)
-            os.system("mv %s %s.badcsvfile" % (csvfile, csvfile))
+            os.rename(csvfile, csvfile+'.bad')
             continue
 
         print('- Applying calibration equations')
         for col in df2.columns:
-            #print(col)
-            if col[0:2]=='12' or col[0:2]=='21':
+            print(col)
+            if isinstance(col,str) and (col[0:2]=='12' or col[0:2]=='21'):
                 this_transducer = transducersDF[(transducersDF['serial']) == col]
                 #print(this_transducer)
                 if len(this_transducer.index)==1:
@@ -370,21 +371,26 @@ for filenum, csvfile in enumerate(csvfiles[0:MAXFILES]):
         passed = False
 
     # check clock drift
-    gpsdf = measureClockDrift(df2)
-    if not gpsdf.empty:
-        # write out
-        gpscsv = convertedcsvfile.replace('.csv','_gps.csv')
-        gpsdf.to_csv(gpscsv)
-        passed = False
+    gpscsv = convertedcsvfile.replace('.csv','_gps.csv')
+    if not os.path.isfile(gpscsv):
+        gpsdf = measureClockDrift(df2)
+        if not gpsdf.empty:
+            # write out
+            gpsdf.to_csv(gpscsv)
+            passed = False
+    else:
+        gpsdf = pd.read_csv(gpscsv)
     
-    #print('- writing to SDS')
-    #convert2sds(df2, SDS_TOP)
+
     
     print('- DONE\n')
     thisd = {}
-    thisd['filename']=os.path.basename(csvfile)
-    thisd['starttime']=starttime
-    thisd['endtime']=endtime
+    sourcefileparts = csvfile.split('\\')
+    sourcefilerelpath = os.path.join(sourcefileparts[-3],sourcefileparts[-2],sourcefileparts[-1])
+    thisd['sourcefile']=sourcefilerelpath
+    thisd['outputfile']=convertedcsvfile
+    thisd['starttime']=starttime.strftime('%Y/%m/%d %H:%M:%S')
+    thisd['endtime']=endtime.strftime('%Y/%m/%d %H:%M:%S')
     thisd['hours']=np.round(timediff.seconds/3600.0,2)
     thisd['npts']=nrows
     thisd['nRECS']=df2.iloc[-1]['RECORD']-df2.iloc[0]['RECORD']+1
@@ -399,5 +405,9 @@ for filenum, csvfile in enumerate(csvfiles[0:MAXFILES]):
     lod.append(thisd)
     lookuptableDF = pd.DataFrame(lod)
     print(lookuptableDF)
-lookuptableDF.to_csv('lookuptable.csv')    
+    if passed:
+        print('- writing to SDS')
+        convert2sds(df2, SDS_TOP)
+
+lookuptableDF.to_csv(lookuptable)    
 

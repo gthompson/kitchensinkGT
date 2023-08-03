@@ -1509,23 +1509,27 @@ def write_stream2sds(st, sdsclient):
 
         #this_date = datetime.date.fromisoformat('%s-%s-%s' % (YYYY,MM,DD))
         #this_jday = this_date.strftime('%j')        
-        os.makedirs(sdsdir, exist_ok=True)
+        if not os.path.isdir(sdsdir):
+            os.makedirs(sdsdir, exist_ok=True)
         #sdsfile = os.path.join(sdsdir, '%s.D.%s.%s' % (tr.id, YYYY, this_jday))
         #print(tr)
         print(sdsfile)
         if os.path.isfile(sdsfile): # try to load and merge data from file if it already exists
             st_before = obspy.read(sdsfile)
-            #print('Merging with:')
-            #print(st_before[0])
+            print(sdsfile,' already contains data')
+            print(st_before)
+            print('trying to merge this new trace:')
+            print(tr)
             tr_now = tr.copy()
             st_before.append(tr_now)
             try:
                 st_before.merge(method=1,fill_value=0)
+                print('merge succeeded')
             except:
-                print('Could not merge', st_before)
-                pass
-            #print('Now:')
-            #print(st_before)
+                print('Could not merge. No new data written.')
+                break
+            print('After merging:')
+            print(st_before)
             if len(st_before)==1:
                 #print("Just one trace")
                 if st_before[0].stats.sampling_rate >= 1:
@@ -1533,11 +1537,8 @@ def write_stream2sds(st, sdsclient):
                         if st_before[0].stats.npts < tr.stats.npts:
                             tr.write(sdsfile, 'mseed')
             else:
-                if st_before[0].stats.sampling_rate >= 1:
-                    if tr.stats.sampling_rate >= 1:
-                        if st_before[0].stats.npts < tr.stats.npts:
-                            tr.write(sdsfile, 'mseed')
+                print('Cannot write Stream with more than 1 trace to a single SDS file')
         else:    
-            #print(tr)
+            print(sdsfile,' does not already exist. Writing')
             if tr.stats.sampling_rate >= 1:
                 tr.write(sdsfile, 'mseed')
