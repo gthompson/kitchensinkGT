@@ -60,8 +60,8 @@ def get_fdsn_identifier(fdsnURL):
     return prepend
 
 
-
-def get_inventory_and_waveforms(fdsnURL, searchRadiusDeg, olat, olon, startt, endt, chanstring, data_root, overwrite=False, network='*', station='*', location='*'):
+# Use get_inventory and get_stream in FDSNtools here
+""" def get_inventory_and_waveforms(fdsnURL, searchRadiusDeg, olat, olon, startt, endt, chanstring, data_root, overwrite=False, network='*', station='*', location='*'):
     fdsnClient = Client(fdsnURL)  
     if not os.path.isdir(data_root):
         print('No such directory %s' % data_root)
@@ -112,11 +112,11 @@ def get_inventory_and_waveforms(fdsnURL, searchRadiusDeg, olat, olon, startt, en
         if len(st)>0:
             st.write(mseedfile)
         
-    return st, inv
+    return st, inv """
 
 
 
-def smart_merge(st):
+def smart_merge(st): # a more thorough version exists in libseisGT
     st2 = obspy.core.Stream()
     for tr_original in st:
         tr = tr_original.copy()
@@ -181,8 +181,8 @@ def reconstitute_stream(st, inv, fmin=0.0001):
     return reconstituted
 
 
-
-def attach_station_coordinates_from_inventory(inventory, st):
+# FOLLOWING FUNCTIONS NOW IN INVENTORYTOOLS
+""" def attach_station_coordinates_from_inventory(inventory, st):
     """ attach_station_coordinates_from_inventory """
     for tr in st:
         for netw in inventory.networks:
@@ -208,7 +208,7 @@ def attach_distance_to_stream(st, olat, olon):
             tr.stats['distance'] =  distkm * 1000
         except:
             print('cannot compute distance for %s' % tr.id)
-    return
+    return """
        
 
      
