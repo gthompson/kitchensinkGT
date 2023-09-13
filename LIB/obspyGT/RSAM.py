@@ -10,15 +10,19 @@ class RSAMobj:
     def __init__(self, st=None, inv=None, sampling_interval=60.0, verbose=False, metric='mean', freqmin=0.1, zerophase=False, corners=2 ):
         self.stream = Stream()
         self.metric = metric
+        self.corrected = False
         if isinstance(st, Stream):
-            st.detrend(type='linear') # remove a linear trend
-            # filter >0.5 Hz by default for RSAM
-            if inv:
-                st.filter('highpass', freq=freqmin, zerophase=False, corners=corners) 
-                st.remove_response(output='VEL', inventory=inv)    
-            else:
-                print('No inventory for RSAM calculation. Only detrended.')  
             for tr in st:
+                if tr.stats.channel[2] in 'ENZ' or tr.stats.channel[1:]=='DF': # filter seismic and infrasound channels only
+                    print('Detrending %s' % tr.id)
+                    tr.detrend(type='linear')
+                    tr.filter('highpass', freq=freqmin, zerophase=False, corners=corners) 
+                    # filter >0.5 Hz by default for RSAM
+                    if inv:
+                        tr.remove_response(output='VEL', inventory=inv)    
+                        self.corrected = True
+                    else:
+                        print('No inventory for RSAM calculation. Only detrended.')  
                 this_tr = tr.copy()
                 x = tr.data # get the data
                 # now we want to reshape the data vector into an array, so we can take advantage of np.mean()
@@ -42,9 +46,12 @@ class RSAMobj:
                 self.stream.append(this_tr)
         self.sampling_interval = sampling_interval
 
-    def plot(self, equal_scale=False, type='normal', percentile=None):
-        if type=='normal':
-            normalplot(self.stream, equal_scale=equal_scale, percentile=percentile)
+    def plot(self, equal_scale=False, type='linear', percentile=None, linestyle='-'):
+        st = self.stream.copy()
+        for tr in st:
+            tr.data = np.where(tr.data==0, np.nan, tr.data)
+        if type=='linear':
+            linearplot(st, equal_scale=equal_scale, percentile=percentile, linestyle=linestyle)
 
 
     def _fix_traceid(self):
@@ -59,20 +66,27 @@ class RSAMobj:
 
 
     def write(self, SDS_TOP):
-        RSAMSDS_TOP = os.path.join(SDS_TOP,'RSAM',self.metric)
+        if self.corrected:
+            RSAMSDS_TOP = os.path.join(SDS_TOP,'CSAM',self.metric)
+        else:
+            RSAMSDS_TOP = os.path.join(SDS_TOP,'RSAM',self.metric)            
         #self._fix_traceid()
         RSAMSDSobj = obspyGT.SDS.SDSobj(RSAMSDS_TOP, streamobj=self.stream)
         RSAMSDSobj.write()           
         
     
-    def read(self, startt, endt, SDS_TOP, metric='mean', speed=2):
-        RSAMSDS_TOP = os.path.join(SDS_TOP,'RSAM',self.metric)
+    def read(self, startt, endt, SDS_TOP, metric='mean', speed=2, corrected=False):
+        if corrected:
+            RSAMSDS_TOP = os.path.join(SDS_TOP,'CSAM',self.metric)
+        else:
+            RSAMSDS_TOP = os.path.join(SDS_TOP,'RSAM',self.metric)           
         thisSDSobj = obspyGT.SDS.SDSobj(RSAMSDS_TOP)
         thisSDSobj.read(startt, endt, speed=speed)
         print(thisSDSobj.stream)
         self.stream = thisSDSobj.stream
         self.metric=metric
-        self.sampling_interval=self.stream[0].stats.delta
+        if len(self.stream)>0:
+            self.sampling_interval=self.stream[0].stats.delta
 
 
 
@@ -121,22 +135,24 @@ class ReducedDisplacementObj():
                 self.stream.append(this_tr)
         self.sampling_interval = sampling_interval
 
-    def plot(self, equal_scale=False, type='normal', percentile=None):
-        if type=='normal':
-            normalplot(self.stream, equal_scale=equal_scale, percentile=percentile) 
-
-        elif type=='iceweb':
+    def plot(self, equal_scale=False, type='linear', percentile=None, linestyle='-'):
+        st = self.stream.copy()
+        for tr in st:
+            tr.data = np.where(tr.data==0, np.nan, tr.data)
+        if type=='linear':
+            linearplot(st, equal_scale=equal_scale, percentile=percentile, linestyle=linestyle)
+        elif type=='log':
             import matplotlib.pyplot as plt
             import matplotlib.dates as mdates
             from math import log2
             plt.rcParams["figure.figsize"] = (10,6)
             fig, ax = plt.subplots()
-            for tr in self.stream:
+            for tr in st:
                 x = tr.data
                  # now we want to reshape the data vector into an array, so we can take advantage of np.mean()
                 s = np.size(x) # find the size of the data vector
                 nc = np.max((1, int(log2(s/260))))  # number of columns
-                nc = nc * 4
+                #nc = nc * 4
                 nr = int(s / nc) # number of rows
                 x = x[0:nr*nc] # cut off any trailing samples
                 y = x.reshape((nr, nc))
@@ -145,7 +161,7 @@ class ReducedDisplacementObj():
                 t = [this_t.datetime for this_t in t] 
                 #print(t) 
                 t = t[:len(y2)]      
-                ax.semilogy(t, y2,'.', label='%s' % tr.id) #, alpha=0.03)
+                ax.semilogy(t, y2,linestyle, label='%s' % tr.id) #, alpha=0.03)
             ax.format_xdata = mdates.DateFormatter('%H')
             ax.legend()
             plt.xticks(rotation=45)
@@ -184,7 +200,7 @@ class ReducedDisplacementObj():
         self.metric=metric
         self.sampling_interval=self.stream[0].stats.delta  
 
-def daily_wrapper(startt, endt, SDS_TOP, centerlat, centerlon, searchRadiusDeg, \
+def fdsn_daily_wrapper(startt, endt, SDS_TOP, centerlat, centerlon, searchRadiusDeg, \
         fdsnURL="http://service.iris.edu", channel='BHZ', freqmin=0.5, freqmax=15.0, \
         zerophase=False, corners=2, sampling_interval=60.0, writeSDS=True, writeDRS=True):
     import obspyGT.SDS
@@ -193,7 +209,7 @@ def daily_wrapper(startt, endt, SDS_TOP, centerlat, centerlon, searchRadiusDeg, 
     secsPerDay = 86400  
     while startt<endt:
         print(startt)
-        eod = startt+secsPerDay-1/10000
+        eod = startt+secsPerDay #-1/10000
         # read from SDS - if no data download from FDSN
 
         thisSDSobj = obspyGT.SDS.SDSobj(SDS_TOP) 
@@ -222,8 +238,38 @@ def daily_wrapper(startt, endt, SDS_TOP, centerlat, centerlon, searchRadiusDeg, 
 
         startt+=secsPerDay # add 1 day 
 
-def normalplot(st, equal_scale=False, percentile=None):
-    hf = st.plot(handle=True, equal_scale=equal_scale); # standard ObsPy plot
+
+def sds_daily_wrapper(startt, endt, SDS_TOP, channel='BHZ', freqmin=0.5, freqmax=15.0, \
+        zerophase=False, corners=2, sampling_interval=60.0, writeSDS=True, writeDRS=True, inv=None, trace_ids=None):
+    import obspyGT.SDS
+    import obspyGT.FDSNtools
+    import obspyGT.InventoryTools
+    secsPerDay = 86400  
+    while startt<endt:
+        print(startt)
+        eod = startt+secsPerDay #-1/10000
+        # read from SDS - if no data download from FDSN
+
+        thisSDSobj = obspyGT.SDS.SDSobj(SDS_TOP) 
+        if not thisSDSobj.read(startt, eod, speed=2, trace_ids=trace_ids): # non-zero return value means no data in SDS so we will use FDSN
+
+            # compute instrument-corrected RSAM
+            thisRSAMobj = RSAMobj(st=thisSDSobj.stream.copy(), inv=inv, sampling_interval=sampling_interval, \
+                              freqmin=freqmin, zerophase=zerophase, corners=corners)
+            thisRSAMobj.write(SDS_TOP) # write RSAM to an SDS-like structure
+        
+            # compute/write reduced displacement
+            if writeDRS and inv:
+                thisDRSobj = ReducedDisplacementObj(st=thisSDSobj.stream.copy(), inv=inv, sampling_interval=sampling_interval, \
+                                freqmin=freqmin, freqmax=freqmax, zerophase=zerophase, corners=corners, \
+                                     centerlat=centerlat, centerlon=centerlon )
+                thisDRSobj.write(SDS_TOP) # write Drs to an SDS-like structure
+    
+
+        startt+=secsPerDay # add 1 day 
+
+def linearplot(st, equal_scale=False, percentile=None, linestyle='-'):
+    hf = st.plot(handle=True, equal_scale=equal_scale, linestyle=linestyle) #, method='full'); # standard ObsPy plot
     # change the y-axis so it starts at 0
     allAxes = hf.get_axes()
     ylimupper = [ax.get_ylim()[1] for ax in allAxes]

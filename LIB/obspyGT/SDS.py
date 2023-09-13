@@ -18,7 +18,7 @@ class SDSobj():
         self.stream = streamobj
 
     # Read SDS archive
-    def read(self, startt, endt, skip_low_rate_channels=True, trace_ids=None, speed=1 ):
+    def read(self, startt, endt, skip_low_rate_channels=True, trace_ids=None, speed=1, verbose=True ):
         if not trace_ids:
             #nslc_tuples = sdsclient.get_all_nslc(sds_type='D', datetime=startt) 
             trace_ids = self._sds_get_nonempty_traceids(startt, endt)
@@ -26,18 +26,20 @@ class SDSobj():
         st = Stream()
         for trace_id in trace_ids:
             net, sta, loc, chan = trace_id.split('.')
-            print(net, sta, loc, chan)
             if chan[0]=='L' and skip_low_rate_channels:
+                print(trace_id,' skipped')
                 continue
             if speed==1:
                 sdsfiles = self.client._get_filenames(net, sta, loc, chan, startt, endt)
-                print(sdsfiles)
+                #print(sdsfiles)
                 this_st = Stream()
                 for sdsfile in sdsfiles:
                     if os.path.isfile(sdsfile):
+                        if verbose:
+                            print('st = read("%s")' % sdsfile)
                         that_st = read(sdsfile)
                         that_st.merge(method=1,fill_value=0)
-                        print(sdsfile, that_st)
+                        #print(sdsfile, that_st)
                         for tr in that_st:
                             this_st.append(tr)  
             elif speed==2:
