@@ -31,11 +31,12 @@ def _get_MSEED_filename(startt, endt, trace_ids, cachedir=CACHE_DIR):
     return os.path.join(cachedir, '%s_%s_%s_%s.MSEED' % (startt.strftime('%Y%m%d%H%M'),endt.strftime('%Y%m%d%H%M'),trace_ids[0],trace_ids[-1]))
 
 
-def get_inventory(fdsnClient, startt, endt, centerlat, centerlon, searchRadiusDeg, network='*', station='*', channel='*',overwrite=False ):
+def get_inventory(fdsnClient, startt, endt, centerlat, centerlon, searchRadiusDeg, network='*', station='*', channel='*', overwrite=False, cache=False ):
     """ 
-    Get inventory of stations/channels available. Cache locally using fixed filename.
+    Get inventory of stations/channels available. Cache locally using fixed filenam, if cache==True. Default is to download each time.
     """
     stationXmlFile = _get_stationXML_filename(startt, endt, centerlat, centerlon, searchRadiusDeg)
+
     if os.path.isfile(stationXmlFile) and not overwrite:
         # load inv from file
         inv = obspy.core.inventory.read_inventory(stationXmlFile)
@@ -58,19 +59,20 @@ def get_inventory(fdsnClient, startt, endt, centerlat, centerlon, searchRadiusDe
         except Exception as e: 
             print(e)
             print('-  no inventory available')
-
-        else:         
-            # Save the inventory to a stationXML file
-            inv.write(stationXmlFile, format='STATIONXML')
-            print('inventory saved to %s' % stationXmlFile)
+            return None
+        else:
+            if cache:         
+                # Save the inventory to a stationXML file
+                inv.write(stationXmlFile, format='STATIONXML')
+                print('inventory saved to %s' % stationXmlFile)
             
-    return inv
+            return inv
 
 
 
-def get_stream(fdsnClient, trace_ids, startt, endt, overwrite=False):
+def get_stream(fdsnClient, trace_ids, startt, endt, overwrite=False, cache=False):
     """ 
-    Load waveform data for all trace ids for this time range. Cache locally using fixed filename.
+    Load waveform data for all trace ids for this time range. Cache locally using fixed filename, if cache==True. Default is to download each time.
     """
     import numpy as np
     mseedfile = _get_MSEED_filename(startt, endt, trace_ids)
@@ -83,13 +85,13 @@ def get_stream(fdsnClient, trace_ids, startt, endt, overwrite=False):
         st = obspy.core.Stream()
         fdsnClient = _check_client_or_string(fdsnClient)
         for trace_id in trace_ids:
-            network, station, chancode = trace_id.split('.')
-            print("net=%s, station=%s, chancode=%s" % (network, station, chancode))
+            network, station, location, chancode = trace_id.split('.')
+            print("net=%s, station=%s, location=%s, chancode=%s" % (network, station, location, chancode))
             try:
                 this_st = fdsnClient.get_waveforms(
                     network,
                     station,
-                    "*",
+                    location,
                     chancode,
                     starttime=startt,
                     endtime=endt,
@@ -128,7 +130,8 @@ def get_stream(fdsnClient, trace_ids, startt, endt, overwrite=False):
                     tr2.stats.sampling_rate = fsamp
                 st.merge(fill_value=0, method=1)
             # Save raw waveform data to miniseed
-            st.write(mseedfile, format="MSEED") # write RAW data
+            if cache:
+                st.write(mseedfile, format="MSEED") # write RAW data
     
     return st
 

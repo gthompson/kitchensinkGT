@@ -13,7 +13,7 @@ def inventory2traceid(inv, chancode=''):
         for stationObject in stationObjects:
             channelObjects = stationObject.channels
             for channelObject in channelObjects:
-                this_trace_id = networkObject.code + '.' + stationObject.code + '.' + channelObject.code
+                this_trace_id = networkObject.code + '.' + stationObject.code + '.*.' + channelObject.code
                 trace_ids.append(this_trace_id)
     
     return trace_ids

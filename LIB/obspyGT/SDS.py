@@ -123,52 +123,103 @@ class SDSobj():
         return availabilityDF, trace_ids
 
 
-    def write(self):
-        print(self)
-        print(self.stream)
+    def write(self, overwrite=False):
+        #print(self)
+        #print(self.stream)
         for tr in self.stream:
-            print(tr)
-        
+            #print(tr)
             sdsfile = self.client._get_filename(tr.stats.network, tr.stats.station, tr.stats.location, tr.stats.channel, tr.stats.starttime, 'D')
-            #YYYY = "%04d" % tr.stats.starttime.year
-            #MM = "%02d" % tr.stats.starttime.month
-            #DD = "%02d" % tr.stats.starttime.day
-            #sdsdir = os.path.join(SDS_TOP, YYYY, tr.stats.network, \
-            #        tr.stats.station, tr.stats.channel+'.D')
             sdsdir = os.path.dirname(sdsfile)
-            print(sdsdir)
-
-            #this_date = datetime.date.fromisoformat('%s-%s-%s' % (YYYY,MM,DD))
-            #this_jday = this_date.strftime('%j')        
+            print(sdsdir)       
             if not os.path.isdir(sdsdir):
                 os.makedirs(sdsdir, exist_ok=True)
-            #sdsfile = os.path.join(sdsdir, '%s.D.%s.%s' % (tr.id, YYYY, this_jday))
-            #print(tr)
-            print(sdsfile)
-            if os.path.isfile(sdsfile): # try to load and merge data from file if it already exists
-                st_before = obspy.read(sdsfile)
-                print(sdsfile,' already contains data')
-                print(st_before)
-                print('trying to merge this new trace:')
-                print(tr)
-                tr_now = tr.copy()
-                st_before.append(tr_now)
-                try:
-                    st_before.merge(method=1,fill_value=0)
-                    print('merge succeeded')
-                except:
-                    print('Could not merge. No new data written.')
-                    break
-                print('After merging:')
-                print(st_before)
-                if len(st_before)==1:
-                    #print("Just one trace")
-                    if st_before[0].stats.sampling_rate >= 1:
-                        if tr.stats.sampling_rate >= 1:
-                            if st_before[0].stats.npts < tr.stats.npts:
-                                tr.write(sdsfile, 'mseed')
+            if overwrite:
+                if os.path.isfile(sdsfile): 
+                    print(sdsfile,' already contains data. overwriting')
                 else:
-                    print('Cannot write Stream with more than 1 trace to a single SDS file')
-            else:    
-                print(sdsfile,' does not already exist. Writing')
+                    print(sdsfile,' does not already exist. Writing')
                 tr.write(sdsfile, 'mseed')
+            else:
+                if os.path.isfile(sdsfile): # try to load and merge data from file if it already exists
+                    st_before = obspy.read(sdsfile)
+                    print(sdsfile,' already contains data')
+                    print(st_before)
+                    print('trying to merge this new trace:')
+                    print(tr)
+                    tr_now = tr.copy()
+                    st_before.append(tr_now)
+                    try:
+                        st_before.merge(method=1,fill_value=0)
+                        print('merge succeeded')
+                    except:
+                        print('Could not merge. No new data written.')
+                        break
+                    print('After merging:')
+                    print(st_before)
+                    if len(st_before)==1:
+                        #print("Just one trace")
+                        if st_before[0].stats.sampling_rate >= 1:
+                            if tr.stats.sampling_rate >= 1:
+                                if st_before[0].stats.npts < tr.stats.npts:
+                                    tr.write(sdsfile, 'mseed')
+                    else:
+                        print('Cannot write Stream with more than 1 trace to a single SDS file')
+                else:    
+                    print(sdsfile,' does not already exist. Writing')
+                    tr.write(sdsfile, 'mseed')
+
+
+def FDSN_to_SDS_daily_wrapper(startt, endt, SDS_TOP, centerlat=None, centerlon=None, searchRadiusDeg=None, trace_ids=None, \
+        fdsnURL="http://service.iris.edu", overwrite=True, inv=None):
+    '''
+    Download Stream from FDSN server and save to SDS format. Default is to overwrite each time.
+    
+    NSLC combinations to download either come from (1) trace_ids name-value pair, (2) inv name-value pair, (3) circular search parameters, in that order.
+
+        Parameters:
+            startt (UTCDateTime): An ObsPy UTCDateTime marking the start date/time of the data request.
+            endt (UTCDateTime)  : An ObsPy UTCDateTime marking the end date/time of the data request.
+            SDS_TOP (str)       : The path to the SDS directory structure.
+
+        Optional Name-Value Parameters:
+            trace_ids (List)    : A list of N.S.L.C strings. Default None. If given, this overrides other options.
+            inv (Inventory)     : An ObsPy Inventory object. Default None. If given, trace_ids will be extracted from it, unless explicity given.
+            centerlat (float)   : Decimal degrees latitude for circular station search. Default None.
+            centerlon (float)   : Decimal degrees longitude for circular station search. Default None.
+            searchRadiusDeg (float) : Decimal degrees radius for circular station search. Default None.
+            fdsnURL (str) : URL corresponding to FDSN server. Default is "http://service.iris.edu".
+            overwrite (bool) : If True, overwrite existing data in SDS archive.
+
+        Returns: None. Instead an SDS volume is created/expanded.
+
+    '''
+    import obspyGT.FDSNtools
+    import obspyGT.InventoryTools
+    secsPerDay = 86400  
+    while startt<endt:
+        print(startt)
+        eod = startt+secsPerDay 
+        # read from SDS - if no data download from FDSN
+
+        thisSDSobj = obspyGT.SDS.SDSobj(SDS_TOP) 
+        
+        if thisSDSobj.read(startt, eod, speed=2) or overwrite: # non-zero return value means no data in SDS so we will use FDSN
+            # read from FDSN
+            if not trace_ids:
+                if inv: 
+                    trace_ids = obspyGT.InventoryTools.inventory2traceid(inv)
+                else:
+                    inv = obspyGT.FDSNtools.get_inventory(fdsnURL, startt, eod, centerlat, centerlon, \
+                                                        searchRadiusDeg, overwrite=overwrite ) # could add N S L C requirements too
+                    if inv:
+                        trace_ids = obspyGT.InventoryTools.inventory2traceid(inv)
+            if trace_ids:
+                st = obspyGT.FDSNtools.get_stream(fdsnURL, trace_ids, startt, eod, overwrite=overwrite)
+                thisSDSobj.stream = st
+                thisSDSobj.write(overwrite=overwrite) # save raw data to SDS
+            else:
+                print('SDS archive not written to.')
+
+    
+
+        startt+=secsPerDay # add 1 day 
