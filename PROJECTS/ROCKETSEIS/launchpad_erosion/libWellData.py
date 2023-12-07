@@ -191,7 +191,7 @@ def localtime2utc(this_dt):
         hours = 5
     localTimeCorrection = 3600 * hours
     return this_dt + localTimeCorrection
-    
+   
 '''
 def convert2units(st, transducersDF):
     for tr in st:
@@ -312,4 +312,156 @@ def correct_csvfiles(csvfiles, paths, converted_by_LoggerNet=True, MAXFILES=None
         #    print('- writing to SDS')
         #    convert2sds(df2, SDS_TOP)
 
-    lookuptableDF.to_csv(paths['lookuptable'], index=False)                
+    lookuptableDF.to_csv(paths['lookuptable'], index=False)   
+
+
+def removed_unnamed_columns(df):
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    return df
+
+def convert2sds(df, sdsobj, transducersDF): # I think df here is supposed to be from a single picklefile
+    #print('***')
+    #print(df.columns)  
+    #print('***')  
+    local_startt = obspy.UTCDateTime(df.iloc[0]['TIMESTAMP'])
+    nextt = obspy.UTCDateTime(df.iloc[1]['TIMESTAMP'])
+    dt = nextt-local_startt
+    utc_startt = localtime2utc(local_startt)
+    if utc_startt > obspy.UTCDateTime():
+        return
+    print('local ', local_startt, '-> UTC ', utc_startt)
+    st = obspy.Stream()    
+    #print('***')
+    #print(df.columns)    
+    for col in df.columns[2:]:
+        print('Processing column %s' % col)
+        this_transducer = transducersDF[(transducersDF['serial']) == col]
+        print('***')
+        print(this_transducer)
+        print('***')
+        if len(this_transducer.index)==1:
+            this_transducer = this_transducer.iloc[0].to_dict()
+            tr = obspy.Trace()
+            tr.id = this_transducer['id']
+            tr.stats.starttime = utc_startt
+            tr.stats.delta = dt  
+            tr.data = np.array(df[col])           
+            print(f"sampling rate = {tr.stats.sampling_rate}")
+            if int(tr.stats.sampling_rate)==20:
+                if tr.stats.channel[0]=='H':
+                    tr.stats.channel="B%s" % tr.stats.channel[1:]
+            if int(tr.stats.sampling_rate)==1:
+                if tr.stats.channel[0]=='H' or tr.stats.channel[0]=='B':
+                    tr.stats.channel="L%s" % tr.stats.channel[1:]
+            #print(tr)
+            st.append(tr)
+    print('Final Stream object to write')
+    print(st)
+    sdsobj.stream = st
+    successful = sdsobj.write()
+    if successful:
+        print("Wrote whole Stream object to SDS")
+    else: 
+        print("Failed to write entire Stream object:")
+        print(df)
+    return successful
+
+
+def convert2sds_badfile(df, sdsobj, transducersDF): # I think df here is supposed to be from a single picklefile
+    # NEED TO MODIFY THIS TO DEAL WITH TIME SKIPS
+    # No time skip should be more than half a sample.
+    # Backward slips are harder to deal with, since time will overlap. Overwrite previous samples when that happens.
+
+    # get rid of anything not within 4 hours of last row
+    d = pd.to_datetime(df['TIMESTAMP'])
+    df2 = df[ d > d[d.size-1]-pd.Timedelta(hours=4) ]
+    good_i = range(len(df2)+1)
+    
+    # find correct dt using mode
+    t = np.array([obspy.UTCDateTime(df.iloc[i]['TIMESTAMP']) for i in range(len(df2))])
+    dt_array = np.diff(t)
+    dt = pd.Series(dt_array).mode()[0]
+
+    # Now we have expected dt, we need to check ...
+    #good_i = range(len(dt_list)+1) # last row always assumed good
+    bad_i = []
+    for i in good_i:
+        if i==0:
+            continue
+        this_dt = dt[i] 
+        
+        in enumerate(dt_list):
+        if this_dt < 0:
+            # time slipped backwards
+            # note: this_dt = t[i+1] - t[i]
+            # find the values of t for which overlap occurs
+            bool_i = t[0:i] > t[i+1]
+            bad_i = bad_i + np.where(bool_i)[0]
+        elif this_dt < dt/2:
+            # basically a repeated sample time
+            if i>0:
+                dt2  = dt_array[i] + dt_array[i-1]
+                if dt2 == 2 * dt
+                    bad_i = bad_i.append(i+1)
+        elif this_dt > dt*3/2:
+            # not sure we need to do anything for this. might mean 1 or more samples missed, but does that matter?
+    
+    # get final list of good rows        
+    bad_i = list(set(bad_i))
+    for this_i in bad_i:
+        good_i.remove(this_i)
+    t = t[good_i]
+    df3 = df2[good_i]
+
+    # now all times should be ascending. Resample.
+    if dt == 0.01:
+        resampStr = '10ms'
+    elif dt == 0.05:
+        resampleStr = '50ms'
+    elif dt = 1.0:
+        resampleStr = '1s'
+    df3['datetime'] = pd.to_datetime(df3['TIMESTAMP']) 
+    df3.set_index('datetime')
+    df4 = df3.resample(resampStr).asfreq()
+    df4.reset_index(drop=True) # datetime index gone
+
+    local_startt = obspy.UTCDateTime(df4.iloc[0]['TIMESTAMP'])
+    utc_startt = localtime2utc(local_startt)
+    if utc_startt > obspy.UTCDateTime():
+        return
+    print('local ', local_startt, '-> UTC ', utc_startt)                
+            
+    st = obspy.Stream()      
+    for col in df4.columns[2:]:
+        print('Processing column %s' % col)
+        this_transducer = transducersDF[(transducersDF['serial']) == col]
+        print('***')
+        print(this_transducer)
+        print('***')
+        if len(this_transducer.index)==1:
+            this_transducer = this_transducer.iloc[0].to_dict()
+            tr = obspy.Trace()
+            tr.id = this_transducer['id']
+            tr.stats.starttime = utc_startt
+            tr.stats.delta = dt  
+            tr.data = np.array(df[col])           
+            print(f"sampling rate = {tr.stats.sampling_rate}")
+            if int(tr.stats.sampling_rate)==20:
+                if tr.stats.channel[0]=='H':
+                    tr.stats.channel="B%s" % tr.stats.channel[1:]
+            if int(tr.stats.sampling_rate)==1:
+                if tr.stats.channel[0]=='H' or tr.stats.channel[0]=='B':
+                    tr.stats.channel="L%s" % tr.stats.channel[1:]
+            #print(tr)
+            st.append(tr)
+    print('Final Stream object to write')
+    print(st)
+    sdsobj.stream = st
+    successful = sdsobj.write()
+    if successful:
+        print("Wrote whole Stream object to SDS")
+    else: 
+        print("Failed to write entire Stream object:")
+        print(df)
+    return successful
+    
