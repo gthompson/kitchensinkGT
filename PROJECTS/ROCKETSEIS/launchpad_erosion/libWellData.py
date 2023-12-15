@@ -1,7 +1,7 @@
 # Library for converting Well data from CS to pickle files & MiniSEED
 
 import numpy as np
-from obspy import UTCDateTime
+from obspy import UTCDateTime, Stream, Trace
 
 # Define phase 2 lookup table & conversions
 # From "2022-12-03_ Field Sheet for Deployment of Groundwater Equipment at NASA_Part_II.pdf" 
@@ -221,7 +221,7 @@ def correct_csvfiles(csvfiles, paths, converted_by_LoggerNet=True, MAXFILES=None
         print('File %d of %d: %s' % ((filenum+1), MAXFILES, rawcsvfile))
         dirname = os.path.basename(os.path.dirname(rawcsvfile))
         uploaddir = os.path.basename(os.path.dirname(os.path.dirname(rawcsvfile)))
-        correctedcsvfile = os.path.join(paths['CORRECTED'], "%s.%s.%s" % (os.path.basename(uploaddir), dirname, csvbase))
+        correctedcsvfile = os.path.join("%s.%s.%s" % (os.path.basename(uploaddir), dirname, csvbase))
         if os.path.isfile(correctedcsvfile) & keep_existing:
             print('- Already DONE')
             df2 = pd.read_csv(correctedcsvfile)
@@ -319,18 +319,18 @@ def removed_unnamed_columns(df):
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     return df
 
-def convert2sds(df, sdsobj, transducersDF): # I think df here is supposed to be from a single picklefile
+def convert2sds(df, sdsobj, transducersDF, dryrun=False): # I think df here is supposed to be from a single picklefile
     #print('***')
     #print(df.columns)  
     #print('***')  
-    local_startt = obspy.UTCDateTime(df.iloc[0]['TIMESTAMP'])
-    nextt = obspy.UTCDateTime(df.iloc[1]['TIMESTAMP'])
+    local_startt = UTCDateTime(df.iloc[0]['TIMESTAMP'])
+    nextt = UTCDateTime(df.iloc[1]['TIMESTAMP'])
     dt = nextt-local_startt
     utc_startt = localtime2utc(local_startt)
-    if utc_startt > obspy.UTCDateTime():
+    if utc_startt > UTCDateTime():
         return
     print('local ', local_startt, '-> UTC ', utc_startt)
-    st = obspy.Stream()    
+    st = Stream()    
     #print('***')
     #print(df.columns)    
     for col in df.columns[2:]:
@@ -341,7 +341,7 @@ def convert2sds(df, sdsobj, transducersDF): # I think df here is supposed to be 
         print('***')
         if len(this_transducer.index)==1:
             this_transducer = this_transducer.iloc[0].to_dict()
-            tr = obspy.Trace()
+            tr = Trace()
             tr.id = this_transducer['id']
             tr.stats.starttime = utc_startt
             tr.stats.delta = dt  
@@ -357,20 +357,28 @@ def convert2sds(df, sdsobj, transducersDF): # I think df here is supposed to be 
             st.append(tr)
     print('Final Stream object to write')
     print(st)
-    sdsobj.stream = st
-    successful = sdsobj.write()
-    if successful:
-        print("Wrote whole Stream object to SDS")
-    else: 
-        print("Failed to write entire Stream object:")
-        print(df)
-    return successful
+    if dryrun:
+        return False
+    else:
+        sdsobj.stream = st
+        successful = sdsobj.write()
+        if successful:
+            print("Wrote whole Stream object to SDS")
+        else: 
+            print("Failed to write entire Stream object:")
+            print(df)
+        return successful
 
 
-def convert2sds_badfile(df, sdsobj, transducersDF): # I think df here is supposed to be from a single picklefile
+def convert2sds_badfile(df, sdsobj, transducersDF, dryrun=False): # I think df here is supposed to be from a single picklefile
     # NEED TO MODIFY THIS TO DEAL WITH TIME SKIPS
     # No time skip should be more than half a sample.
     # Backward slips are harder to deal with, since time will overlap. Overwrite previous samples when that happens.
+
+    if dryrun:
+        mseeddirname = os.path.join(sdsobj.topdir, 'well_mseed')
+        if not os.path.isdir(mseeddirname):
+            os.makedirs(mseeddirname)
 
     # get rid of anything not within 4 hours of last row
     d = pd.to_datetime(df['TIMESTAMP'])
@@ -378,7 +386,7 @@ def convert2sds_badfile(df, sdsobj, transducersDF): # I think df here is suppose
     good_i = range(len(df2)+1)
     
     # find correct dt using mode
-    t = np.array([obspy.UTCDateTime(df.iloc[i]['TIMESTAMP']) for i in range(len(df2))])
+    t = np.array([UTCDateTime(df.iloc[i]['TIMESTAMP']) for i in range(len(df2))])
     dt_array = np.diff(t)
     dt = pd.Series(dt_array).mode()[0]
 
@@ -389,8 +397,6 @@ def convert2sds_badfile(df, sdsobj, transducersDF): # I think df here is suppose
         if i==0:
             continue
         this_dt = dt[i] 
-        
-        in enumerate(dt_list):
         if this_dt < 0:
             # time slipped backwards
             # note: this_dt = t[i+1] - t[i]
@@ -401,11 +407,12 @@ def convert2sds_badfile(df, sdsobj, transducersDF): # I think df here is suppose
             # basically a repeated sample time
             if i>0:
                 dt2  = dt_array[i] + dt_array[i-1]
-                if dt2 == 2 * dt
+                if dt2 == 2 * dt:
                     bad_i = bad_i.append(i+1)
         elif this_dt > dt*3/2:
             # not sure we need to do anything for this. might mean 1 or more samples missed, but does that matter?
-    
+            pass
+            
     # get final list of good rows        
     bad_i = list(set(bad_i))
     for this_i in bad_i:
@@ -418,20 +425,20 @@ def convert2sds_badfile(df, sdsobj, transducersDF): # I think df here is suppose
         resampStr = '10ms'
     elif dt == 0.05:
         resampleStr = '50ms'
-    elif dt = 1.0:
+    elif dt == 1.0:
         resampleStr = '1s'
     df3['datetime'] = pd.to_datetime(df3['TIMESTAMP']) 
     df3.set_index('datetime')
     df4 = df3.resample(resampStr).asfreq()
     df4.reset_index(drop=True) # datetime index gone
 
-    local_startt = obspy.UTCDateTime(df4.iloc[0]['TIMESTAMP'])
+    local_startt = UTCDateTime(df4.iloc[0]['TIMESTAMP'])
     utc_startt = localtime2utc(local_startt)
-    if utc_startt > obspy.UTCDateTime():
+    if utc_startt > UTCDateTime():
         return
     print('local ', local_startt, '-> UTC ', utc_startt)                
             
-    st = obspy.Stream()      
+    st = Stream()      
     for col in df4.columns[2:]:
         print('Processing column %s' % col)
         this_transducer = transducersDF[(transducersDF['serial']) == col]
@@ -440,7 +447,7 @@ def convert2sds_badfile(df, sdsobj, transducersDF): # I think df here is suppose
         print('***')
         if len(this_transducer.index)==1:
             this_transducer = this_transducer.iloc[0].to_dict()
-            tr = obspy.Trace()
+            tr = Trace()
             tr.id = this_transducer['id']
             tr.stats.starttime = utc_startt
             tr.stats.delta = dt  
@@ -456,12 +463,19 @@ def convert2sds_badfile(df, sdsobj, transducersDF): # I think df here is suppose
             st.append(tr)
     print('Final Stream object to write')
     print(st)
-    sdsobj.stream = st
-    successful = sdsobj.write()
-    if successful:
-        print("Wrote whole Stream object to SDS")
-    else: 
-        print("Failed to write entire Stream object:")
-        print(df)
-    return successful
+    
+    if dryrun:
+        for tr in st:
+            mseedfilename = os.path.join(mseeddirname, '%s.%s.%s.ms' % (tr.id, tr.stats.starttime.strftime('%Y%m%d_%H%M%S'), tr.stats.endtime.strftime('%H%M%S') ) )
+            tr.write(mseedfilename, format='MSEED')
+        return True
+    else:
+        sdsobj.stream = st
+        successful = sdsobj.write()
+        if successful:
+            print("Wrote whole Stream object to SDS")
+        else: 
+            print("Failed to write entire Stream object:")
+            print(df)
+        return successful
     
