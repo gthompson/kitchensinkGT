@@ -1,7 +1,8 @@
 # Library for converting Well data from CS to pickle files & MiniSEED
-
 import numpy as np
 from obspy import UTCDateTime, Stream, Trace
+import os
+import pandas as pd
 
 # Define phase 2 lookup table & conversions
 # From "2022-12-03_ Field Sheet for Deployment of Groundwater Equipment at NASA_Part_II.pdf" 
@@ -175,15 +176,10 @@ def compute_psi(dig, d):
     return psi
 
 def psi2pascals(psi):
-    psi2kPa = 6.894757
-    Pa = psi * psi2kPa * 1000
-    return Pa
+    return psi * 6894.76
 
-def psi2depthmetres(psi):
-    psi2kPa = 6.894757
-    kPa2mH20 = 0.101974
-    mH20 = psi * psi2kPa * kPa2mH20
-    return mH20
+def psi2feet(psi):
+    return 2.31 * psi
 
 def localtime2utc(this_dt):
     hours = 4
@@ -334,11 +330,11 @@ def convert2sds(df, sdsobj, transducersDF, dryrun=False): # I think df here is s
     #print('***')
     #print(df.columns)    
     for col in df.columns[2:]:
-        print('Processing column %s' % col)
+        #print('Processing column %s' % col)
         this_transducer = transducersDF[(transducersDF['serial']) == col]
-        print('***')
-        print(this_transducer)
-        print('***')
+        #print('***')
+        #print(this_transducer)
+        #print('***')
         if len(this_transducer.index)==1:
             this_transducer = this_transducer.iloc[0].to_dict()
             tr = Trace()
@@ -369,6 +365,16 @@ def convert2sds(df, sdsobj, transducersDF, dryrun=False): # I think df here is s
             print(df)
         return successful
 
+def remove_overlaps(a):
+    c = np.where(np.diff(a) <= 0)[0]
+    bad_i = []
+    for d in c:
+        bool_i = a[0:d] >= a[d+1]
+        new_bad_i = list(np.where(bool_i)[0] ) 
+        new_bad_i.append(d)
+        bad_i = bad_i + new_bad_i
+    return list(set(bad_i))
+
 
 def convert2sds_badfile(df, sdsobj, transducersDF, dryrun=False): # I think df here is supposed to be from a single picklefile
     # NEED TO MODIFY THIS TO DEAL WITH TIME SKIPS
@@ -380,71 +386,67 @@ def convert2sds_badfile(df, sdsobj, transducersDF, dryrun=False): # I think df h
         if not os.path.isdir(mseeddirname):
             os.makedirs(mseeddirname)
 
+    print('df original length: ', len(df))
+
     # get rid of anything not within 4 hours of last row
     d = pd.to_datetime(df['TIMESTAMP'])
     df2 = df[ d > d[d.size-1]-pd.Timedelta(hours=4) ]
-    good_i = range(len(df2)+1)
+    #good_i = [i for i in range(len(df2))]
+    print('df2 original length: ', len(df2))
     
     # find correct dt using mode
-    t = np.array([UTCDateTime(df.iloc[i]['TIMESTAMP']) for i in range(len(df2))])
+    t = np.array( [UTCDateTime(df2.iloc[i]['TIMESTAMP']).timestamp for i in range(len(df2)) ])
     dt_array = np.diff(t)
-    dt = pd.Series(dt_array).mode()[0]
+    dt = np.median(dt_array)
+    #dt_series = pd.Series(dt_array)
+    #print(dt_series.describe())
+    #dt = dt_series.mode()[0]
+
+    # maybe we only care about times where t slipped backwards?
+    # if it goes forward, do we care?
+    # do we insert interpolate onto regular sampling?
+    # so just generate a list of -ve diffs
+    # then process each of those to discover overlaps
 
     # Now we have expected dt, we need to check ...
     #good_i = range(len(dt_list)+1) # last row always assumed good
-    bad_i = []
-    for i in good_i:
-        if i==0:
-            continue
-        this_dt = dt[i] 
-        if this_dt < 0:
-            # time slipped backwards
-            # note: this_dt = t[i+1] - t[i]
-            # find the values of t for which overlap occurs
-            bool_i = t[0:i] > t[i+1]
-            bad_i = bad_i + np.where(bool_i)[0]
-        elif this_dt < dt/2:
-            # basically a repeated sample time
-            if i>0:
-                dt2  = dt_array[i] + dt_array[i-1]
-                if dt2 == 2 * dt:
-                    bad_i = bad_i.append(i+1)
-        elif this_dt > dt*3/2:
-            # not sure we need to do anything for this. might mean 1 or more samples missed, but does that matter?
-            pass
-            
-    # get final list of good rows        
-    bad_i = list(set(bad_i))
-    for this_i in bad_i:
-        good_i.remove(this_i)
-    t = t[good_i]
-    df3 = df2[good_i]
+    bad_i = remove_overlaps(t)     
+    print('bad_i length: ', len(bad_i))
+    df2 = df2.drop(df2.index[bad_i]) 
+    print('df2 new length: ', len(df2))
+    del t
 
-    # now all times should be ascending. Resample.
-    if dt == 0.01:
-        resampStr = '10ms'
-    elif dt == 0.05:
+    # now all times should be ascending. Resample.#
+    if dt > 0.0099 and dt < 0.0101:
+        resampleStr = '10ms'
+    elif dt > 0.0499 and dt < 0.0501:
         resampleStr = '50ms'
-    elif dt == 1.0:
+    elif dt > 0.999 and dt < 1.001:
         resampleStr = '1s'
-    df3['datetime'] = pd.to_datetime(df3['TIMESTAMP']) 
-    df3.set_index('datetime')
-    df4 = df3.resample(resampStr).asfreq()
-    df4.reset_index(drop=True) # datetime index gone
+    else:
+        print('delta_t not recognized: ', dt)
+        
 
-    local_startt = UTCDateTime(df4.iloc[0]['TIMESTAMP'])
+    df2['datetime'] = pd.to_datetime(df2['TIMESTAMP']) 
+    df2.set_index('datetime', inplace=True)
+
+ 
+    df2_resamp = df2.resample(resampleStr).asfreq()
+    df2_resamp.reset_index(drop=True) # datetime index gone
+
+    local_startt = UTCDateTime(df2_resamp.iloc[0]['TIMESTAMP'])
     utc_startt = localtime2utc(local_startt)
     if utc_startt > UTCDateTime():
         return
-    print('local ', local_startt, '-> UTC ', utc_startt)                
+    print('local ', local_startt, '-> UTC ', utc_startt) 
             
     st = Stream()      
-    for col in df4.columns[2:]:
-        print('Processing column %s' % col)
+    for col in df2_resamp.columns[2:]:
+        #print('Processing column %s' % col)
         this_transducer = transducersDF[(transducersDF['serial']) == col]
-        print('***')
-        print(this_transducer)
-        print('***')
+        #print('***')
+        #print(this_transducer)
+        #print('***')
         if len(this_transducer.index)==1:
             this_transducer = this_transducer.iloc[0].to_dict()
             tr = Trace()
@@ -452,7 +454,7 @@ def convert2sds_badfile(df, sdsobj, transducersDF, dryrun=False): # I think df h
             tr.stats.starttime = utc_startt
             tr.stats.delta = dt  
             tr.data = np.array(df[col])           
-            print(f"sampling rate = {tr.stats.sampling_rate}")
+            #print(f"sampling rate = {tr.stats.sampling_rate}")
             if int(tr.stats.sampling_rate)==20:
                 if tr.stats.channel[0]=='H':
                     tr.stats.channel="B%s" % tr.stats.channel[1:]
@@ -465,9 +467,11 @@ def convert2sds_badfile(df, sdsobj, transducersDF, dryrun=False): # I think df h
     print(st)
     
     if dryrun:
+        print('dryrun')
         for tr in st:
             mseedfilename = os.path.join(mseeddirname, '%s.%s.%s.ms' % (tr.id, tr.stats.starttime.strftime('%Y%m%d_%H%M%S'), tr.stats.endtime.strftime('%H%M%S') ) )
-            tr.write(mseedfilename, format='MSEED')
+            print('SCAFFOLD: writing ',mseedfilename)
+            tr.write(mseedfilename, format='MSEED') #, encoding=5)
         return True
     else:
         sdsobj.stream = st
