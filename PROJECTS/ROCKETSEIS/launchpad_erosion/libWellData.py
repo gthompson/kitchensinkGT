@@ -181,6 +181,9 @@ def psi2pascals(psi):
 def psi2feet(psi):
     return 2.31 * psi
 
+def psi2inches(psi):
+    return 2.31 * psi * 12
+
 def localtime2utc(this_dt):
     hours = 4
     if this_dt>UTCDateTime(2022,11,6,2,0,0):
