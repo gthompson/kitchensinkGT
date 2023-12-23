@@ -486,3 +486,156 @@ def convert2sds_badfile(df, sdsobj, transducersDF, dryrun=False): # I think df h
             print(df)
         return successful
     
+
+def convert2mseed(df, MSEED_DIR, transducersDF): # I think df here is supposed to be from a single picklefile
+    #print('***')
+    #print(df.columns)  
+    #print('***')
+    mseeddirname = os.path.join(MSEED_DIR, 'good')
+    if not os.path.isdir(mseeddirname):
+        os.makedirs(mseeddirname)  
+    local_startt = UTCDateTime(df.iloc[0]['TIMESTAMP'])
+    nextt = UTCDateTime(df.iloc[1]['TIMESTAMP'])
+    dt = nextt-local_startt
+    utc_startt = localtime2utc(local_startt)
+    if utc_startt > UTCDateTime():
+        return
+    print('local ', local_startt, '-> UTC ', utc_startt)
+    st = Stream()    
+    #print('***')
+    #print(df.columns)    
+    for col in df.columns[2:]:
+        #print('Processing column %s' % col)
+        this_transducer = transducersDF[(transducersDF['serial']) == col]
+        #print('***')
+        #print(this_transducer)
+        #print('***')
+        if len(this_transducer.index)==1:
+            this_transducer = this_transducer.iloc[0].to_dict()
+            tr = Trace()
+            tr.id = this_transducer['id']
+            tr.stats.starttime = utc_startt
+            tr.stats.delta = dt  
+            tr.data = np.array(df[col])           
+            print(f"sampling rate = {tr.stats.sampling_rate}")
+            if int(tr.stats.sampling_rate)==20:
+                if tr.stats.channel[0]=='H':
+                    tr.stats.channel="B%s" % tr.stats.channel[1:]
+            if int(tr.stats.sampling_rate)==1:
+                if tr.stats.channel[0]=='H' or tr.stats.channel[0]=='B':
+                    tr.stats.channel="L%s" % tr.stats.channel[1:]
+            #print(tr)
+            st.append(tr)
+    print('Final Stream object to write')
+    print(st)
+    for tr in st:
+        mseedfilename = os.path.join(mseeddirname, '%s.%s.%s.ms' % (tr.id, tr.stats.starttime.strftime('%Y%m%d_%H%M%S'), tr.stats.endtime.strftime('%H%M%S') ) )
+        print('SCAFFOLD: writing ',mseedfilename)
+        tr.write(mseedfilename, format='MSEED') #, encoding=5)
+    
+
+def remove_overlaps(a):
+    c = np.where(np.diff(a) <= 0)[0]
+    bad_i = []
+    for d in c:
+        bool_i = a[0:d] >= a[d+1]
+        new_bad_i = list(np.where(bool_i)[0] ) 
+        new_bad_i.append(d)
+        bad_i = bad_i + new_bad_i
+    return list(set(bad_i))
+
+
+def convert2mseed_badfile(df, MSEED_DIR, transducersDF): # I think df here is supposed to be from a single picklefile
+    # NEED TO MODIFY THIS TO DEAL WITH TIME SKIPS
+    # No time skip should be more than half a sample.
+    # Backward slips are harder to deal with, since time will overlap. Overwrite previous samples when that happens.
+
+    mseeddirname = os.path.join(MSEED_DIR, 'bad')
+    if not os.path.isdir(mseeddirname):
+        os.makedirs(mseeddirname)
+
+    print('df original length: ', len(df))
+
+    # get rid of anything not within 4 hours of last row
+    d = pd.to_datetime(df['TIMESTAMP'])
+    df2 = df[ d > d[d.size-1]-pd.Timedelta(hours=4) ]
+    #good_i = [i for i in range(len(df2))]
+    print('df2 original length: ', len(df2))
+    
+    # find correct dt using mode
+    t = np.array( [UTCDateTime(df2.iloc[i]['TIMESTAMP']).timestamp for i in range(len(df2)) ])
+    dt_array = np.diff(t)
+    dt = np.median(dt_array)
+    #dt_series = pd.Series(dt_array)
+    #print(dt_series.describe())
+    #dt = dt_series.mode()[0]
+
+    # maybe we only care about times where t slipped backwards?
+    # if it goes forward, do we care?
+    # do we insert interpolate onto regular sampling?
+    # so just generate a list of -ve diffs
+    # then process each of those to discover overlaps
+
+    # Now we have expected dt, we need to check ...
+    #good_i = range(len(dt_list)+1) # last row always assumed good
+    bad_i = remove_overlaps(t)     
+    print('bad_i length: ', len(bad_i))
+    df2 = df2.drop(df2.index[bad_i]) 
+    print('df2 new length: ', len(df2))
+    del t
+
+    # now all times should be ascending. Resample.#
+    if dt > 0.0099 and dt < 0.0101:
+        resampleStr = '10ms'
+    elif dt > 0.0499 and dt < 0.0501:
+        resampleStr = '50ms'
+    elif dt > 0.999 and dt < 1.001:
+        resampleStr = '1s'
+    else:
+        print('delta_t not recognized: ', dt)
+        
+
+    df2['datetime'] = pd.to_datetime(df2['TIMESTAMP']) 
+    df2.set_index('datetime', inplace=True)
+
+ 
+    df2_resamp = df2.resample(resampleStr).asfreq()
+    df2_resamp.reset_index(drop=True) # datetime index gone
+
+    local_startt = UTCDateTime(df2_resamp.iloc[0]['TIMESTAMP'])
+    utc_startt = localtime2utc(local_startt)
+    if utc_startt > UTCDateTime():
+        return
+    print('local ', local_startt, '-> UTC ', utc_startt) 
+            
+    st = Stream()      
+    for col in df2_resamp.columns[2:]:
+        #print('Processing column %s' % col)
+        this_transducer = transducersDF[(transducersDF['serial']) == col]
+        #print('***')
+        #print(this_transducer)
+        #print('***')
+        if len(this_transducer.index)==1:
+            this_transducer = this_transducer.iloc[0].to_dict()
+            tr = Trace()
+            tr.id = this_transducer['id']
+            tr.stats.starttime = utc_startt
+            tr.stats.delta = dt  
+            tr.data = np.array(df[col])           
+            #print(f"sampling rate = {tr.stats.sampling_rate}")
+            if int(tr.stats.sampling_rate)==20:
+                if tr.stats.channel[0]=='H':
+                    tr.stats.channel="B%s" % tr.stats.channel[1:]
+            if int(tr.stats.sampling_rate)==1:
+                if tr.stats.channel[0]=='H' or tr.stats.channel[0]=='B':
+                    tr.stats.channel="L%s" % tr.stats.channel[1:]
+            #print(tr)
+            st.append(tr)
+    print('Final Stream object to write')
+    print(st)
+    
+    for tr in st:
+        mseedfilename = os.path.join(mseeddirname, '%s.%s.%s.ms' % (tr.id, tr.stats.starttime.strftime('%Y%m%d_%H%M%S'), tr.stats.endtime.strftime('%H%M%S') ) )
+        print('SCAFFOLD: writing ',mseedfilename)
+        tr.write(mseedfilename, format='MSEED') #, encoding=5)
+ 
