@@ -528,11 +528,8 @@ def convert2mseed(df, MSEED_DIR, transducersDF): # I think df here is supposed t
             st.append(tr)
     print('Final Stream object to write')
     print(st)
-    for tr in st:
-        mseedfilename = os.path.join(mseeddirname, '%s.%s.%s.ms' % (tr.id, tr.stats.starttime.strftime('%Y%m%d_%H%M%S'), tr.stats.endtime.strftime('%H%M%S') ) )
-        print('SCAFFOLD: writing ',mseedfilename)
-        tr.write(mseedfilename, format='MSEED') #, encoding=5)
     
+    return stream2miniseed(st, mseeddirname)
 
 def remove_overlaps(a):
     c = np.where(np.diff(a) <= 0)[0]
@@ -633,9 +630,18 @@ def convert2mseed_badfile(df, MSEED_DIR, transducersDF): # I think df here is su
             st.append(tr)
     print('Final Stream object to write')
     print(st)
-    
+    return stream2miniseed(st, mseeddirname)
+
+def stream2miniseed(st, mseeddirname):
+    successful = True
     for tr in st:
-        mseedfilename = os.path.join(mseeddirname, '%s.%s.%s.ms' % (tr.id, tr.stats.starttime.strftime('%Y%m%d_%H%M%S'), tr.stats.endtime.strftime('%H%M%S') ) )
+        mseedfilename = os.path.join(mseeddirname, '%s.%s.%s.ms' % (tr.id, tr.stats.starttime.strftime('%Y%m%d_%H%M%S'), tr.stats.endtime.strftime('%Y%m%d_%H%M%S') ) )
+        if os.path.isfile(mseedfilename):
+            continue
         print('SCAFFOLD: writing ',mseedfilename)
-        tr.write(mseedfilename, format='MSEED') #, encoding=5)
+        try:
+            tr.write(mseedfilename, format='MSEED') #, encoding=5)
+        except:
+            successful = False	
+    return successful
  

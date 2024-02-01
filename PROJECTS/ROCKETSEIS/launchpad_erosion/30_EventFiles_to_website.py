@@ -8,8 +8,19 @@
 # Segmented event waveform files are saved as MiniSEED to EVENT_WAVEFORMS
 # 
 # 
-from IPython import get_ipython
-get_ipython().run_line_magic('run', 'header.ipynb')
+import header
+paths = header.setup_environment()
+import os
+#import sys
+import glob
+#import numpy as np
+import pandas as pd
+from obspy.core import UTCDateTime, read
+#import FDSNtools
+#import wrappers
+#import SDS
+import libWellData as LLE
+
 HTML_DIR = '/var/www/html/thompsong/KSC_EROSION/EVENTS'
 PNG_DIR = os.path.join(HTML_DIR, 'images')
 EVENT_WAVEFORMS = os.path.join(paths['outdir'], 'EVENTS') # must exist, and Excel file must be here
@@ -95,7 +106,7 @@ def make_index_html(launchesDF):
 </head>
 <body>
 <table border=1>
-<tr><th>Date</th><th>Rocket/Payload</th><th>Launchpad</th><th>Short</th><th>Long</th><th>Strength (um/s)</th></tr>
+<tr><th>Date</th><th>Rocket/Payload</th><th>Launchpad</th><th>Raw</th><th>Short</th><th>Long</th><th>Strength (um/s)</th></tr>
     """    
     for i, row in launchesDF.iterrows():
 
@@ -107,6 +118,11 @@ def make_index_html(launchesDF):
 
         contents0 += f"<tr> <td>{lts_human} ({launchTime.timestamp,} {launchTime.strftime('%j')}) </td> "
         contents0 += f"<td>{row['Rocket_Payload']}</td> <td>{row['SLC']}</td> "
+        rawpng = os.path.join(EVENT_WAVEFORMS, row['rawfile'].replace('.pkl','.png'))
+        if os.path.isfile(rawpng):
+            contents0 += f"<td><a href={rawpng}>raw</a></td> "
+        else:
+            contents0 += "<td>None</td> "
 
         HHZpeak = 0 
         for ext in ['short', 'long']:

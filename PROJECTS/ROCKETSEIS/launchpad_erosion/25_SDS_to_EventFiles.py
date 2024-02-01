@@ -8,13 +8,70 @@
 # Segmented event waveform files are saved as MiniSEED to EVENT_WAVEFORMS
 # 
 # 
-from IPython import get_ipython
-get_ipython().run_line_magic('run', 'header.ipynb')
+#from IPython import get_ipython
+#get_ipython().run_line_magic('run', 'header.ipynb')
+import os
+import header
+paths = header.setup_environment()
+paths['SDS_TOP'] = os.path.join(paths['outdir'], 'SDS')
 HTML_DIR = '/var/www/html/thompsong/KSC_EROSION/EVENTS'
 PNG_DIR = os.path.join(HTML_DIR, 'images')
 EVENT_WAVEFORMS = os.path.join(paths['outdir'], 'EVENTS') # must exist, and Excel file must be here
 csv_launches = os.path.join(paths['outdir'], 'PilotStudy_KSC_Rocket_Launches.csv')
 csv_launches_detected = os.path.join(paths['outdir'], 'PilotStudy_KSC_Rocket_Launches_detected.csv')
+#import glob
+import numpy as np
+import pandas as pd
+from obspy.core import read, Stream, UTCDateTime
+#import FDSNtools
+#import wrappers
+import SDS
+import libWellData as LLE
+
+import libDatascopeGT
+from obspy.clients.filesystem.sds import Client
+def try_different_waveform_loading_methods(thisSDSobj, startt, endt, methods=[1,2,3,4]):
+
+    # Datascope
+    dbpath = os.path.join(paths['outdir'], 'db', f'db{startt.strftime("%Y%m%d")}' )
+    #st1 = libDatascopeGT.db2Stream(dbpath, startt, endt)
+
+    # Direct Miniseed load with ObsPy
+    st2 = libDatascopeGT.mseed2Stream(paths['SDS_TOP'], startt, endt)
+
+    # ObsPy SDS archive reader
+    sdsclient = Client(paths['SDS_TOP'])
+    st3 = sdsclient.get_waveforms("*", "*", "*", "[HDCES]*", startt, endt)
+
+    # My SDS class that wraps ObsPy SDS reader
+    thisSDSobj.read(startt, endt, speed=1)
+    st4 = thisSDSobj.stream
+      
+    #compare_trace_ids(st1, st2, testA=1, testB=2)
+    #compare_trace_ids(st3, st2, testA=3, testB=2)
+    #compare_trace_ids(st4, st2, testA=4, testB=2) 
+    #combine_streams(st2, st1)
+    combine_streams(st2, st3)    
+    combine_streams(st2, st4)
+    return st2
+    
+def combine_streams(stB, stA):
+    appended = False
+    for trA in stA:
+        found = False
+        for trB in stB:
+            if trA.stats.station == trB.stats.station and trA.stats.location == trB.stats.location and trA.stats.channel == trB.stats.channel:
+                if trA.stats.network == '':
+                    trA.stats.network = trB.stats.network
+                if trA.stats.starttime >= trB.stats.starttime and trA.stats.endtime <= trB.stats.endtime:
+                    found = True
+                    break
+        if not found:
+            stB.append(trA)
+            appended = True
+    if appended:
+        stB.merge(method=0, fill_value=0)
+
 
 
 def event_sds2pkl(launchtime, thisSDSobj, EVENT_WAVEFORMS, pretrig=3600, posttrig=3600, overwrite=False):    
@@ -25,9 +82,7 @@ def event_sds2pkl(launchtime, thisSDSobj, EVENT_WAVEFORMS, pretrig=3600, posttri
         print('segmenting %s from SDS' % rawfile) 
         startt = launchtime - pretrig
         endt = launchtime + posttrig
-        thisSDSobj.read(startt, endt, speed=1)
-        st = thisSDSobj.stream
-        st.merge(method=0,fill_value=0)
+        st = try_different_waveform_loading_methods(thisSDSobj, startt, endt, methods=[1,2,3,4])
 
         if len(st)>0:
             try:
@@ -40,15 +95,19 @@ def event_sds2pkl(launchtime, thisSDSobj, EVENT_WAVEFORMS, pretrig=3600, posttri
                         st2.append(tr)
                     except:
                         print('Failed:\n',tr)
-                print(st2)
-                if len(st2)>0:
-                    st2.write(rawfile, format='pickle')
-                #print('Failed to write raw file')
-                #print(st)
-                #rawfile = None
+                st=st2
+                if len(st)>0:
+                    st.write(rawfile, format='pickle')
+                else:
+                    rawfile=None
         else:
             print('Got no data')
             rawfile = None
+    if rawfile:
+        rawpng = os.path.join(PNG_DIR, os.path.basename(rawfile.replace('.pkl','.png')))
+        if not os.path.exists(rawpng):
+            print('creating raw file plot ',rawpng)
+            st.plot(equal_scale=False, outfile=rawpng)
     return rawfile
 
 def clean(st):
@@ -68,7 +127,9 @@ def apply_calibration_correction(st):
             tr.stats['countsPerUnit'] = 1
             if not 'units' in tr.stats:
                 tr.stats['units'] = 'Counts'
-            if tr.stats.network[0] =='6': # well data
+            if tr.stats.station[0].isnumeric(): # well data
+                if len(tr.stats.network)==0:
+                    tr.stats.network = '6'
                 if tr.stats.channel[2] == 'D':
                     tr.stats.countsPerUnit = 1/LLE.psi2inches(1) # counts (psi) per inch
                     tr.stats.units = 'inches'
@@ -169,7 +230,7 @@ def group_streams_for_plotting(st):
 # Read launch data into a DataFrame and generate a list of launch times in Python datetime.datetime format
 
 
-startover = False # starts with original CSV file again
+startover = True # starts with original CSV file again
 if os.path.isfile(csv_launches_detected) and startover==False:
     launchesDF = LLE.removed_unnamed_columns(pd.read_csv(csv_launches_detected, index_col=None))
 else:
@@ -184,24 +245,32 @@ for thisdir in [EVENT_WAVEFORMS, HTML_DIR, PNG_DIR]:
         os.makedirs(thisdir)
 
 if not 'rawfile' in launchesDF.columns:
-    launchesDF['rawfile'] = None
+    launchesDF['rawfile'] = ''
 if not 'corrected_file' in launchesDF.columns: 
-    launchesDF['corrected_file'] = None 
+    launchesDF['corrected_file'] = ''
 if not 'detection_time' in launchesDF.columns:
-    launchesDF['detection_time'] = None 
+    launchesDF['detection_time'] = '' 
 if not 'short_file' in launchesDF.columns:
-    launchesDF['short_file'] = None 
+    launchesDF['short_file'] = ''
 if not 'plotted' in launchesDF.columns:
     launchesDF['plotted'] = False     
 launchesDF.to_csv(csv_launches_detected) 
 
+def check_st(st):
+    print(st)
+    wellst=st.select(network='6*')
+    if len(wellst)>0:
+        plot(equal_scale=False)
+        anykey = input('<Enter> to contine')
 
 # For each launch, segment raw SDS data to multi-trace MiniSEED file in EVENT_WAVEFORMS directory
 thisSDSobj = SDS.SDSobj(paths['SDS_TOP'])
+print(launchesDF)
 for i, row in launchesDF.iterrows():
     launchTime = UTCDateTime(row['Date'])
-    print('Processing launch at %s' % launchTime.strftime('%Y-%m-%d %H:%M:%S'))                        
     if not row['corrected_file']:
+        print('Processing launch at %s' % launchTime.strftime('%Y-%m-%d %H:%M:%S')) 
+        print(row)
         if row['rawfile']:
             rawfile = os.path.join(EVENT_WAVEFORMS, row['rawfile'])
         else:
@@ -218,9 +287,14 @@ for i, row in launchesDF.iterrows():
         print('%s: %d channels' % (rawfile,len(st)))
 
         # all these functions safe for well traces too
+        print(st)
+        st.plot
         clean(st) 
+        print(st)
         apply_calibration_correction(st)
+        print(st)
         remove_spikes(st)
+        print(st)
         
         # write corrected event out
         correctedfile =  os.path.join(EVENT_WAVEFORMS, '%s_long.pkl' % launchTime.strftime('%Y%m%dT%H%M%S'))
@@ -234,7 +308,7 @@ del thisSDSobj
 launchesDF.to_csv(csv_launches_detected) 
 
 
-print('Detecting events')            
+           
 for i, row in launchesDF.iterrows():
     if row['detection_time'] or not startover:
         continue
@@ -263,12 +337,10 @@ launchesDF.to_csv(csv_launches_detected)
 
 
 # Short files
-
-print('Creating short files')
 for i, row in launchesDF.iterrows():                       
     if not row['short_file']:
         launchTime = UTCDateTime(row['Date']) 
-        print('- Processing launch at %s' % launchTime.strftime('%Y-%m-%d %H:%M:%S')) 
+        print('- Creating short file for launch at %s' % launchTime.strftime('%Y-%m-%d %H:%M:%S')) 
         if row['corrected_file']:
             correctedfile =  os.path.join(EVENT_WAVEFORMS, row['corrected_file'])
         else:
@@ -285,7 +357,7 @@ for i, row in launchesDF.iterrows():
         if not assocTime:
             continue
         st_short = st.copy()
-        st_short.filter('highpass', freq=0.1, corners=2)
+        #st_short.filter('highpass', freq=0.1, corners=2)
         st_short.trim(starttime=assocTime-30, endtime=assocTime+150)
         print(st_short)
         if len(st_short)>0:
@@ -301,8 +373,6 @@ launchesDF.to_csv(csv_launches_detected)
 
 
 # Plots
-
-print('Plotting')
 for i, row in launchesDF.iterrows():
     if row['plotted']:
         continue
@@ -327,6 +397,6 @@ for i, row in launchesDF.iterrows():
             if len(stream_group)>0:
                 pngfile = os.path.join(PNG_DIR, '%s_%s_%s.png' % (launchTime.strftime('%Y%m%dT%H%M%S'), station, ext))
                 stream_group.plot(equal_scale=False, outfile=pngfile)
-
+    launchesDF.at[i, 'plotted'] = True
 launchesDF.to_csv(csv_launches_detected)          
 

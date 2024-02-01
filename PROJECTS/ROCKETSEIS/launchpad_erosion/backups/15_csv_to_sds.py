@@ -1,10 +1,18 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from IPython import get_ipython
-
-get_ipython().run_line_magic('run', 'header.ipynb')
-#print(paths)
+import header
+paths = header.setup_environment()
+import os
+#import sys
+#import glob
+#import numpy as np
+import pandas as pd
+#from obspy.core import read, Stream, UTCDateTime
+#import FDSNtools
+#import wrappers
+import SDS
+import libWellData as LLE
 
 dryrun = False
 
