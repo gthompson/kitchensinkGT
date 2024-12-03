@@ -13,7 +13,7 @@ import math
 
 class SAM:
 
-    def __init__(self, dataframes=None, stream=None, sampling_interval=60.0, filter=[0.5, 18.0], bands = {'VLP': [0.02, 0.2], 'LP':[0.5, 4.0], 'VT':[4.0, 18.0]}, corners=4, clip=None, verbose=False):
+    def __init__(self, dataframes=None, stream=None, sampling_interval=60.0, filter=[0.5, 18.0], bands = {'VLP': [0.02, 0.2], 'LP':[0.5, 4.0], 'VT':[4.0, 18.0]}, corners=4, clip=None, verbose=False, squash_nans=False):
         ''' Create an SAM object 
         
             Optional name-value pairs:
@@ -27,6 +27,11 @@ class SAM:
                     (e.g. 0.02-0.2 Hz for VLP). If 'LP' and 'VT' are in this dictionary, an extra column called 'fratio' will also 
                     be computed, which is the log2 of the ratio of the 'VT' column to the 'LP' column, following the definition of
                     frequency ratio by Rodgers et al. (2015).
+                corners: number of corners to use in filters
+                clip: [min, max] level to use for clipping data. default: None
+                verbose: default False
+                squash_nans: new behaviour is that if any time window contains a NaN, the whole time window for all metrics will be NaN.
+                             if squash_nans=True, then old behaviour restored, where NaNs stripped before computing each metric by using nan-aware averaging functions
         '''
         self.dataframes = {} 
 
@@ -101,26 +106,40 @@ class SAM:
                 if clip:
                     tr2.data = np.clip(tr2.data, a_max=clip, a_min=-clip)    
                 tr2.filter('bandpass', freqmin=filter[0], freqmax=filter[1], corners=corners)
-                y = self.reshape_trace_data(np.absolute(tr2.data), sampling_rate, sampling_interval)
+                y = tr2.data
+                #y = self.reshape_trace_data(np.absolute(tr2.data), sampling_rate, sampling_interval)
             else:
-                y = self.reshape_trace_data(np.absolute(tr.data), sampling_rate, sampling_interval)
+                y = tr.data
+            y = y.astype('float')
+            y[y == 0.0] = np.nan
+            y = self.reshape_trace_data(np.absolute(y), sampling_rate, sampling_interval)
 
-            df['min'] = pd.Series(np.nanmin(y,axis=1))   
-            df['mean'] = pd.Series(np.nanmean(y,axis=1)) 
-            df['max'] = pd.Series(np.nanmax(y,axis=1))
-            df['median'] = pd.Series(np.nanmedian(y,axis=1))
-            df['rms'] = pd.Series(np.nanstd(y,axis=1))
-
+            if squash_nans:
+                df['min'] = pd.Series(np.nanmin(y,axis=1))   
+                df['mean'] = pd.Series(np.nanmean(y,axis=1)) 
+                df['max'] = pd.Series(np.nanmax(y,axis=1))
+                df['median'] = pd.Series(np.nanmedian(y,axis=1))
+                df['rms'] = pd.Series(np.nanstd(y,axis=1))
+            else:
+                df['min'] = pd.Series(np.min(y,axis=1))   
+                df['mean'] = pd.Series(np.mean(y,axis=1)) 
+                df['max'] = pd.Series(np.max(y,axis=1))
+                df['median'] = pd.Series(np.median(y,axis=1))
+                df['rms'] = pd.Series(np.std(y,axis=1))
             if bands:
                 for key in bands:
                     tr2 = tr.copy()
                     [flow, fhigh] = bands[key]
                     tr2.filter('bandpass', freqmin=flow, freqmax=fhigh, corners=corners)
-                    y = self.reshape_trace_data(abs(tr2.data), sampling_rate, sampling_interval)
-                    df[key] = pd.Series(np.nanmean(y,axis=1))
+                    y = self.reshape_trace_data(np.absolute(tr2.data), sampling_rate, sampling_interval)
+                    if squash_nans:
+                        df[key] = pd.Series(np.nanmean(y,axis=1))
+                    else:
+                        df[key] = pd.Series(np.mean(y,axis=1))
                 if 'LP' in bands and 'VT' in bands:
                     df['fratio'] = np.log2(df['VT']/df['LP'])
-  
+
+            df.replace(0.0, np.nan, inplace=True)
             self.dataframes[tr.id] = df
 
     
@@ -170,9 +189,13 @@ class SAM:
             old_sampling_interval = self.get_sampling_interval(df)
             if new_sampling_interval > old_sampling_interval:
                 freq = '%.0fmin' % (new_sampling_interval/60)
-                new_df = df.groupby(pd.Grouper(key='date', freq=freq)).mean()
-                new_df.reset_index(drop=True)
-                dataframes[id] = new_df
+                try:
+                    new_df = df.groupby(pd.Grouper(key='date', freq=freq)).mean()
+                    new_df.reset_index(drop=True)
+                except:
+                    print(f'Could not downsample dataframe for {id}')
+                else:
+                    dataframes[id] = new_df
             else:
                 print('Cannot downsample to a smaller sampling interval')
         return self.__class__(dataframes=dataframes) 
@@ -277,7 +300,7 @@ class SAM:
             plt.close('all')
 
     @classmethod
-    def read(classref, startt, endt, SAM_DIR, trace_ids=None, sampling_interval=60, ext='pickle'):
+    def read(classref, startt, endt, SAM_DIR, trace_ids=None, network='*', sampling_interval=60, ext='pickle', verbose=False):
         ''' read one or many SAM files from folder specified by SAM_DIR for date/time range specified by startt, endt
             return corresponding SAM object
 
@@ -285,6 +308,7 @@ class SAM:
 
             Optional name-value pairs:
                 trace_ids (list): only load SAM files corresponding to these trace IDs.
+                network (str): only load SAM files matching this network code. Ignored if trace_ids given.
                 sampling_interval (int): seconds of raw seismic data corresponding to each SAM sample. Default: 60
                 ext (str): should be 'csv' or 'pickle' (default). Indicates what type of file format to open.
 
@@ -295,11 +319,12 @@ class SAM:
         if not trace_ids: # make a list of possible trace_ids, regardless of year
             trace_ids = []
             for year in range(startt.year, endt.year+1):
-                samfilepattern = classref.get_filename(SAM_DIR, '*', year, sampling_interval, ext)
-                print(samfilepattern)
+                samfilepattern = classref.get_filename(SAM_DIR, network, year, sampling_interval, ext)
+                #print(samfilepattern)
                 samfiles = glob.glob(samfilepattern)
                 if len(samfiles)==0:
-                    print(f'No files found matching {samfilepattern}')
+                    if verbose:
+                        print(f'No files found matching {samfilepattern}')
                 #samfiles = glob.glob(os.path.join(SAM_DIR,'SAM_*_[0-9][0-9][0-9][0-9]_%ds.%s' % (sampling_interval, ext )))
                 for samfile in samfiles:
                     parts = samfile.split('_')
@@ -313,7 +338,8 @@ class SAM:
                 samfile = classref.get_filename(SAM_DIR, id, yyyy, sampling_interval, ext)
                 #samfile = os.path.join(SAM_DIR,'SAM_%s_%4d_%ds.%s' % (id, yyyy, sampling_interval, ext))
                 if os.path.isfile(samfile):
-                    print('Reading ',samfile)
+                    if verbose:
+                        print('Reading ',samfile)
                     if ext=='csv':
                         df = pd.read_csv(samfile, index_col=False)
                     elif ext=='pickle':
@@ -490,6 +516,7 @@ class SAM:
                 tr.stats.delta = self.get_sampling_interval(df)
                 tr.stats.starttime = obspy.core.UTCDateTime(df.iloc[0]['time'])
                 tr.id = key
+                print(min(tr.data))
                 if tr.data.size - np.count_nonzero(np.isnan(tr.data)):
                     st.append(tr)
                 
@@ -522,16 +549,13 @@ class SAM:
         if not keep_empty:
             self.__remove_empty()
         
-    def write(self, SAM_DIR, ext='pickle', overwrite=False):
+    def write(self, SAM_DIR, ext='pickle', overwrite=False, verbose=False):
         ''' Write SAM object to CSV or Pickle files (one per net.sta.loc.chan, per year) into folder specified by SAM_DIR
 
             Optional name-value pairs:
                 ext: Should be 'csv' or 'pickle' (default). Specifies what file format to save each DataFrame.   
         '''
         print('write')
-        #print(self)
-        if not os.path.isdir(SAM_DIR):
-            os.makedirs(SAM_DIR)
         for id in self.dataframes:
             df = self.dataframes[id]
             if df.empty:
@@ -539,26 +563,46 @@ class SAM:
             starttime = df.iloc[0]['time']
             yyyy = obspy.core.UTCDateTime(starttime).year
             samfile = self.get_filename(SAM_DIR, id, yyyy, self.get_sampling_interval(df), ext)
-            #samfile = os.path.join(SAM_DIR,'SAM_%s_%4d_%ds.%s' % (id, yyyy, self.get_sampling_interval(df), ext))
-            print(samfile)
-            if os.path.isfile(samfile):# and not overwrite:
-            #if os.path.isfile(samfile) and not overwrite:
+            samdir = os.path.dirname(samfile)
+            if not os.path.isdir(samdir):
+                os.makedirs(samdir)
+            if os.path.isfile(samfile): # COMBINE
                 if ext=='csv':
                     original_df = pd.read_csv(samfile)
                 elif ext=='pickle':
                     original_df = pd.read_pickle(samfile)
-                # SCAFFOLD: should check if SAM data already exist in file for the DataFrame time range.
-                # Currently just combining and dropping duplicates without much thought. maybe ok?
+                if not overwrite: # DO NOT COMBINE IF WE ALREADY HAVE DATA FOR THIS TIMEWINDOW
+                    endtime = df.iloc[-1]['time']
+                    if endtime > starttime:
+                        original_df['pddatetime'] = pd.to_datetime(original_df['time'], unit='s')
+                        # construct Boolean mask
+                        try:
+                            mask = original_df['pddatetime'].between(starttime.isoformat(), endtime.isoformat())
+                        except:
+                            # something went wrong. just try to combine
+                            pass
+                        else:
+                            # apply Boolean mask
+                            subset_df = original_df[mask]
+                            subset_df = subset_df.drop(columns=['pddatetime'])
+                            original_df.drop(columns=['pddatetime'])
+                            if len(subset_df)>=len(df):
+                                # skip combining
+                                continue
+                    else:
+                        # skip combining
+                        continue
+
+                # COMBINING HERE
                 combined_df = pd.concat([original_df, df], ignore_index=True)
                 combined_df = combined_df.drop_duplicates(subset=['time'], keep='last') # overwrite duplicate data
-                print(f'Modifying {samfile}')
-                #combined_df['datetime'] = [obspy.UTCDateTime(t).datetime for t in combined_df['time']]
-                #print(combined_df)                
+                print(f'Modifying {samfile}')             
                 if ext=='csv':
                     combined_df.to_csv(samfile, index=False)
                 elif ext=='pickle':
                     combined_df.to_pickle(samfile)
-            else:
+                    
+            else: # WRITE FOR FIRST TIME
                 # SCAFFOLD: do i need to create a blank file here for whole year? probably not because smooth() is date-aware
                 print(f'Writing {samfile}')
                 if ext=='csv':
@@ -579,7 +623,8 @@ class SAM:
     
     @staticmethod
     def get_filename(SAM_DIR, id, year, sampling_interval, ext, name='RSAM'):
-	    return os.path.join(SAM_DIR,'%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))
+        network = id.split('.')[0]
+        return os.path.join(SAM_DIR, name, network, '%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))
 
     @staticmethod
     def __get_npts(df):
@@ -676,7 +721,7 @@ class RSAM(SAM):
         
     @staticmethod
     def get_filename(SAM_DIR, id, year, sampling_interval, ext, name='RSAM'):
-	    return os.path.join(SAM_DIR,'%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))
+        return SAM.get_filename(SAM_DIR, id, year, sampling_interval, ext, name=name)
 
     @classmethod
     def readRSAMbinary(classref, SAM_DIR, station, stime, etime):
@@ -748,7 +793,7 @@ class VSAM(SAM):
 
     @staticmethod
     def get_filename(SAM_DIR, id, year, sampling_interval, ext, name='VSAM'):
-        return os.path.join(SAM_DIR,'%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))
+        return SAM.get_filename(SAM_DIR, id, year, sampling_interval, ext, name=name)
 
     @staticmethod
     def compute_geometrical_spreading_correction(this_distance_km, chan, surfaceWaves=False, wavespeed_kms=2000, peakf=2.0):
@@ -843,7 +888,7 @@ class DSAM(VSAM):
 
     @staticmethod
     def get_filename(SAM_DIR, id, year, sampling_interval, ext, name='DSAM'):
-        return os.path.join(SAM_DIR,'%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))
+        return SAM.get_filename(SAM_DIR, id, year, sampling_interval, ext, name=name)
 
     def compute_reduced_displacement(self, inventory, source, surfaceWaves=False, Q=None, wavespeed_kms=2.0, peakf=None):
         corrected_dataframes = self.reduce(inventory, source, surfaceWaves=surfaceWaves, Q=Q, wavespeed_kms=wavespeed_kms, fixpeakf=peakf)
@@ -1038,7 +1083,7 @@ class VSEM(VSAM):
             
     @staticmethod
     def get_filename(SAM_DIR, id, year, sampling_interval, ext, name='VSEM'):
-        return os.path.join(SAM_DIR,'%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))
+        return SAM.get_filename(SAM_DIR, id, year, sampling_interval, ext, name=name)
 	    
 	    
 
@@ -1062,7 +1107,7 @@ class DR(SAM):
     
     @staticmethod
     def get_filename(SAM_DIR, id, year, sampling_interval, ext, name='DR'):
-	    return os.path.join(SAM_DIR,'%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))
+        return SAM.get_filename(SAM_DIR, id, year, sampling_interval, ext, name=name)
 	    
     def linearplot(st, equal_scale=False, percentile=None, linestyle='-'):
     	hf = st.plot(handle=True, equal_scale=equal_scale, linestyle=linestyle) #, method='full'); # standard ObsPy plot
@@ -1241,25 +1286,25 @@ class DRS(DR):
     
     @staticmethod
     def get_filename(SAM_DIR, id, year, sampling_interval, ext, name='DRS'):
-	    return os.path.join(SAM_DIR,'%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))
+        return SAM.get_filename(SAM_DIR, id, year, sampling_interval, ext, name=name)
 	    
 class VR(DR):
     
     @staticmethod
     def get_filename(SAM_DIR, id, year, sampling_interval, ext, name='VR'):
-	    return os.path.join(SAM_DIR,'%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))
+        return SAM.get_filename(SAM_DIR, id, year, sampling_interval, ext, name=name)
 	    
 class VRS(DR):
     
     @staticmethod
     def get_filename(SAM_DIR, id, year, sampling_interval, ext, name='VRS'):
-	    return os.path.join(SAM_DIR,'%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))	   
+        return SAM.get_filename(SAM_DIR, id, year, sampling_interval, ext, name=name)   
 	    	    
 class ER(DR):
 
     @staticmethod
     def get_filename(SAM_DIR, id, year, sampling_interval, ext, name='ER'):
-	    return os.path.join(SAM_DIR,'%s_%s_%4d_%ds.%s' % (name, id, year, sampling_interval, ext))	   
+        return SAM.get_filename(SAM_DIR, id, year, sampling_interval, ext, name=name)   
        
     def sum_energy(self, startt=None, endt=None, metric='energy', a=-3.2, b=2/3): #, inventory, source):
         st = self.to_stream(metric)
